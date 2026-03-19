@@ -15,7 +15,7 @@ export const LEAD_ORIGINS = [
   { value: "indicacao", label: "Indicação" },
   { value: "ads", label: "Ads" },
   { value: "evento", label: "Evento" },
-  { value: "outbound", label: "Outbound" },
+  { value: "inbound", label: "Inbound" },
   { value: "advisory", label: "Advisory" },
 ] as const;
 

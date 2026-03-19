@@ -24,6 +24,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { BUSINESS_UNITS } from "@/lib/utils/constants";
 import { useCreateProduct, useUpdateProduct } from "@/lib/hooks/use-products";
+import { useUser } from "@/lib/hooks/use-user";
 import type { Product } from "@/lib/hooks/use-products";
 
 const CATEGORIES = [
@@ -66,6 +67,7 @@ interface ProductFormProps {
 }
 
 export const ProductForm = ({ open, onClose, product }: ProductFormProps) => {
+  const { user } = useUser();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
 
@@ -115,7 +117,7 @@ export const ProductForm = ({ open, onClose, product }: ProductFormProps) => {
     if (product) {
       await updateProduct.mutateAsync({ id: product.id, ...payload });
     } else {
-      await createProduct.mutateAsync({ ...payload, org_id: "" });
+      await createProduct.mutateAsync({ ...payload, org_id: user?.org_id ?? "" });
     }
     onClose();
   };

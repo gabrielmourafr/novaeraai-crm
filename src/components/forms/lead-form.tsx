@@ -27,6 +27,7 @@ import { useCreateLead, useUpdateLead } from "@/lib/hooks/use-leads";
 import { usePipelines } from "@/lib/hooks/use-pipelines";
 import { useCompanies } from "@/lib/hooks/use-companies";
 import { useContacts } from "@/lib/hooks/use-contacts";
+import { useUser } from "@/lib/hooks/use-user";
 import type { LeadWithRelations, Lead } from "@/lib/hooks/use-leads";
 
 const leadSchema = z.object({
@@ -60,6 +61,7 @@ export const LeadForm = ({
   defaultPipelineId,
   defaultStageId,
 }: LeadFormProps) => {
+  const { user } = useUser();
   const createLead = useCreateLead();
   const updateLead = useUpdateLead();
   const { data: pipelines } = usePipelines();
@@ -141,7 +143,7 @@ export const LeadForm = ({
     if (lead) {
       await updateLead.mutateAsync({ id: lead.id, ...payload });
     } else {
-      await createLead.mutateAsync({ ...payload, org_id: "" });
+      await createLead.mutateAsync({ ...payload, org_id: user?.org_id ?? "" });
     }
     onClose();
   };

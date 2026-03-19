@@ -24,6 +24,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { COMPANY_SEGMENTS, COMPANY_SIZES } from "@/lib/utils/constants";
 import { useCreateCompany, useUpdateCompany } from "@/lib/hooks/use-companies";
+import { useUser } from "@/lib/hooks/use-user";
 import type { Database } from "@/types/database";
 
 type Company = Database["public"]["Tables"]["companies"]["Row"];
@@ -50,6 +51,7 @@ interface CompanyFormProps {
 }
 
 export const CompanyForm = ({ open, onClose, company }: CompanyFormProps) => {
+  const { user } = useUser();
   const createCompany = useCreateCompany();
   const updateCompany = useUpdateCompany();
 
@@ -107,7 +109,7 @@ export const CompanyForm = ({ open, onClose, company }: CompanyFormProps) => {
     if (company) {
       await updateCompany.mutateAsync({ id: company.id, ...payload });
     } else {
-      await createCompany.mutateAsync({ ...payload, org_id: "" });
+      await createCompany.mutateAsync({ ...payload, org_id: user?.org_id ?? "" });
     }
     onClose();
   };

@@ -29,6 +29,7 @@ import {
 } from "@/lib/hooks/use-proposals";
 import { useLeads, type LeadWithRelations } from "@/lib/hooks/use-leads";
 import { useProducts } from "@/lib/hooks/use-products";
+import { useUser } from "@/lib/hooks/use-user";
 
 const proposalSchema = z.object({
   number: z.string().min(1, "Número é obrigatório"),
@@ -59,6 +60,7 @@ interface Props {
 
 export function ProposalEditor({ proposal }: Props) {
   const router = useRouter();
+  const { user } = useUser();
   const createProposal = useCreateProposal();
   const updateProposal = useUpdateProposal();
   const updateItems = useUpdateProposalItems();
@@ -224,7 +226,7 @@ export function ProposalEditor({ proposal }: Props) {
       router.push(`/proposals/${proposal.id}`);
     } else {
       const result = await createProposal.mutateAsync({
-        proposal: { ...payload, org_id: "" },
+        proposal: { ...payload, org_id: user?.org_id ?? "" },
         items: lineItems,
       });
       const created = result as { id: string };
@@ -248,7 +250,7 @@ export function ProposalEditor({ proposal }: Props) {
       router.push(`/proposals/${proposal.id}`);
     } else {
       const result = await createProposal.mutateAsync({
-        proposal: { ...payload, org_id: "" },
+        proposal: { ...payload, org_id: user?.org_id ?? "" },
         items: lineItems,
       });
       toast.success("Proposta criada e enviada!");

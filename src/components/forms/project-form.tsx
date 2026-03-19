@@ -26,6 +26,7 @@ import { BUSINESS_UNITS, PROJECT_STATUSES } from "@/lib/utils/constants";
 import { useCreateProject, useUpdateProject } from "@/lib/hooks/use-projects";
 import { useCompanies } from "@/lib/hooks/use-companies";
 import { useContacts } from "@/lib/hooks/use-contacts";
+import { useUser } from "@/lib/hooks/use-user";
 import type { Project } from "@/lib/hooks/use-projects";
 
 const projectSchema = z.object({
@@ -51,6 +52,7 @@ interface ProjectFormProps {
 }
 
 export const ProjectForm = ({ open, onClose, project }: ProjectFormProps) => {
+  const { user } = useUser();
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
   const { data: companies } = useCompanies();
@@ -115,7 +117,7 @@ export const ProjectForm = ({ open, onClose, project }: ProjectFormProps) => {
     if (project) {
       await updateProject.mutateAsync({ id: project.id, ...payload });
     } else {
-      await createProject.mutateAsync({ ...payload, org_id: "" });
+      await createProject.mutateAsync({ ...payload, org_id: user?.org_id ?? "" });
     }
     onClose();
   };

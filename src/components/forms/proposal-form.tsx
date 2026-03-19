@@ -28,6 +28,7 @@ import { useCreateProposal, useUpdateProposal } from "@/lib/hooks/use-proposals"
 import { useLeads } from "@/lib/hooks/use-leads";
 import { useCompanies } from "@/lib/hooks/use-companies";
 import { useContacts } from "@/lib/hooks/use-contacts";
+import { useUser } from "@/lib/hooks/use-user";
 import { useProducts } from "@/lib/hooks/use-products";
 import { formatCurrency } from "@/lib/utils/format";
 import type { ProposalWithRelations, Proposal } from "@/lib/hooks/use-proposals";
@@ -61,6 +62,7 @@ interface ProposalFormProps {
 }
 
 export const ProposalForm = ({ open, onClose, proposal }: ProposalFormProps) => {
+  const { user } = useUser();
   const createProposal = useCreateProposal();
   const updateProposal = useUpdateProposal();
   const { data: leads } = useLeads();
@@ -186,7 +188,7 @@ export const ProposalForm = ({ open, onClose, proposal }: ProposalFormProps) => 
       await updateProposal.mutateAsync({ id: proposal.id, ...payload });
     } else {
       await createProposal.mutateAsync({
-        proposal: { ...payload, org_id: "" },
+        proposal: { ...payload, org_id: user?.org_id ?? "" },
         items: lineItems,
       });
     }

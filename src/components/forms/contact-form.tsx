@@ -24,6 +24,7 @@ import {
 import { DECISION_ROLES, LEAD_ORIGINS } from "@/lib/utils/constants";
 import { useCreateContact, useUpdateContact } from "@/lib/hooks/use-contacts";
 import { useCompanies } from "@/lib/hooks/use-companies";
+import { useUser } from "@/lib/hooks/use-user";
 import type { Database } from "@/types/database";
 
 type Contact = Database["public"]["Tables"]["contacts"]["Row"];
@@ -50,6 +51,7 @@ interface ContactFormProps {
 }
 
 export const ContactForm = ({ open, onClose, contact, defaultCompanyId }: ContactFormProps) => {
+  const { user } = useUser();
   const createContact = useCreateContact();
   const updateContact = useUpdateContact();
   const { data: companies } = useCompanies();
@@ -106,7 +108,7 @@ export const ContactForm = ({ open, onClose, contact, defaultCompanyId }: Contac
     if (contact) {
       await updateContact.mutateAsync({ id: contact.id, ...payload });
     } else {
-      await createContact.mutateAsync({ ...payload, org_id: "" });
+      await createContact.mutateAsync({ ...payload, org_id: user?.org_id ?? "" });
     }
     onClose();
   };
