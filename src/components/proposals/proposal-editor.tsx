@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, ArrowLeft, Save, Send } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Save, Send, Paperclip, X, FileText } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -71,6 +71,17 @@ export function ProposalEditor({ proposal }: Props) {
     { product_id: null, name: "", description: "", quantity: 1, unit_price: 0, discount: 0 },
   ]);
   const [globalDiscount, setGlobalDiscount] = useState<number>(0);
+  const [attachments, setAttachments] = useState<File[]>([]);
+
+  const handleAttachFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    setAttachments((prev) => [...prev, ...files]);
+    e.target.value = "";
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const {
     register,
@@ -540,6 +551,46 @@ export function ProposalEditor({ proposal }: Props) {
             placeholder="Condições de pagamento, prazo de entrega, vigência do contrato..."
           />
         </div>
+      </div>
+
+      {/* Section 4: Anexos */}
+      <div className="bg-card rounded-xl border border-border p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
+            Anexos
+          </h2>
+          <label className="cursor-pointer">
+            <input type="file" multiple className="hidden" onChange={handleAttachFiles} />
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-sm text-text-secondary hover:border-primary/50 hover:text-primary transition-colors">
+              <Paperclip size={14} />
+              Anexar arquivo
+            </span>
+          </label>
+        </div>
+
+        {attachments.length === 0 ? (
+          <label className="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg py-8 hover:border-primary/40 hover:bg-primary/5 transition-colors group">
+            <input type="file" multiple className="hidden" onChange={handleAttachFiles} />
+            <Paperclip size={20} className="text-text-muted group-hover:text-primary mb-2 transition-colors" />
+            <p className="text-sm text-text-muted">Clique para selecionar arquivos</p>
+            <p className="text-xs text-text-muted/60 mt-1">PDF, DOC, XLS, imagens, etc.</p>
+          </label>
+        ) : (
+          <div className="space-y-2">
+            {attachments.map((file, i) => (
+              <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/5 border border-border">
+                <FileText size={16} className="text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-text-primary truncate">{file.name}</p>
+                  <p className="text-xs text-text-muted">{(file.size / 1024).toFixed(1)} KB</p>
+                </div>
+                <button type="button" onClick={() => removeAttachment(i)} className="p-1 rounded hover:bg-danger/10 text-text-muted hover:text-danger transition-colors">
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Sticky Bottom Bar */}

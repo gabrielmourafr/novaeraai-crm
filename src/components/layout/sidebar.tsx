@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutDashboard, Target, Building2, Users, FileText, Package,
+  LayoutDashboard, Target, Building2, FileText, Package,
   Rocket, FolderOpen, DollarSign, CheckSquare, Calendar, Settings,
   ChevronLeft, ChevronRight, LogOut,
 } from "lucide-react";
@@ -25,9 +25,8 @@ const NAV_GROUPS = [
   {
     label: "COMERCIAL",
     items: [
-      { icon: Target, label: "Leads", href: "/leads" },
+      { icon: Target, label: "Leads & Contatos", href: "/leads" },
       { icon: Building2, label: "Empresas", href: "/companies" },
-      { icon: Users, label: "Contatos", href: "/contacts" },
       { icon: FileText, label: "Propostas", href: "/proposals" },
       { icon: Package, label: "Catálogo", href: "/catalog" },
     ],
@@ -70,6 +69,7 @@ export const Sidebar = () => {
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
+    if (href === "/leads") return pathname.startsWith("/leads") || pathname.startsWith("/contacts");
     return pathname.startsWith(href);
   };
 
