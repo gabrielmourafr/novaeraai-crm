@@ -29,7 +29,7 @@ interface LeadsTableProps {
 
 export const LeadsTable = ({ leads, onEdit, onDelete }: LeadsTableProps) => {
   return (
-    <div className="bg-white rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-xl border border-border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>

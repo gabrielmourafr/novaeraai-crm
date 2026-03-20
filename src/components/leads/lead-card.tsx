@@ -21,7 +21,7 @@ export const LeadCard = ({ lead, onEdit, onDelete }: LeadCardProps) => {
   const tempLabel = TEMPERATURES.find((t) => t.value === lead.temperature)?.label;
 
   return (
-    <div className="bg-white rounded-lg border border-border p-3 shadow-sm hover:shadow-md transition-shadow group">
+    <div className="bg-card rounded-lg border border-border p-3 shadow-sm hover:shadow-md transition-shadow group">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium text-text-primary line-clamp-2 flex-1">{lead.title}</p>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">

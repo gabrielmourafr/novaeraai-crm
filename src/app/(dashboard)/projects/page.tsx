@@ -80,7 +80,7 @@ function ProgramBadge({ program }: { program: string | null }) {
 
 function ProgressBar({ value }: { value: number }) {
   return (
-    <div className="h-1.5 bg-[#F1F5F9] rounded-full overflow-hidden w-full">
+    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden w-full">
       <div
         className="h-full bg-[#0B87C3] rounded-full transition-all"
         style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
@@ -92,9 +92,9 @@ function ProgressBar({ value }: { value: number }) {
 type OrgUser = { id: string; full_name: string; avatar_url: string | null; org_id: string; email: string; role: "admin" | "member"; created_at: string };
 
 function UserAvatar({ userId, users }: { userId: string | null; users: OrgUser[] }) {
-  if (!userId) return <span className="text-xs text-[#94A3B8]">—</span>;
+  if (!userId) return <span className="text-xs text-text-muted">—</span>;
   const user = users.find((u) => u.id === userId);
-  if (!user) return <span className="text-xs text-[#94A3B8]">—</span>;
+  if (!user) return <span className="text-xs text-text-muted">—</span>;
   return (
     <div
       className="w-6 h-6 rounded-full bg-[#0B87C3]/20 text-[#0B87C3] text-[10px] font-semibold flex items-center justify-center flex-shrink-0"
@@ -210,7 +210,7 @@ export default function ProjectsPage() {
             onClick={() => setView("por_cliente")}
             className={cn(
               "px-4 py-2 text-sm font-medium transition-colors",
-              view === "por_cliente" ? "bg-[#0B87C3] text-white" : "text-[#64748B] hover:bg-white/5"
+              view === "por_cliente" ? "bg-[#0B87C3] text-white" : "text-text-muted hover:bg-white/5"
             )}
           >
             Por Cliente
@@ -219,7 +219,7 @@ export default function ProjectsPage() {
             onClick={() => setView("todos")}
             className={cn(
               "px-4 py-2 text-sm font-medium transition-colors",
-              view === "todos" ? "bg-[#0B87C3] text-white" : "text-[#64748B] hover:bg-white/5"
+              view === "todos" ? "bg-[#0B87C3] text-white" : "text-text-muted hover:bg-white/5"
             )}
           >
             Todos
@@ -278,7 +278,7 @@ export default function ProjectsPage() {
       {/* Content */}
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
-          <p className="text-[#94A3B8] text-sm">Carregando projetos...</p>
+          <p className="text-text-muted text-sm">Carregando projetos...</p>
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -307,16 +307,16 @@ export default function ProjectsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
                       <span className="font-semibold text-[#0F172A]">{company.name}</span>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#F1F5F9] text-[#64748B]">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/5 text-text-muted">
                         {cProjects.length} {cProjects.length === 1 ? "projeto" : "projetos"}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-1.5 max-w-xs">
                       <ProgressBar value={avgProgress} />
-                      <span className="text-xs text-[#64748B] flex-shrink-0">{avgProgress}%</span>
+                      <span className="text-xs text-text-muted flex-shrink-0">{avgProgress}%</span>
                     </div>
                   </div>
-                  <div className="text-[#94A3B8] flex-shrink-0">
+                  <div className="text-text-muted flex-shrink-0">
                     {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                   </div>
                 </button>
@@ -329,22 +329,22 @@ export default function ProjectsPage() {
                         onClick={() => router.push(`/projects/${project.id}`)}
                         className={cn(
                           "flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors",
-                          idx < cProjects.length - 1 && "border-b border-[#F1F5F9]"
+                          idx < cProjects.length - 1 && "border-b border-border"
                         )}
                       >
                         <div className="w-10 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-[#0F172A] truncate">{project.name}</p>
-                          <p className="text-[10px] text-[#94A3B8] font-mono">{project.code}</p>
+                          <p className="text-[10px] text-text-muted font-mono">{project.code}</p>
                         </div>
                         <ProgramBadge program={project.program} />
                         <StatusBadge status={project.status} />
                         <div className="hidden md:flex items-center gap-2 w-28 flex-shrink-0">
                           <ProgressBar value={project.progress} />
-                          <span className="text-xs text-[#64748B] w-8 text-right flex-shrink-0">{project.progress}%</span>
+                          <span className="text-xs text-text-muted w-8 text-right flex-shrink-0">{project.progress}%</span>
                         </div>
                         <UserAvatar userId={project.assignee_id} users={orgUsers} />
-                        <div className="text-xs text-[#94A3B8] w-24 text-right flex-shrink-0">
+                        <div className="text-xs text-text-muted w-24 text-right flex-shrink-0">
                           {project.expected_end_date ? formatDate(project.expected_end_date) : "—"}
                         </div>
                       </div>
@@ -359,15 +359,15 @@ export default function ProjectsPage() {
         <div className="rounded-xl overflow-hidden" style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}>
           <Table>
             <TableHeader>
-              <TableRow className="bg-[#F8FAFC]">
-                <TableHead className="text-xs font-semibold uppercase text-[#64748B]">Nome</TableHead>
-                <TableHead className="text-xs font-semibold uppercase text-[#64748B]">Empresa</TableHead>
-                <TableHead className="text-xs font-semibold uppercase text-[#64748B]">Programa</TableHead>
-                <TableHead className="text-xs font-semibold uppercase text-[#64748B]">Status</TableHead>
-                <TableHead className="text-xs font-semibold uppercase text-[#64748B] w-36">Progresso</TableHead>
-                <TableHead className="text-xs font-semibold uppercase text-[#64748B]">Responsável</TableHead>
-                <TableHead className="text-xs font-semibold uppercase text-[#64748B]">Início</TableHead>
-                <TableHead className="text-xs font-semibold uppercase text-[#64748B]">Fim Previsto</TableHead>
+              <TableRow className="bg-white/5">
+                <TableHead className="text-xs font-semibold uppercase text-text-muted">Nome</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-text-muted">Empresa</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-text-muted">Programa</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-text-muted">Status</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-text-muted w-36">Progresso</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-text-muted">Responsável</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-text-muted">Início</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-text-muted">Fim Previsto</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -380,7 +380,7 @@ export default function ProjectsPage() {
                   <TableCell>
                     <div>
                       <p className="text-sm font-medium text-[#0F172A]">{project.name}</p>
-                      <p className="text-[10px] text-[#94A3B8] font-mono">{project.code}</p>
+                      <p className="text-[10px] text-text-muted font-mono">{project.code}</p>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -393,7 +393,7 @@ export default function ProjectsPage() {
                         {project.company.name}
                       </Link>
                     ) : (
-                      <span className="text-[#94A3B8] text-sm">—</span>
+                      <span className="text-text-muted text-sm">—</span>
                     )}
                   </TableCell>
                   <TableCell><ProgramBadge program={project.program} /></TableCell>
@@ -401,16 +401,16 @@ export default function ProjectsPage() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <ProgressBar value={project.progress} />
-                      <span className="text-xs text-[#64748B] w-8 text-right flex-shrink-0">{project.progress}%</span>
+                      <span className="text-xs text-text-muted w-8 text-right flex-shrink-0">{project.progress}%</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <UserAvatar userId={project.assignee_id} users={orgUsers} />
                   </TableCell>
-                  <TableCell className="text-sm text-[#64748B]">
+                  <TableCell className="text-sm text-text-muted">
                     {project.start_date ? formatDate(project.start_date) : "—"}
                   </TableCell>
-                  <TableCell className="text-sm text-[#64748B]">
+                  <TableCell className="text-sm text-text-muted">
                     {project.expected_end_date ? formatDate(project.expected_end_date) : "—"}
                   </TableCell>
                 </TableRow>

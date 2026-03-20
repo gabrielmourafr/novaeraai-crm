@@ -142,7 +142,7 @@ export const ProductForm = ({ open, onClose, product }: ProductFormProps) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Unidade de Negócio *</Label>
-              <Select value={businessUnitValue ?? ""} onValueChange={(v) => setValue("business_unit", v)}>
+              <Select value={businessUnitValue ?? "__none__"} onValueChange={(v) => setValue("business_unit", v === "__none__" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar" />
                 </SelectTrigger>
@@ -157,7 +157,7 @@ export const ProductForm = ({ open, onClose, product }: ProductFormProps) => {
 
             <div className="space-y-1.5">
               <Label>Categoria *</Label>
-              <Select value={categoryValue ?? ""} onValueChange={(v) => setValue("category", v)}>
+              <Select value={categoryValue ?? "__none__"} onValueChange={(v) => setValue("category", v === "__none__" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar" />
                 </SelectTrigger>
@@ -186,7 +186,7 @@ export const ProductForm = ({ open, onClose, product }: ProductFormProps) => {
 
             <div className="space-y-1.5">
               <Label>Recorrência *</Label>
-              <Select value={recurrenceValue ?? ""} onValueChange={(v) => setValue("recurrence", v)}>
+              <Select value={recurrenceValue ?? "__none__"} onValueChange={(v) => setValue("recurrence", v === "__none__" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar" />
                 </SelectTrigger>
@@ -201,7 +201,7 @@ export const ProductForm = ({ open, onClose, product }: ProductFormProps) => {
 
           <div className="space-y-1.5">
             <Label>Status *</Label>
-            <Select value={statusValue ?? ""} onValueChange={(v) => setValue("status", v)}>
+            <Select value={statusValue ?? "__none__"} onValueChange={(v) => setValue("status", v === "__none__" ? "" : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecionar" />
               </SelectTrigger>

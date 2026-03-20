@@ -74,7 +74,7 @@ const temperatureColors: Record<string, string> = {
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8] mb-1">
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-1">
         {label}
       </p>
       <div className="text-sm text-[#0F172A]">{value}</div>
@@ -131,9 +131,9 @@ export default function CompanyDetailPage() {
   if (error || !company) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <Building2 size={48} className="text-[#94A3B8] mb-4" />
+        <Building2 size={48} className="text-text-muted mb-4" />
         <h2 className="text-lg font-semibold text-[#0F172A] mb-2">Empresa não encontrada</h2>
-        <p className="text-sm text-[#94A3B8] mb-6">
+        <p className="text-sm text-text-muted mb-6">
           A empresa que você está procurando não existe ou foi removida.
         </p>
         <Button onClick={() => router.push("/companies")} variant="outline">
@@ -149,7 +149,7 @@ export default function CompanyDetailPage() {
       {/* Back */}
       <button
         onClick={() => router.push("/companies")}
-        className="flex items-center gap-1.5 text-sm text-[#94A3B8] hover:text-[#0B87C3] transition-colors"
+        className="flex items-center gap-1.5 text-sm text-text-muted hover:text-[#0B87C3] transition-colors"
       >
         <ArrowLeft size={15} />
         Empresas
@@ -167,7 +167,7 @@ export default function CompanyDetailPage() {
           <div>
             <h1 className="font-bold text-2xl text-[#0F172A] leading-tight">{company.name}</h1>
             {company.trade_name && (
-              <p className="text-sm text-[#94A3B8] mt-0.5">{company.trade_name}</p>
+              <p className="text-sm text-text-muted mt-0.5">{company.trade_name}</p>
             )}
             <div className="flex flex-wrap gap-1.5 mt-2">
               {company.segment && (
@@ -212,9 +212,9 @@ export default function CompanyDetailPage() {
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-border bg-white p-6">
+        <div className="rounded-xl border border-border bg-card p-6">
           <div className="flex items-start justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8]">
+            <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
               Total de Receita
             </span>
             <div className="p-1.5 rounded-lg bg-emerald-50">
@@ -224,9 +224,9 @@ export default function CompanyDetailPage() {
           <p className="font-bold text-xl text-[#0F172A]">{formatCurrency(totalRevenue)}</p>
         </div>
 
-        <div className="rounded-xl border border-border bg-white p-6">
+        <div className="rounded-xl border border-border bg-card p-6">
           <div className="flex items-start justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8]">
+            <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
               Leads Ativos
             </span>
             <div className="p-1.5 rounded-lg bg-blue-50">
@@ -236,9 +236,9 @@ export default function CompanyDetailPage() {
           <p className="font-bold text-2xl text-[#0F172A]">{activeLeads}</p>
         </div>
 
-        <div className="rounded-xl border border-border bg-white p-6">
+        <div className="rounded-xl border border-border bg-card p-6">
           <div className="flex items-start justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8]">
+            <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
               Projetos Ativos
             </span>
             <div className="p-1.5 rounded-lg bg-purple-50">
@@ -248,9 +248,9 @@ export default function CompanyDetailPage() {
           <p className="font-bold text-2xl text-[#0F172A]">{activeProjects}</p>
         </div>
 
-        <div className="rounded-xl border border-border bg-white p-6">
+        <div className="rounded-xl border border-border bg-card p-6">
           <div className="flex items-start justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8]">
+            <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
               Última Interação
             </span>
             <div className="p-1.5 rounded-lg bg-amber-50">
@@ -266,7 +266,7 @@ export default function CompanyDetailPage() {
       {/* Main 2-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         {/* Left: Tabs */}
-        <div className="rounded-xl border border-border bg-white overflow-hidden">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
           <Tabs defaultValue="overview" className="w-full">
             <div className="border-b border-border px-6 overflow-x-auto">
               <TabsList className="h-12 bg-transparent p-0 gap-0 w-max">
@@ -282,7 +282,7 @@ export default function CompanyDetailPage() {
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#0B87C3] data-[state=active]:text-[#0B87C3] data-[state=active]:shadow-none text-[#94A3B8] px-4 h-12 text-sm font-medium bg-transparent"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#0B87C3] data-[state=active]:text-[#0B87C3] data-[state=active]:shadow-none text-text-muted px-4 h-12 text-sm font-medium bg-transparent"
                   >
                     {tab.label}
                   </TabsTrigger>
@@ -317,7 +317,7 @@ export default function CompanyDetailPage() {
                   value={
                     company.address ? (
                       <span className="flex items-start gap-1">
-                        <MapPin size={13} className="mt-0.5 flex-shrink-0 text-[#94A3B8]" />
+                        <MapPin size={13} className="mt-0.5 flex-shrink-0 text-text-muted" />
                         {company.address}
                       </span>
                     ) : (
@@ -339,7 +339,7 @@ export default function CompanyDetailPage() {
                 <InfoRow label="Criado em" value={formatDate(company.created_at)} />
                 {company.notes && (
                   <div className="sm:col-span-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8] mb-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-1">
                       Observações
                     </p>
                     <p className="text-sm text-[#0F172A] whitespace-pre-line">{company.notes}</p>
@@ -392,7 +392,7 @@ export default function CompanyDetailPage() {
                           <p className="text-sm font-medium text-[#0F172A]">
                             {contact.full_name}
                           </p>
-                          <p className="text-xs text-[#94A3B8]">
+                          <p className="text-xs text-text-muted">
                             {[contact.job_title, contact.email].filter(Boolean).join(" · ") || "—"}
                           </p>
                         </div>
@@ -438,16 +438,16 @@ export default function CompanyDetailPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider pb-2 pr-4">
+                        <th className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider pb-2 pr-4">
                           Lead
                         </th>
-                        <th className="text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider pb-2 pr-4">
+                        <th className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider pb-2 pr-4">
                           Estágio
                         </th>
-                        <th className="text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider pb-2 pr-4">
+                        <th className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider pb-2 pr-4">
                           Valor
                         </th>
-                        <th className="text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider pb-2">
+                        <th className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider pb-2">
                           Temp.
                         </th>
                       </tr>
@@ -461,7 +461,7 @@ export default function CompanyDetailPage() {
                         >
                           <td className="py-3 pr-4">
                             <p className="font-medium text-[#0F172A]">{lead.title}</p>
-                            <p className="text-xs text-[#94A3B8]">
+                            <p className="text-xs text-text-muted">
                               {formatDate(lead.created_at)}
                             </p>
                           </td>
@@ -479,7 +479,7 @@ export default function CompanyDetailPage() {
                                 {lead.stage.name}
                               </span>
                             ) : (
-                              <span className="text-[#94A3B8]">—</span>
+                              <span className="text-text-muted">—</span>
                             )}
                           </td>
                           <td className="py-3 pr-4 text-[#0F172A]">
@@ -496,7 +496,7 @@ export default function CompanyDetailPage() {
                                 {getTemperatureMeta(lead.temperature)?.label ?? lead.temperature}
                               </span>
                             ) : (
-                              <span className="text-[#94A3B8]">—</span>
+                              <span className="text-text-muted">—</span>
                             )}
                           </td>
                         </tr>
@@ -558,7 +558,7 @@ export default function CompanyDetailPage() {
                               </span>
                             </div>
                             {project.program && (
-                              <p className="text-xs text-[#94A3B8] mb-2">{project.program}</p>
+                              <p className="text-xs text-text-muted mb-2">{project.program}</p>
                             )}
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
@@ -570,13 +570,13 @@ export default function CompanyDetailPage() {
                                   }}
                                 />
                               </div>
-                              <span className="text-xs text-[#94A3B8] flex-shrink-0 w-8 text-right">
+                              <span className="text-xs text-text-muted flex-shrink-0 w-8 text-right">
                                 {project.progress}%
                               </span>
                             </div>
                           </div>
                           {project.expected_end_date && (
-                            <p className="text-xs text-[#94A3B8] flex-shrink-0 mt-0.5">
+                            <p className="text-xs text-text-muted flex-shrink-0 mt-0.5">
                               {formatDate(project.expected_end_date)}
                             </p>
                           )}
@@ -612,18 +612,18 @@ export default function CompanyDetailPage() {
         {/* Right Sidebar */}
         <div className="space-y-4">
           {/* Details */}
-          <div className="rounded-xl border border-border bg-white p-6 space-y-4">
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
             <h3 className="text-sm font-semibold text-[#0F172A]">Detalhes</h3>
             <div className="space-y-3 text-sm">
               {company.cnpj && (
                 <div>
-                  <p className="text-xs text-[#94A3B8] mb-0.5">CNPJ</p>
+                  <p className="text-xs text-text-muted mb-0.5">CNPJ</p>
                   <p className="text-[#0F172A]">{company.cnpj}</p>
                 </div>
               )}
               {company.website && (
                 <div>
-                  <p className="text-xs text-[#94A3B8] mb-0.5">Website</p>
+                  <p className="text-xs text-text-muted mb-0.5">Website</p>
                   <a
                     href={company.website}
                     target="_blank"
@@ -637,15 +637,15 @@ export default function CompanyDetailPage() {
               )}
               {company.address && (
                 <div>
-                  <p className="text-xs text-[#94A3B8] mb-0.5">Endereço</p>
+                  <p className="text-xs text-text-muted mb-0.5">Endereço</p>
                   <p className="text-[#0F172A] flex items-start gap-1">
-                    <MapPin size={13} className="mt-0.5 flex-shrink-0 text-[#94A3B8]" />
+                    <MapPin size={13} className="mt-0.5 flex-shrink-0 text-text-muted" />
                     {company.address}
                   </p>
                 </div>
               )}
               <div>
-                <p className="text-xs text-[#94A3B8] mb-0.5">Cadastrado em</p>
+                <p className="text-xs text-text-muted mb-0.5">Cadastrado em</p>
                 <p className="text-[#0F172A]">{formatDate(company.created_at)}</p>
               </div>
             </div>
@@ -653,7 +653,7 @@ export default function CompanyDetailPage() {
 
           {/* Tags */}
           {company.tags && company.tags.length > 0 && (
-            <div className="rounded-xl border border-border bg-white p-6">
+            <div className="rounded-xl border border-border bg-card p-6">
               <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Tags</h3>
               <div className="flex flex-wrap gap-1.5">
                 {company.tags.map((tag) => (
@@ -666,7 +666,7 @@ export default function CompanyDetailPage() {
           )}
 
           {/* Quick Actions */}
-          <div className="rounded-xl border border-border bg-white p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Ações Rápidas</h3>
             <div className="space-y-2">
               {contacts?.[0]?.phone && (
@@ -690,7 +690,7 @@ export default function CompanyDetailPage() {
                 </a>
               )}
               {!contacts?.[0]?.phone && !contacts?.[0]?.email && (
-                <p className="text-xs text-[#94A3B8]">
+                <p className="text-xs text-text-muted">
                   Adicione contatos para ver as ações disponíveis.
                 </p>
               )}

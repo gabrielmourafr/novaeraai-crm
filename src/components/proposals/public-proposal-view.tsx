@@ -84,7 +84,7 @@ export function PublicProposalView({ id }: Props) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <div className="min-h-screen bg-white/5 flex items-center justify-center">
         <Loader2 size={32} className="animate-spin text-[#0B87C3]" />
       </div>
     );
@@ -92,7 +92,7 @@ export function PublicProposalView({ id }: Props) {
 
   if (error || !proposal) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <div className="min-h-screen bg-white/5 flex items-center justify-center">
         <div className="text-center max-w-md">
           <h1 className="text-xl font-semibold text-gray-900 mb-2">Link inválido</h1>
           <p className="text-gray-500 text-sm">
@@ -115,7 +115,7 @@ export function PublicProposalView({ id }: Props) {
     proposal.status !== "aceita";
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
+    <div className="min-h-screen bg-white/5">
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
 
         {/* Header */}
@@ -142,7 +142,7 @@ export function PublicProposalView({ id }: Props) {
 
         {/* Client Info */}
         {(proposal.company || proposal.contact) && (
-          <div className="bg-white rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-6">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
               Destinatário
             </h2>
@@ -177,7 +177,7 @@ export function PublicProposalView({ id }: Props) {
         )}
 
         {/* Items Table */}
-        <div className="bg-white rounded-xl border border-border overflow-hidden">
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="p-6 border-b border-border">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
               Itens
@@ -185,7 +185,7 @@ export function PublicProposalView({ id }: Props) {
           </div>
           <table className="w-full">
             <thead>
-              <tr className="bg-[#F8FAFC] text-xs text-gray-400 font-medium">
+              <tr className="bg-white/5 text-xs text-gray-400 font-medium">
                 <th className="text-left px-6 py-3">Item</th>
                 <th className="text-center px-4 py-3 w-16">Qtd</th>
                 <th className="text-right px-4 py-3 w-32">Valor Unit.</th>
@@ -197,7 +197,7 @@ export function PublicProposalView({ id }: Props) {
               {items.map((item, i) => {
                 const sub = item.quantity * item.unit_price * (1 - (item.discount ?? 0) / 100);
                 return (
-                  <tr key={item.id ?? i} className="border-t border-[#F1F5F9]">
+                  <tr key={item.id ?? i} className="border-t border-border">
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-900 text-sm">{item.name}</p>
                     </td>
@@ -217,7 +217,7 @@ export function PublicProposalView({ id }: Props) {
                 );
               })}
             </tbody>
-            <tfoot className="border-t border-border bg-[#F8FAFC]">
+            <tfoot className="border-t border-border bg-white/5">
               {(proposal.discount ?? 0) > 0 && (
                 <>
                   <tr>
@@ -252,7 +252,7 @@ export function PublicProposalView({ id }: Props) {
 
         {/* Conditions */}
         {proposal.conditions && (
-          <div className="bg-white rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-6">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
               Condições Comerciais
             </h2>
@@ -263,7 +263,7 @@ export function PublicProposalView({ id }: Props) {
         )}
 
         {/* Accept Button */}
-        <div className="bg-white rounded-xl border border-border p-8 text-center">
+        <div className="bg-card rounded-xl border border-border p-8 text-center">
           {accepted ? (
             <div className="space-y-3">
               <div className="flex justify-center">

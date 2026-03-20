@@ -83,7 +83,7 @@ export default function CompaniesPage() {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-xl border p-5 space-y-3">
+            <div key={i} className="bg-card rounded-xl border p-5 space-y-3">
               <div className="flex items-center gap-3">
                 <Skeleton className="w-10 h-10 rounded-lg" />
                 <div className="space-y-1.5 flex-1">
@@ -111,7 +111,7 @@ export default function CompaniesPage() {
           {companies.map((company) => (
             <div
               key={company.id}
-              className="bg-white rounded-xl border border-border p-5 hover:shadow-md transition-all duration-200 hover:border-primary/20"
+              className="bg-card rounded-xl border border-border p-5 hover:shadow-md transition-all duration-200 hover:border-primary/20"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">

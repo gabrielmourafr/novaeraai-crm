@@ -6,7 +6,6 @@ import { Plus, Trash2, ArrowLeft, Save, Send } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -220,17 +219,21 @@ export function ProposalEditor({ proposal }: Props) {
     const payload = buildPayload("rascunho");
     const lineItems = buildLineItems();
 
-    if (proposal) {
-      await updateProposal.mutateAsync({ id: proposal.id, ...payload });
-      await updateItems.mutateAsync({ proposalId: proposal.id, items: lineItems });
-      router.push(`/proposals/${proposal.id}`);
-    } else {
-      const result = await createProposal.mutateAsync({
-        proposal: { ...payload, org_id: user?.org_id ?? "" },
-        items: lineItems,
-      });
-      const created = result as { id: string };
-      router.push(`/proposals/${created.id}`);
+    try {
+      if (proposal) {
+        await updateProposal.mutateAsync({ id: proposal.id, ...payload });
+        await updateItems.mutateAsync({ proposalId: proposal.id, items: lineItems });
+        router.push(`/proposals/${proposal.id}`);
+      } else {
+        const result = await createProposal.mutateAsync({
+          proposal: { ...payload, org_id: user?.org_id ?? "" },
+          items: lineItems,
+        });
+        const created = result as { id: string };
+        router.push(`/proposals/${created.id}`);
+      }
+    } catch {
+      // erro já tratado pelo onError do hook
     }
   };
 
@@ -243,19 +246,21 @@ export function ProposalEditor({ proposal }: Props) {
     const payload = buildPayload("enviada");
     const lineItems = buildLineItems();
 
-    if (proposal) {
-      await updateProposal.mutateAsync({ id: proposal.id, ...payload });
-      await updateItems.mutateAsync({ proposalId: proposal.id, items: lineItems });
-      toast.success("Proposta enviada!");
-      router.push(`/proposals/${proposal.id}`);
-    } else {
-      const result = await createProposal.mutateAsync({
-        proposal: { ...payload, org_id: user?.org_id ?? "" },
-        items: lineItems,
-      });
-      toast.success("Proposta criada e enviada!");
-      const created = result as { id: string };
-      router.push(`/proposals/${created.id}`);
+    try {
+      if (proposal) {
+        await updateProposal.mutateAsync({ id: proposal.id, ...payload });
+        await updateItems.mutateAsync({ proposalId: proposal.id, items: lineItems });
+        router.push(`/proposals/${proposal.id}`);
+      } else {
+        const result = await createProposal.mutateAsync({
+          proposal: { ...payload, org_id: user?.org_id ?? "" },
+          items: lineItems,
+        });
+        const created = result as { id: string };
+        router.push(`/proposals/${created.id}`);
+      }
+    } catch {
+      // erro já tratado pelo onError do hook
     }
   };
 
@@ -280,7 +285,7 @@ export function ProposalEditor({ proposal }: Props) {
       </div>
 
       {/* Section 1: Lead & Cliente */}
-      <div className="bg-white rounded-xl border border-border p-6 space-y-4">
+      <div className="bg-card rounded-xl border border-border p-6 space-y-4">
         <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
           Lead & Cliente
         </h2>
@@ -339,7 +344,7 @@ export function ProposalEditor({ proposal }: Props) {
               {...register("company_name")}
               placeholder="Auto-preenchido ao selecionar lead"
               readOnly={!!selectedLead}
-              className={selectedLead ? "bg-[#F8FAFC] text-text-muted" : ""}
+              className={selectedLead ? "bg-white/5 text-text-muted" : ""}
             />
           </div>
           <div className="space-y-1.5">
@@ -349,14 +354,14 @@ export function ProposalEditor({ proposal }: Props) {
               {...register("contact_name")}
               placeholder="Auto-preenchido ao selecionar lead"
               readOnly={!!selectedLead}
-              className={selectedLead ? "bg-[#F8FAFC] text-text-muted" : ""}
+              className={selectedLead ? "bg-white/5 text-text-muted" : ""}
             />
           </div>
         </div>
       </div>
 
       {/* Section 2: Itens */}
-      <div className="bg-white rounded-xl border border-border p-6 space-y-4">
+      <div className="bg-card rounded-xl border border-border p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
             Itens da Proposta
@@ -385,7 +390,7 @@ export function ProposalEditor({ proposal }: Props) {
               {items.map((item, index) => {
                 const sub = item.quantity * item.unit_price * (1 - item.discount / 100);
                 return (
-                  <tr key={index} className="border-b border-[#F1F5F9] last:border-0">
+                  <tr key={index} className="border-b border-border last:border-0">
                     <td className="py-2 pr-2">
                       <Select
                         value={item.product_id ?? "__none__"}
@@ -426,7 +431,8 @@ export function ProposalEditor({ proposal }: Props) {
                         type="number"
                         step="0.01"
                         min={0}
-                        value={item.unit_price}
+                        value={item.unit_price === 0 ? "" : item.unit_price}
+                        placeholder="0,00"
                         onChange={(e) =>
                           updateItem(index, "unit_price", parseFloat(e.target.value) || 0)
                         }
@@ -498,7 +504,7 @@ export function ProposalEditor({ proposal }: Props) {
       </div>
 
       {/* Section 3: Detalhes */}
-      <div className="bg-white rounded-xl border border-border p-6 space-y-4">
+      <div className="bg-card rounded-xl border border-border p-6 space-y-4">
         <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
           Detalhes
         </h2>
@@ -537,7 +543,7 @@ export function ProposalEditor({ proposal }: Props) {
       </div>
 
       {/* Sticky Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border p-4 flex justify-end gap-3 z-50">
+      <div className="fixed bottom-0 left-0 right-0 bg-[#040912]/95 backdrop-blur border-t border-border p-4 flex justify-end gap-3 z-50">
         <Button
           type="button"
           variant="outline"

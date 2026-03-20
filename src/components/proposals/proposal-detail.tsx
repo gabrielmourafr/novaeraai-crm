@@ -173,7 +173,7 @@ export function ProposalDetail({ proposal }: Props) {
       </div>
 
       {/* Proposal Info Card */}
-      <div className="bg-white rounded-xl border border-border p-6">
+      <div className="bg-card rounded-xl border border-border p-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {proposal.company && (
             <div>
@@ -228,7 +228,7 @@ export function ProposalDetail({ proposal }: Props) {
       </div>
 
       {/* Items Table */}
-      <div className="bg-white rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="p-6 border-b border-border">
           <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
             Itens da Proposta
@@ -241,7 +241,7 @@ export function ProposalDetail({ proposal }: Props) {
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="bg-[#F8FAFC] text-xs text-text-muted font-medium">
+              <tr className="bg-white/5 text-xs text-text-muted font-medium">
                 <th className="text-left px-6 py-3">Item</th>
                 <th className="text-center px-4 py-3 w-16">Qtd</th>
                 <th className="text-right px-4 py-3 w-32">Valor Unit.</th>
@@ -253,7 +253,7 @@ export function ProposalDetail({ proposal }: Props) {
               {items.map((item, i) => {
                 const sub = item.quantity * item.unit_price * (1 - (item.discount ?? 0) / 100);
                 return (
-                  <tr key={item.id ?? i} className="border-t border-[#F1F5F9]">
+                  <tr key={item.id ?? i} className="border-t border-border">
                     <td className="px-6 py-4">
                       <p className="font-medium text-text-primary text-sm">{item.name}</p>
                     </td>
@@ -273,7 +273,7 @@ export function ProposalDetail({ proposal }: Props) {
                 );
               })}
             </tbody>
-            <tfoot className="border-t border-border bg-[#F8FAFC]">
+            <tfoot className="border-t border-border bg-white/5">
               {(proposal.discount ?? 0) > 0 && (
                 <>
                   <tr>
@@ -309,7 +309,7 @@ export function ProposalDetail({ proposal }: Props) {
 
       {/* Conditions */}
       {proposal.conditions && (
-        <div className="bg-white rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-border p-6">
           <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
             Condições Comerciais
           </h2>

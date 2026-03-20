@@ -267,7 +267,7 @@ export const TaskForm = ({
             <div className="space-y-1.5">
               <Label>Responsável</Label>
               <Select
-                value={assigneeValue ?? ""}
+                value={assigneeValue ?? "__none__"}
                 onValueChange={(v) => setValue("assignee_id", v === "__none__" ? "" : v)}
               >
                 <SelectTrigger>

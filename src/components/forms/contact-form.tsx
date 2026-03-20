@@ -204,11 +204,12 @@ export const ContactForm = ({ open, onClose, contact, defaultCompanyId }: Contac
 
           <div className="space-y-1.5">
             <Label>Origem</Label>
-            <Select value={originValue ?? ""} onValueChange={(v) => setValue("origin", v)}>
+            <Select value={originValue ?? "__none__"} onValueChange={(v) => setValue("origin", v === "__none__" ? undefined : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecionar" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="__none__">Selecionar</SelectItem>
                 {LEAD_ORIGINS.map((o) => (
                   <SelectItem key={o.value} value={o.value}>
                     {o.label}

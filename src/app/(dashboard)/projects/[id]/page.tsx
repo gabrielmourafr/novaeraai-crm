@@ -84,9 +84,9 @@ const PRIORITY_COLORS: Record<string, string> = {
 type OrgUser = { id: string; full_name: string; avatar_url: string | null; org_id: string; email: string; role: "admin" | "member"; created_at: string };
 
 function UserAvatar({ userId, users, size = "sm" }: { userId: string | null; users: OrgUser[]; size?: "sm" | "md" }) {
-  if (!userId) return <span className="text-xs text-[#94A3B8]">—</span>;
+  if (!userId) return <span className="text-xs text-text-muted">—</span>;
   const user = users.find((u) => u.id === userId);
-  if (!user) return <span className="text-xs text-[#94A3B8]">—</span>;
+  if (!user) return <span className="text-xs text-text-muted">—</span>;
   const dim = size === "md" ? "w-8 h-8 text-xs" : "w-6 h-6 text-[10px]";
   return (
     <div
@@ -261,18 +261,18 @@ export default function ProjectDetailPage() {
       {/* Back */}
       <button
         onClick={() => router.push("/projects")}
-        className="flex items-center gap-1.5 text-sm text-[#64748B] hover:text-[#0F172A] transition-colors"
+        className="flex items-center gap-1.5 text-sm text-text-muted hover:text-[#0F172A] transition-colors"
       >
         <ArrowLeft size={16} />
         Projetos
       </button>
 
       {/* Header card */}
-      <div className="rounded-xl border border-border bg-white p-6">
+      <div className="rounded-xl border border-border bg-card p-6">
         <div className="flex flex-col lg:flex-row lg:items-start gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
-              <span className="text-xs font-mono text-[#94A3B8]">{project.code}</span>
+              <span className="text-xs font-mono text-text-muted">{project.code}</span>
               <span
                 className={cn(
                   "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium",
@@ -300,10 +300,10 @@ export default function ProjectDetailPage() {
 
             <div className="mt-4">
               <div className="flex items-center justify-between text-sm mb-1.5">
-                <span className="text-[#64748B]">Progresso geral</span>
+                <span className="text-text-muted">Progresso geral</span>
                 <span className="font-semibold text-[#0F172A]">{project.progress}%</span>
               </div>
-              <div className="h-2 bg-[#F1F5F9] rounded-full overflow-hidden">
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[#0B87C3] rounded-full transition-all"
                   style={{ width: `${Math.min(100, project.progress)}%` }}
@@ -311,7 +311,7 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-6 mt-4 text-sm text-[#64748B]">
+            <div className="flex flex-wrap gap-6 mt-4 text-sm text-text-muted">
               {project.start_date && (
                 <div className="flex items-center gap-1.5">
                   <Calendar size={14} />
@@ -321,7 +321,7 @@ export default function ProjectDetailPage() {
                 </div>
               )}
               {daysInfo !== null && (
-                <div className={cn("flex items-center gap-1.5", daysInfo < 0 ? "text-red-500" : "text-[#64748B]")}>
+                <div className={cn("flex items-center gap-1.5", daysInfo < 0 ? "text-red-500" : "text-text-muted")}>
                   <Clock size={14} />
                   <span>
                     {daysInfo < 0
@@ -363,29 +363,29 @@ export default function ProjectDetailPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-border bg-white p-5">
-          <p className="text-xs font-semibold uppercase text-[#94A3B8] tracking-wider">Progresso</p>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-xs font-semibold uppercase text-text-muted tracking-wider">Progresso</p>
           <p className="font-display font-bold text-3xl text-[#0F172A] mt-2">{project.progress}%</p>
         </div>
-        <div className="rounded-xl border border-border bg-white p-5">
-          <p className="text-xs font-semibold uppercase text-[#94A3B8] tracking-wider">Dias Restantes</p>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-xs font-semibold uppercase text-text-muted tracking-wider">Dias Restantes</p>
           <p className={cn("font-display font-bold text-3xl mt-2", daysInfo !== null && daysInfo < 0 ? "text-red-500" : "text-[#0F172A]")}>
             {daysInfo !== null ? (daysInfo < 0 ? `+${Math.abs(daysInfo)}` : daysInfo) : "—"}
           </p>
         </div>
-        <div className="rounded-xl border border-border bg-white p-5">
-          <p className="text-xs font-semibold uppercase text-[#94A3B8] tracking-wider">Tarefas Pendentes</p>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-xs font-semibold uppercase text-text-muted tracking-wider">Tarefas Pendentes</p>
           <p className="font-display font-bold text-3xl text-[#0F172A] mt-2">{pendingTasksCount}</p>
         </div>
-        <div className="rounded-xl border border-border bg-white p-5">
-          <p className="text-xs font-semibold uppercase text-[#94A3B8] tracking-wider">Valor a Receber</p>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-xs font-semibold uppercase text-text-muted tracking-wider">Valor a Receber</p>
           <p className="font-display font-bold text-2xl text-[#0F172A] mt-2">{formatCurrency(pendingValue)}</p>
         </div>
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="overview">
-        <TabsList className="bg-white border border-border rounded-xl p-1 h-auto flex flex-wrap gap-1">
+        <TabsList className="bg-card border border-border rounded-xl p-1 h-auto flex flex-wrap gap-1">
           {["overview", "kanban", "tarefas", "documentos", "financeiro", "timeline"].map((tab) => {
             const labels: Record<string, string> = {
               overview: "Overview",
@@ -409,7 +409,7 @@ export default function ProjectDetailPage() {
             {/* Left: description + milestones */}
             <div className="space-y-4">
               {project.description && (
-                <div className="rounded-xl border border-border bg-white p-5">
+                <div className="rounded-xl border border-border bg-card p-5">
                   <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Descrição / Escopo</h3>
                   <p className="text-sm text-[#475569] whitespace-pre-wrap leading-relaxed">{project.description}</p>
                 </div>
@@ -417,7 +417,7 @@ export default function ProjectDetailPage() {
 
               {/* Milestones across all phases */}
               {project.phases && project.phases.length > 0 && (
-                <div className="rounded-xl border border-border bg-white p-5">
+                <div className="rounded-xl border border-border bg-card p-5">
                   <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Marcos</h3>
                   <div className="space-y-2">
                     {project.phases.flatMap((phase) =>
@@ -430,16 +430,16 @@ export default function ProjectDetailPage() {
                             {m.completed ? (
                               <CheckSquare size={16} className="text-emerald-500" />
                             ) : (
-                              <Square size={16} className="text-[#94A3B8]" />
+                              <Square size={16} className="text-text-muted" />
                             )}
                           </button>
-                          <span className={cn("text-sm flex-1", m.completed && "line-through text-[#94A3B8]")}>
+                          <span className={cn("text-sm flex-1", m.completed && "line-through text-text-muted")}>
                             {m.name}
                           </span>
                           {m.due_date && (
-                            <span className="text-xs text-[#94A3B8]">{formatDate(m.due_date)}</span>
+                            <span className="text-xs text-text-muted">{formatDate(m.due_date)}</span>
                           )}
-                          <span className="text-[10px] text-[#94A3B8] bg-[#F8FAFC] px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] text-text-muted bg-white/5 px-1.5 py-0.5 rounded">
                             {phase.name}
                           </span>
                         </div>
@@ -452,17 +452,17 @@ export default function ProjectDetailPage() {
 
             {/* Right: phases */}
             {project.phases && project.phases.length > 0 && (
-              <div className="rounded-xl border border-border bg-white p-5">
+              <div className="rounded-xl border border-border bg-card p-5">
                 <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Fases</h3>
                 <div className="space-y-3">
                   {project.phases.map((phase) => {
                     const ps = PHASE_STATUS_STYLES[phase.status] ?? { bg: "bg-gray-100", text: "text-gray-600" };
                     const phaseLabel = phase.status === "pendente" ? "Pendente" : phase.status === "em_andamento" ? "Em andamento" : "Concluída";
                     return (
-                      <div key={phase.id} className="flex items-center gap-4 p-3 rounded-lg bg-[#F8FAFC]">
+                      <div key={phase.id} className="flex items-center gap-4 p-3 rounded-lg bg-white/5">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-[#0F172A]">{phase.name}</p>
-                          <div className="flex gap-3 text-xs text-[#94A3B8] mt-0.5">
+                          <div className="flex gap-3 text-xs text-text-muted mt-0.5">
                             {phase.start_date && <span>{formatDate(phase.start_date)}</span>}
                             {phase.end_date && <span>→ {formatDate(phase.end_date)}</span>}
                           </div>
@@ -499,11 +499,11 @@ export default function ProjectDetailPage() {
 
                     return (
                       <div key={phase.id} className="w-72 flex-shrink-0">
-                        <div className="rounded-t-xl bg-white border border-border border-b-0 p-3 flex items-center justify-between">
+                        <div className="rounded-t-xl bg-card border border-border border-b-0 p-3 flex items-center justify-between">
                           <div>
                             <p className="text-sm font-semibold text-[#0F172A]">{phase.name}</p>
                             <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-xs text-[#94A3B8]">{phaseTasks.length} tarefas</span>
+                              <span className="text-xs text-text-muted">{phaseTasks.length} tarefas</span>
                               <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium", ps.bg, ps.text)}>
                                 {phaseLabel}
                               </span>
@@ -512,7 +512,7 @@ export default function ProjectDetailPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-[#64748B]"
+                            className="h-7 w-7 text-text-muted"
                             onClick={() => { setTaskFormPhaseId(phase.id); setTaskFormOpen(true); }}
                           >
                             <Plus size={14} />
@@ -526,7 +526,7 @@ export default function ProjectDetailPage() {
                               {...provided.droppableProps}
                               className={cn(
                                 "min-h-[200px] rounded-b-xl border border-border p-2 space-y-2 transition-colors",
-                                snapshot.isDraggingOver ? "bg-[#0B87C3]/5" : "bg-[#F8FAFC]"
+                                snapshot.isDraggingOver ? "bg-[#0B87C3]/5" : "bg-white/5"
                               )}
                             >
                               {phaseTasks.map((task, index) => (
@@ -536,7 +536,7 @@ export default function ProjectDetailPage() {
                                       ref={provided.innerRef}
                                       {...provided.draggableProps}
                                       className={cn(
-                                        "bg-white rounded-lg border border-border p-3 space-y-2 transition-shadow",
+                                        "bg-card rounded-lg border border-border p-3 space-y-2 transition-shadow",
                                         snapshot.isDragging && "shadow-lg"
                                       )}
                                     >
@@ -552,7 +552,7 @@ export default function ProjectDetailPage() {
                                           style={{ background: PRIORITY_COLORS[task.priority] ?? "#94A3B8" }}
                                           title={task.priority}
                                         />
-                                        <span className="text-[10px] text-[#94A3B8] bg-[#F8FAFC] px-1.5 py-0.5 rounded">
+                                        <span className="text-[10px] text-text-muted bg-white/5 px-1.5 py-0.5 rounded">
                                           {task.type}
                                         </span>
                                         <div className="ml-auto">
@@ -560,7 +560,7 @@ export default function ProjectDetailPage() {
                                         </div>
                                       </div>
                                       {task.due_date && (
-                                        <p className="text-[10px] text-[#94A3B8] flex items-center gap-1">
+                                        <p className="text-[10px] text-text-muted flex items-center gap-1">
                                           <Calendar size={10} />
                                           {formatDate(task.due_date)}
                                         </p>
@@ -600,7 +600,7 @@ export default function ProjectDetailPage() {
                       "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
                       taskFilter === f
                         ? "bg-[#0B87C3] text-white"
-                        : "bg-white border border-border text-[#64748B] hover:bg-white/5"
+                        : "bg-white border border-border text-text-muted hover:bg-white/5"
                     )}
                   >
                     {labels[f]}
@@ -625,9 +625,9 @@ export default function ProjectDetailPage() {
                 const phaseTasks = filteredTasks.filter((t) => t.phase_id === phase.id);
                 if (phaseTasks.length === 0) return null;
                 return (
-                  <div key={phase.id} className="rounded-xl border border-border bg-white overflow-hidden">
-                    <div className="px-4 py-3 bg-[#F8FAFC] border-b border-border">
-                      <p className="text-sm font-semibold text-[#64748B]">{phase.name}</p>
+                  <div key={phase.id} className="rounded-xl border border-border bg-card overflow-hidden">
+                    <div className="px-4 py-3 bg-white/5 border-b border-border">
+                      <p className="text-sm font-semibold text-text-muted">{phase.name}</p>
                     </div>
                     <div className="divide-y divide-[#F1F5F9]">
                       {phaseTasks.map((task) => (
@@ -649,7 +649,7 @@ export default function ProjectDetailPage() {
                   action={{ label: "Nova Tarefa", onClick: () => setTaskFormOpen(true) }}
                 />
               ) : (
-                <div className="rounded-xl border border-border bg-white overflow-hidden">
+                <div className="rounded-xl border border-border bg-card overflow-hidden">
                   <div className="divide-y divide-[#F1F5F9]">
                     {filteredTasks.map((task) => (
                       <TaskRow key={task.id} task={task} users={orgUsers} onToggle={(id, status) =>
@@ -666,9 +666,9 @@ export default function ProjectDetailPage() {
               const noPhase = filteredTasks.filter((t) => !t.phase_id);
               if (noPhase.length === 0) return null;
               return (
-                <div className="rounded-xl border border-border bg-white overflow-hidden">
-                  <div className="px-4 py-3 bg-[#F8FAFC] border-b border-border">
-                    <p className="text-sm font-semibold text-[#64748B]">Sem fase</p>
+                <div className="rounded-xl border border-border bg-card overflow-hidden">
+                  <div className="px-4 py-3 bg-white/5 border-b border-border">
+                    <p className="text-sm font-semibold text-text-muted">Sem fase</p>
                   </div>
                   <div className="divide-y divide-[#F1F5F9]">
                     {noPhase.map((task) => (
@@ -693,7 +693,7 @@ export default function ProjectDetailPage() {
                 "rounded-xl border-2 border-dashed p-8 text-center cursor-pointer transition-colors",
                 isDragActive
                   ? "border-[#0B87C3] bg-[#0B87C3]/5"
-                  : "border-border bg-[#F8FAFC] hover:border-[#0B87C3]/50"
+                  : "border-border bg-white/5 hover:border-[#0B87C3]/50"
               )}
             >
               <input {...getInputProps()} />
@@ -704,13 +704,13 @@ export default function ProjectDetailPage() {
                 <p className="text-sm font-medium text-[#0F172A]">
                   {isDragActive ? "Solte os arquivos aqui" : "Arraste arquivos ou clique para fazer upload"}
                 </p>
-                <p className="text-xs text-[#94A3B8]">PDF, Word, Excel, imagens e outros</p>
+                <p className="text-xs text-text-muted">PDF, Word, Excel, imagens e outros</p>
               </div>
             </div>
 
             {/* Staged files */}
             {uploadFiles.length > 0 && (
-              <div className="rounded-xl border border-border bg-white p-4 space-y-3">
+              <div className="rounded-xl border border-border bg-card p-4 space-y-3">
                 <h3 className="text-sm font-semibold text-[#0F172A]">Arquivos para upload</h3>
                 {uploadFiles.map((f, i) => (
                   <div key={i} className="space-y-1.5">
@@ -723,7 +723,7 @@ export default function ProjectDetailPage() {
                             prev.map((x, idx) => idx === i ? { ...x, type: e.target.value as DocumentType } : x)
                           )
                         }
-                        className="text-xs border border-border rounded px-2 py-1 bg-white"
+                        className="text-xs border border-border rounded px-2 py-1 bg-card"
                       >
                         {DOCUMENT_TYPES.map((t) => (
                           <option key={t.value} value={t.value}>{t.label}</option>
@@ -731,13 +731,13 @@ export default function ProjectDetailPage() {
                       </select>
                       <button
                         onClick={() => setUploadFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                        className="text-[#94A3B8] hover:text-red-500"
+                        className="text-text-muted hover:text-red-500"
                       >
                         <Trash2 size={14} />
                       </button>
                     </div>
                     {f.progress > 0 && (
-                      <div className="h-1 bg-[#F1F5F9] rounded-full overflow-hidden">
+                      <div className="h-1 bg-white/5 rounded-full overflow-hidden">
                         <div className="h-full bg-[#0B87C3] transition-all" style={{ width: `${f.progress}%` }} />
                       </div>
                     )}
@@ -773,25 +773,25 @@ export default function ProjectDetailPage() {
                   return (
                     <div
                       key={doc.id}
-                      className="rounded-xl border border-border bg-white p-4 space-y-3 hover:shadow-md transition-shadow"
+                      className="rounded-xl border border-border bg-card p-4 space-y-3 hover:shadow-md transition-shadow"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <DocIcon size={28} className={iconColor} />
-                        <span className="text-[10px] font-medium bg-[#F1F5F9] text-[#64748B] px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-medium bg-white/5 text-text-muted px-1.5 py-0.5 rounded">
                           v{doc.version}
                         </span>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-[#0F172A] line-clamp-2">{doc.name}</p>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#F1F5F9] text-[#64748B] mt-1">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-text-muted mt-1">
                           {docTypeLabel}
                         </span>
                       </div>
-                      <p className="text-xs text-[#94A3B8]">
+                      <p className="text-xs text-text-muted">
                         {formatDate(doc.created_at)}
                         {doc.uploader && ` · ${doc.uploader.full_name}`}
                       </p>
-                      <div className="flex items-center gap-1.5 pt-1 border-t border-[#F1F5F9]">
+                      <div className="flex items-center gap-1.5 pt-1 border-t border-border">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -835,31 +835,31 @@ export default function ProjectDetailPage() {
           <div className="space-y-4">
             {/* Summary */}
             {contractValue > 0 && (
-              <div className="rounded-xl border border-border bg-white p-5">
+              <div className="rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-[#0F172A]">Resumo Financeiro</h3>
                 </div>
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   <div>
-                    <p className="text-xs text-[#94A3B8]">Valor Contrato</p>
+                    <p className="text-xs text-text-muted">Valor Contrato</p>
                     <p className="text-lg font-bold text-[#0F172A]">{formatCurrency(contractValue)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-[#94A3B8]">Recebido</p>
+                    <p className="text-xs text-text-muted">Recebido</p>
                     <p className="text-lg font-bold text-emerald-600">{formatCurrency(receivedValue)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-[#94A3B8]">Pendente</p>
+                    <p className="text-xs text-text-muted">Pendente</p>
                     <p className="text-lg font-bold text-amber-600">{formatCurrency(pendingValue)}</p>
                   </div>
                 </div>
-                <div className="h-2 bg-[#F1F5F9] rounded-full overflow-hidden">
+                <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-emerald-500 rounded-full"
                     style={{ width: contractValue > 0 ? `${Math.min(100, (receivedValue / contractValue) * 100)}%` : "0%" }}
                   />
                 </div>
-                <p className="text-xs text-[#94A3B8] mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   {contractValue > 0 ? `${Math.round((receivedValue / contractValue) * 100)}% pago` : ""}
                 </p>
               </div>
@@ -873,7 +873,7 @@ export default function ProjectDetailPage() {
                 description="Adicione parcelas/receitas vinculadas a este projeto."
               />
             ) : (
-              <div className="rounded-xl border border-border bg-white overflow-hidden">
+              <div className="rounded-xl border border-border bg-card overflow-hidden">
                 <div className="divide-y divide-[#F1F5F9]">
                   {revenues.map((rev) => {
                     const rs = REVENUE_STATUS_STYLES[rev.status] ?? { bg: "bg-gray-100", text: "text-gray-600" };
@@ -883,11 +883,11 @@ export default function ProjectDetailPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-[#0F172A]">{rev.description}</p>
                           {rev.installment && (
-                            <p className="text-xs text-[#94A3B8]">Parcela: {rev.installment}</p>
+                            <p className="text-xs text-text-muted">Parcela: {rev.installment}</p>
                           )}
                         </div>
                         <p className="text-sm font-semibold text-[#0F172A]">{formatCurrency(rev.value)}</p>
-                        <p className="text-xs text-[#94A3B8] w-24 text-right">
+                        <p className="text-xs text-text-muted w-24 text-right">
                           {rev.due_date ? formatDate(rev.due_date) : "—"}
                         </p>
                         <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium", rs.bg, rs.text)}>
@@ -920,7 +920,7 @@ export default function ProjectDetailPage() {
 
         {/* ── Timeline ── */}
         <TabsContent value="timeline" className="mt-4">
-          <div className="rounded-xl border border-border bg-white p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <Timeline items={activities ?? []} />
           </div>
         </TabsContent>
@@ -968,15 +968,15 @@ function TaskRow({ task, users, onToggle }: TaskRowProps) {
         checked={isDone}
         onCheckedChange={(checked) => onToggle(task.id, checked ? "concluida" : "pendente")}
       />
-      <p className={cn("text-sm flex-1", isDone && "line-through text-[#94A3B8]")}>{task.title}</p>
-      <span className="text-xs text-[#64748B] bg-[#F1F5F9] px-1.5 py-0.5 rounded">{task.type}</span>
+      <p className={cn("text-sm flex-1", isDone && "line-through text-text-muted")}>{task.title}</p>
+      <span className="text-xs text-text-muted bg-white/5 px-1.5 py-0.5 rounded">{task.type}</span>
       <div
         className="w-2 h-2 rounded-full flex-shrink-0"
         style={{ background: PRIORITY_COLORS[task.priority] ?? "#94A3B8" }}
         title={task.priority}
       />
       <UserAvatar userId={task.assignee_id} users={users} />
-      <span className="text-xs text-[#94A3B8] w-20 text-right">
+      <span className="text-xs text-text-muted w-20 text-right">
         {task.due_date ? formatDate(task.due_date) : "—"}
       </span>
     </div>

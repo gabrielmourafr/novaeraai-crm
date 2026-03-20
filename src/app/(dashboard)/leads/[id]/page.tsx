@@ -334,7 +334,7 @@ export default function LeadDetailPage() {
 
         {/* Stage navigation */}
         {sortedStages.length > 0 && (
-          <div className="flex items-center gap-2 p-3 bg-white rounded-xl border border-border">
+          <div className="flex items-center gap-2 p-3 bg-card rounded-xl border border-border">
             <Button
               variant="ghost"
               size="sm"
@@ -398,7 +398,7 @@ export default function LeadDetailPage() {
 
             {/* ── Tab: Atividades ── */}
             <TabsContent value="activities">
-              <div className="rounded-xl border border-border bg-white p-6">
+              <div className="rounded-xl border border-border bg-card p-6">
                 <h3 className="font-semibold text-text-primary mb-4">Histórico</h3>
                 <Timeline items={activities ?? []} />
 
@@ -429,7 +429,7 @@ export default function LeadDetailPage() {
 
             {/* ── Tab: Propostas ── */}
             <TabsContent value="proposals">
-              <div className="rounded-xl border border-border bg-white p-6">
+              <div className="rounded-xl border border-border bg-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-text-primary">Propostas</h3>
                   <Button size="sm" asChild style={{ background: "var(--primary)" }}>
@@ -499,7 +499,7 @@ export default function LeadDetailPage() {
 
             {/* ── Tab: Tarefas ── */}
             <TabsContent value="tasks">
-              <div className="rounded-xl border border-border bg-white p-6">
+              <div className="rounded-xl border border-border bg-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-text-primary">Tarefas</h3>
                   <Button
@@ -574,7 +574,7 @@ export default function LeadDetailPage() {
 
             {/* ── Tab: Notas ── */}
             <TabsContent value="notes">
-              <div className="rounded-xl border border-border bg-white p-6">
+              <div className="rounded-xl border border-border bg-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-text-primary">Notas</h3>
                   {!editingNotes && (
@@ -633,7 +633,7 @@ export default function LeadDetailPage() {
         {/* ── RIGHT: Sidebar ── */}
         <div className="space-y-4">
           {/* Card 1: Lead Details */}
-          <div className="rounded-xl border border-border bg-white p-6 space-y-4">
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
             <h3 className="font-semibold text-text-primary text-sm uppercase tracking-wide">
               Detalhes
             </h3>
@@ -726,7 +726,7 @@ export default function LeadDetailPage() {
                   {lead.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="px-2 py-0.5 rounded bg-[#F8FAFC] border border-border text-xs text-text-secondary"
+                      className="px-2 py-0.5 rounded bg-white/5 border border-border text-xs text-text-secondary"
                     >
                       {tag}
                     </span>
@@ -738,7 +738,7 @@ export default function LeadDetailPage() {
 
           {/* Card 2: Contato Principal */}
           {contact && (
-            <div className="rounded-xl border border-border bg-white p-6 space-y-3">
+            <div className="rounded-xl border border-border bg-card p-6 space-y-3">
               <h3 className="font-semibold text-text-primary text-sm uppercase tracking-wide">
                 Contato Principal
               </h3>
@@ -787,7 +787,7 @@ export default function LeadDetailPage() {
 
           {/* Card 3: Empresa */}
           {company && (
-            <div className="rounded-xl border border-border bg-white p-6 space-y-3">
+            <div className="rounded-xl border border-border bg-card p-6 space-y-3">
               <h3 className="font-semibold text-text-primary text-sm uppercase tracking-wide">
                 Empresa
               </h3>

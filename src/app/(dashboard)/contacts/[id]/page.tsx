@@ -45,7 +45,7 @@ const temperatureColors: Record<string, string> = {
 
 function CompanyLink({ companyId }: { companyId: string | null }) {
   const { data: company } = useCompany(companyId ?? "");
-  if (!companyId || !company) return <span className="text-[#94A3B8]">—</span>;
+  if (!companyId || !company) return <span className="text-text-muted">—</span>;
   return (
     <a
       href={`/companies/${company.id}`}
@@ -66,7 +66,7 @@ function InfoDetailRow({
 }) {
   return (
     <div className="flex items-start gap-3 py-2.5 border-b border-border last:border-0">
-      <p className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8] w-28 flex-shrink-0 mt-0.5">
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-muted w-28 flex-shrink-0 mt-0.5">
         {label}
       </p>
       <div className="text-sm text-[#0F172A] flex-1">{value}</div>
@@ -104,9 +104,9 @@ export default function ContactDetailPage() {
   if (error || !contact) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <Users size={48} className="text-[#94A3B8] mb-4" />
+        <Users size={48} className="text-text-muted mb-4" />
         <h2 className="text-lg font-semibold text-[#0F172A] mb-2">Contato não encontrado</h2>
-        <p className="text-sm text-[#94A3B8] mb-6">
+        <p className="text-sm text-text-muted mb-6">
           O contato que você está procurando não existe ou foi removido.
         </p>
         <Button onClick={() => router.push("/contacts")} variant="outline">
@@ -122,7 +122,7 @@ export default function ContactDetailPage() {
       {/* Back */}
       <button
         onClick={() => router.push("/contacts")}
-        className="flex items-center gap-1.5 text-sm text-[#94A3B8] hover:text-[#0B87C3] transition-colors"
+        className="flex items-center gap-1.5 text-sm text-text-muted hover:text-[#0B87C3] transition-colors"
       >
         <ArrowLeft size={15} />
         Contatos
@@ -145,10 +145,10 @@ export default function ContactDetailPage() {
             </h1>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {contact.job_title && (
-                <span className="text-sm text-[#94A3B8]">{contact.job_title}</span>
+                <span className="text-sm text-text-muted">{contact.job_title}</span>
               )}
               {contact.job_title && contact.company_id && (
-                <span className="text-[#94A3B8] text-sm">·</span>
+                <span className="text-text-muted text-sm">·</span>
               )}
               {contact.company_id && (
                 <CompanyLink companyId={contact.company_id} />
@@ -200,7 +200,7 @@ export default function ContactDetailPage() {
       {/* Main 2-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         {/* Left: Tabs */}
-        <div className="rounded-xl border border-border bg-white overflow-hidden">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
           <Tabs defaultValue="atividades" className="w-full">
             <div className="border-b border-border px-6 overflow-x-auto">
               <TabsList className="h-12 bg-transparent p-0 gap-0 w-max">
@@ -214,7 +214,7 @@ export default function ContactDetailPage() {
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#0B87C3] data-[state=active]:text-[#0B87C3] data-[state=active]:shadow-none text-[#94A3B8] px-4 h-12 text-sm font-medium bg-transparent"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#0B87C3] data-[state=active]:text-[#0B87C3] data-[state=active]:shadow-none text-text-muted px-4 h-12 text-sm font-medium bg-transparent"
                   >
                     {tab.label}
                   </TabsTrigger>
@@ -266,19 +266,19 @@ export default function ContactDetailPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider pb-2 pr-4">
+                        <th className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider pb-2 pr-4">
                           Lead
                         </th>
-                        <th className="text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider pb-2 pr-4">
+                        <th className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider pb-2 pr-4">
                           Empresa
                         </th>
-                        <th className="text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider pb-2 pr-4">
+                        <th className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider pb-2 pr-4">
                           Estágio
                         </th>
-                        <th className="text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider pb-2 pr-4">
+                        <th className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider pb-2 pr-4">
                           Valor
                         </th>
-                        <th className="text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider pb-2">
+                        <th className="text-left text-xs font-semibold text-text-muted uppercase tracking-wider pb-2">
                           Temp.
                         </th>
                       </tr>
@@ -292,7 +292,7 @@ export default function ContactDetailPage() {
                         >
                           <td className="py-3 pr-4">
                             <p className="font-medium text-[#0F172A]">{lead.title}</p>
-                            <p className="text-xs text-[#94A3B8]">
+                            <p className="text-xs text-text-muted">
                               {formatDate(lead.created_at)}
                             </p>
                           </td>
@@ -308,7 +308,7 @@ export default function ContactDetailPage() {
                                 {lead.company.name}
                               </span>
                             ) : (
-                              <span className="text-[#94A3B8]">—</span>
+                              <span className="text-text-muted">—</span>
                             )}
                           </td>
                           <td className="py-3 pr-4">
@@ -325,7 +325,7 @@ export default function ContactDetailPage() {
                                 {lead.stage.name}
                               </span>
                             ) : (
-                              <span className="text-[#94A3B8]">—</span>
+                              <span className="text-text-muted">—</span>
                             )}
                           </td>
                           <td className="py-3 pr-4 text-[#0F172A]">
@@ -342,7 +342,7 @@ export default function ContactDetailPage() {
                                 {getTemperatureMeta(lead.temperature)?.label ?? lead.temperature}
                               </span>
                             ) : (
-                              <span className="text-[#94A3B8]">—</span>
+                              <span className="text-text-muted">—</span>
                             )}
                           </td>
                         </tr>
@@ -368,7 +368,7 @@ export default function ContactDetailPage() {
                         {contact.email}
                       </a>
                     ) : (
-                      <span className="text-[#94A3B8]">—</span>
+                      <span className="text-text-muted">—</span>
                     )
                   }
                 />
@@ -384,7 +384,7 @@ export default function ContactDetailPage() {
                         {contact.phone}
                       </a>
                     ) : (
-                      <span className="text-[#94A3B8]">—</span>
+                      <span className="text-text-muted">—</span>
                     )
                   }
                 />
@@ -402,13 +402,13 @@ export default function ContactDetailPage() {
                         Ver perfil
                       </a>
                     ) : (
-                      <span className="text-[#94A3B8]">—</span>
+                      <span className="text-text-muted">—</span>
                     )
                   }
                 />
                 <InfoDetailRow
                   label="Cargo"
-                  value={contact.job_title ?? <span className="text-[#94A3B8]">—</span>}
+                  value={contact.job_title ?? <span className="text-text-muted">—</span>}
                 />
                 <InfoDetailRow
                   label="Empresa"
@@ -422,7 +422,7 @@ export default function ContactDetailPage() {
                         {getOriginLabel(contact.origin)}
                       </span>
                     ) : (
-                      <span className="text-[#94A3B8]">—</span>
+                      <span className="text-text-muted">—</span>
                     )
                   }
                 />
@@ -434,7 +434,7 @@ export default function ContactDetailPage() {
                         {getDecisionRoleLabel(contact.decision_role)}
                       </span>
                     ) : (
-                      <span className="text-[#94A3B8]">—</span>
+                      <span className="text-text-muted">—</span>
                     )
                   }
                 />
@@ -450,7 +450,7 @@ export default function ContactDetailPage() {
         {/* Right Sidebar */}
         <div className="space-y-4">
           {/* Quick actions */}
-          <div className="rounded-xl border border-border bg-white p-6">
+          <div className="rounded-xl border border-border bg-card p-6">
             <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Ações Rápidas</h3>
             <div className="space-y-2">
               {contact.phone && (
@@ -485,7 +485,7 @@ export default function ContactDetailPage() {
                 </a>
               )}
               {!contact.phone && !contact.email && !contact.linkedin && (
-                <p className="text-xs text-[#94A3B8]">
+                <p className="text-xs text-text-muted">
                   Nenhuma ação disponível sem telefone ou e-mail.
                 </p>
               )}
@@ -493,16 +493,16 @@ export default function ContactDetailPage() {
           </div>
 
           {/* Info card */}
-          <div className="rounded-xl border border-border bg-white p-6 space-y-3">
+          <div className="rounded-xl border border-border bg-card p-6 space-y-3">
             <h3 className="text-sm font-semibold text-[#0F172A]">Informações</h3>
             <div className="text-sm space-y-2">
               <div>
-                <p className="text-xs text-[#94A3B8] mb-0.5">Cadastrado em</p>
+                <p className="text-xs text-text-muted mb-0.5">Cadastrado em</p>
                 <p className="text-[#0F172A]">{formatDate(contact.created_at)}</p>
               </div>
               {contact.company_id && (
                 <div>
-                  <p className="text-xs text-[#94A3B8] mb-0.5">Empresa</p>
+                  <p className="text-xs text-text-muted mb-0.5">Empresa</p>
                   <CompanyLink companyId={contact.company_id} />
                 </div>
               )}
@@ -511,7 +511,7 @@ export default function ContactDetailPage() {
 
           {/* Tags */}
           {contact.tags && contact.tags.length > 0 && (
-            <div className="rounded-xl border border-border bg-white p-6">
+            <div className="rounded-xl border border-border bg-card p-6">
               <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Tags</h3>
               <div className="flex flex-wrap gap-1.5">
                 {contact.tags.map((tag) => (

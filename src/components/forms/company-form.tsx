@@ -148,11 +148,12 @@ export const CompanyForm = ({ open, onClose, company }: CompanyFormProps) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Segmento</Label>
-              <Select value={segmentValue ?? ""} onValueChange={(v) => setValue("segment", v)}>
+              <Select value={segmentValue ?? "__none__"} onValueChange={(v) => setValue("segment", v === "__none__" ? undefined : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">Selecionar</SelectItem>
                   {COMPANY_SEGMENTS.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}
@@ -164,11 +165,12 @@ export const CompanyForm = ({ open, onClose, company }: CompanyFormProps) => {
 
             <div className="space-y-1.5">
               <Label>Porte</Label>
-              <Select value={sizeValue ?? ""} onValueChange={(v) => setValue("size", v)}>
+              <Select value={sizeValue ?? "__none__"} onValueChange={(v) => setValue("size", v === "__none__" ? undefined : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">Selecionar</SelectItem>
                   {COMPANY_SIZES.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}
@@ -197,13 +199,14 @@ export const CompanyForm = ({ open, onClose, company }: CompanyFormProps) => {
           <div className="space-y-1.5">
             <Label>Maturidade Digital</Label>
             <Select
-              value={digitalMaturityValue ?? ""}
-              onValueChange={(v) => setValue("digital_maturity", v)}
+              value={digitalMaturityValue ?? "__none__"}
+              onValueChange={(v) => setValue("digital_maturity", v === "__none__" ? undefined : v)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecionar" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="__none__">Selecionar</SelectItem>
                 <SelectItem value="basica">Básica</SelectItem>
                 <SelectItem value="intermediaria">Intermediária</SelectItem>
                 <SelectItem value="avancada">Avançada</SelectItem>

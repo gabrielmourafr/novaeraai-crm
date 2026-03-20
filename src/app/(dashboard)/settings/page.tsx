@@ -220,7 +220,7 @@ const StageRow = ({
           <button
             onClick={() => onMoveUp(stage)}
             disabled={isFirst}
-            className="p-1 rounded hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className="p-1 rounded hover:bg-white/5 hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             title="Mover para cima"
           >
             <ChevronUp size={14} className="text-text-muted" />
@@ -228,7 +228,7 @@ const StageRow = ({
           <button
             onClick={() => onMoveDown(stage)}
             disabled={isLast}
-            className="p-1 rounded hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className="p-1 rounded hover:bg-white/5 hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             title="Mover para baixo"
           >
             <ChevronDown size={14} className="text-text-muted" />
@@ -238,7 +238,7 @@ const StageRow = ({
               setNameValue(stage.name);
               setEditing(true);
             }}
-            className="p-1 rounded hover:bg-white hover:shadow-sm transition-all"
+            className="p-1 rounded hover:bg-white/5 hover:shadow-sm transition-all"
             title="Editar nome"
           >
             <Pencil size={13} className="text-text-muted" />

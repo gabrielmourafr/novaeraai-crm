@@ -233,11 +233,12 @@ export const LeadForm = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Temperatura</Label>
-              <Select value={temperatureValue ?? ""} onValueChange={(v) => setValue("temperature", v)}>
+              <Select value={temperatureValue ?? "__none__"} onValueChange={(v) => setValue("temperature", v === "__none__" ? undefined : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">Selecionar</SelectItem>
                   {TEMPERATURES.map((t) => (
                     <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                   ))}
@@ -247,11 +248,12 @@ export const LeadForm = ({
 
             <div className="space-y-1.5">
               <Label>Origem</Label>
-              <Select value={originValue ?? ""} onValueChange={(v) => setValue("origin", v)}>
+              <Select value={originValue ?? "__none__"} onValueChange={(v) => setValue("origin", v === "__none__" ? undefined : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">Selecionar</SelectItem>
                   {LEAD_ORIGINS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                   ))}

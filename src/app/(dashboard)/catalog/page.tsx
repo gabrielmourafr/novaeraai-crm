@@ -194,7 +194,7 @@ export default function CatalogPage() {
           </>
         )}
 
-        <div className="flex gap-1 border border-border rounded-lg p-1 bg-white ml-auto">
+        <div className="flex gap-1 border border-border rounded-lg p-1 bg-white/5 ml-auto">
           <button
             onClick={() => setView("frente")}
             className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
@@ -278,7 +278,7 @@ export default function CatalogPage() {
                       return (
                         <div
                           key={product.id}
-                          className="bg-white rounded-xl border border-border p-5 hover:shadow-md transition-shadow group"
+                          className="bg-card rounded-xl border border-border p-5 hover:shadow-md transition-shadow group"
                         >
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="flex-1 min-w-0">
@@ -339,7 +339,7 @@ export default function CatalogPage() {
         </div>
       ) : (
         /* ── Tabela View ── */
-        <div className="bg-white rounded-xl border border-border overflow-hidden">
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
           {filteredForTable.length === 0 ? (
             <div className="p-10 text-center">
               <p className="text-text-muted text-sm">Nenhum produto encontrado com os filtros aplicados.</p>

@@ -89,7 +89,7 @@ export default function ContactsPage() {
       </div>
 
       {isLoading ? (
-        <div className="bg-white rounded-xl border border-border">
+        <div className="bg-card rounded-xl border border-border">
           <div className="p-4 space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="flex items-center gap-4">
@@ -110,7 +110,7 @@ export default function ContactsPage() {
           action={{ label: "Novo Contato", onClick: handleNew }}
         />
       ) : (
-        <div className="bg-white rounded-xl border border-border overflow-hidden">
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>

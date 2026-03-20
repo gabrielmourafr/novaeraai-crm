@@ -123,7 +123,7 @@ export default function LeadsPage() {
           />
         </div>
 
-        <div className="flex gap-1 border border-border rounded-lg p-1 bg-white">
+        <div className="flex gap-1 border border-border rounded-lg p-1 bg-white/5">
           <button
             onClick={() => setView("kanban")}
             className={`p-1.5 rounded ${

@@ -110,7 +110,7 @@ function DocumentCard({ doc, onDelete }: { doc: DocumentWithRelations; onDelete:
       {/* Icon + version */}
       <div className="flex items-start justify-between gap-2">
         <DocIcon size={32} className={iconColor} />
-        <span className="text-[10px] font-medium bg-[#F1F5F9] text-[#64748B] px-1.5 py-0.5 rounded flex-shrink-0">
+        <span className="text-[10px] font-medium bg-white/5 text-text-muted px-1.5 py-0.5 rounded flex-shrink-0">
           v{doc.version}
         </span>
       </div>
@@ -118,7 +118,7 @@ function DocumentCard({ doc, onDelete }: { doc: DocumentWithRelations; onDelete:
       {/* Name + type */}
       <div className="flex-1">
         <p className="text-sm font-semibold text-[#0F172A] line-clamp-2 leading-snug">{doc.name}</p>
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#F1F5F9] text-[#64748B] mt-1.5">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-text-muted mt-1.5">
           {docTypeLabel}
         </span>
       </div>
@@ -126,24 +126,24 @@ function DocumentCard({ doc, onDelete }: { doc: DocumentWithRelations; onDelete:
       {/* Company / project */}
       <div className="space-y-0.5">
         {doc.company && (
-          <p className="text-xs text-[#64748B] flex items-center gap-1">
+          <p className="text-xs text-text-muted flex items-center gap-1">
             <Building2 size={10} />
             {doc.company.name}
           </p>
         )}
         {doc.project && (
-          <p className="text-xs text-[#94A3B8]">{doc.project.name}</p>
+          <p className="text-xs text-text-muted">{doc.project.name}</p>
         )}
       </div>
 
       {/* Date + uploader */}
-      <p className="text-xs text-[#94A3B8]">
+      <p className="text-xs text-text-muted">
         {formatDate(doc.created_at)}
         {doc.uploader && ` · ${doc.uploader.full_name}`}
       </p>
 
       {/* Actions */}
-      <div className="flex items-center gap-1 pt-1 border-t border-[#F1F5F9]">
+      <div className="flex items-center gap-1 pt-1 border-t border-border">
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownload} title="Download">
           <Download size={13} />
         </Button>
@@ -239,7 +239,7 @@ function UploadModal({ open, onClose, orgId, uploadedBy, initialCompanyId = "", 
               "rounded-xl border-2 border-dashed p-8 text-center cursor-pointer transition-colors",
               isDragActive
                 ? "border-[#0B87C3] bg-[#0B87C3]/5"
-                : "border-border bg-[#F8FAFC] hover:border-[#0B87C3]/50"
+                : "border-border bg-white/5 hover:border-[#0B87C3]/50"
             )}
           >
             <input {...getInputProps()} />
@@ -248,7 +248,7 @@ function UploadModal({ open, onClose, orgId, uploadedBy, initialCompanyId = "", 
               <p className="text-sm font-medium text-[#0F172A]">
                 {isDragActive ? "Solte os arquivos aqui" : "Arraste arquivos ou clique para selecionar"}
               </p>
-              <p className="text-xs text-[#94A3B8]">Múltiplos arquivos suportados</p>
+              <p className="text-xs text-text-muted">Múltiplos arquivos suportados</p>
             </div>
           </div>
 
@@ -261,7 +261,7 @@ function UploadModal({ open, onClose, orgId, uploadedBy, initialCompanyId = "", 
                     <p className="text-sm font-medium text-[#0F172A] flex-1 truncate">{f.file.name}</p>
                     <button
                       onClick={() => setStaged((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="text-[#94A3B8] hover:text-red-500 flex-shrink-0"
+                      className="text-text-muted hover:text-red-500 flex-shrink-0"
                     >
                       <X size={14} />
                     </button>
@@ -337,7 +337,7 @@ function UploadModal({ open, onClose, orgId, uploadedBy, initialCompanyId = "", 
                   </div>
 
                   {f.progress > 0 && (
-                    <div className="h-1 bg-[#F1F5F9] rounded-full overflow-hidden">
+                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
                       <div className="h-full bg-[#0B87C3] transition-all" style={{ width: `${f.progress}%` }} />
                     </div>
                   )}
@@ -410,8 +410,8 @@ export default function DocumentsPage() {
       {/* Sidebar */}
       <aside className="w-64 flex-shrink-0">
         <div className="rounded-xl overflow-hidden" style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}>
-          <div className="px-4 py-3 border-b border-border bg-[#F8FAFC]">
-            <p className="text-xs font-semibold uppercase text-[#64748B] tracking-wider">Navegação</p>
+          <div className="px-4 py-3 border-b border-border bg-white/5">
+            <p className="text-xs font-semibold uppercase text-text-muted tracking-wider">Navegação</p>
           </div>
           <div className="p-2 space-y-0.5">
             {/* All docs */}
@@ -421,12 +421,12 @@ export default function DocumentsPage() {
                 "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left",
                 !selectedCompanyId
                   ? "bg-[#0B87C3]/10 text-[#0B87C3] font-medium"
-                  : "text-[#64748B] hover:bg-white/5"
+                  : "text-text-muted hover:bg-white/5"
               )}
             >
               <FolderOpen size={15} />
               <span className="flex-1">Todos os Documentos</span>
-              <span className="text-[10px] bg-[#F1F5F9] text-[#94A3B8] px-1.5 py-0.5 rounded">
+              <span className="text-[10px] bg-white/5 text-text-muted px-1.5 py-0.5 rounded">
                 {allDocs.length}
               </span>
             </button>
@@ -447,13 +447,13 @@ export default function DocumentsPage() {
                         "flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left",
                         isSelected
                           ? "bg-[#0B87C3]/10 text-[#0B87C3] font-medium"
-                          : "text-[#64748B] hover:bg-white/5"
+                          : "text-text-muted hover:bg-white/5"
                       )}
                     >
                       <Building2 size={14} />
                       <span className="flex-1 truncate">{company.name}</span>
                       {count > 0 && (
-                        <span className="text-[10px] bg-[#F1F5F9] text-[#94A3B8] px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] bg-white/5 text-text-muted px-1.5 py-0.5 rounded">
                           {count}
                         </span>
                       )}
@@ -461,7 +461,7 @@ export default function DocumentsPage() {
                     {companyProjects.length > 0 && (
                       <button
                         onClick={() => toggleCompany(company.id)}
-                        className="p-1.5 text-[#94A3B8] hover:text-[#64748B] rounded"
+                        className="p-1.5 text-text-muted hover:text-text-muted rounded"
                       >
                         {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                       </button>
@@ -479,12 +479,12 @@ export default function DocumentsPage() {
                           "w-full flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-lg text-sm transition-colors text-left",
                           isProjectSelected
                             ? "bg-[#0B87C3]/10 text-[#0B87C3] font-medium"
-                            : "text-[#64748B] hover:bg-white/5"
+                            : "text-text-muted hover:bg-white/5"
                         )}
                       >
                         <span className="flex-1 truncate">{project.name}</span>
                         {pCount > 0 && (
-                          <span className="text-[10px] bg-[#F1F5F9] text-[#94A3B8] px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] bg-white/5 text-text-muted px-1.5 py-0.5 rounded">
                             {pCount}
                           </span>
                         )}
@@ -515,7 +515,7 @@ export default function DocumentsPage() {
         />
 
         {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 text-sm text-[#64748B]">
+        <div className="flex items-center gap-1.5 text-sm text-text-muted">
           <button
             onClick={() => { setSelectedCompanyId(null); setSelectedProjectId(null); }}
             className="hover:text-[#0B87C3] transition-colors"
@@ -545,7 +545,7 @@ export default function DocumentsPage() {
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-48 rounded-xl border border-border bg-[#F8FAFC] animate-pulse" />
+              <div key={i} className="h-48 rounded-xl border border-border bg-white/5 animate-pulse" />
             ))}
           </div>
         ) : documents.length === 0 ? (
