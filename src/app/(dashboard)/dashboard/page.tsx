@@ -14,7 +14,7 @@ import { useLeads } from "@/lib/hooks/use-leads";
 import { useProjects } from "@/lib/hooks/use-projects";
 import { useProposals } from "@/lib/hooks/use-proposals";
 import { useAllTasks } from "@/lib/hooks/use-tasks";
-import { useRevenues, useExpenses } from "@/lib/hooks/use-finance";
+import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths } from "@/lib/hooks/use-finance";
 import { useUser } from "@/lib/hooks/use-user";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 
@@ -78,6 +78,8 @@ export default function DashboardPage() {
   const { data: tasks = [] } = useAllTasks();
   const { data: revenues = [] } = useRevenues(year, month);
   const { data: expenses = [] } = useExpenses(year, month);
+  const { data: revenuesLastMonths = {} } = useRevenuesLastMonths(year, month, 6);
+  const { data: expensesLastMonths = {} } = useExpensesLastMonths(year, month, 6);
 
   const totalRevenues = revenues.reduce((s, r) => s + r.value, 0);
   const totalExpenses = expenses.reduce((s, r) => s + r.value, 0);
@@ -107,15 +109,22 @@ export default function DashboardPage() {
 
   // Revenue vs Expense by month (current month + 5 previous)
   const financeData = useMemo(() => {
-    return MONTHS_SHORT.slice(Math.max(0, month - 6), month).map((m, i, arr) => {
-      const isLast = i === arr.length - 1;
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(year, month - 1 - (5 - i), 1);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      const key = `${y}-${String(m).padStart(2, "0")}`;
+      const monthRevenues = revenuesLastMonths[key] ?? [];
+      const monthExpenses = expensesLastMonths[key] ?? [];
+      const monthRevTotal = monthRevenues.reduce((s, r) => s + r.value, 0);
+      const monthExpTotal = monthExpenses.reduce((s, e) => s + e.value, 0);
       return {
-        name: m,
-        receitas: isLast ? totalRevenues : 0,
-        despesas: isLast ? totalExpenses : 0,
+        name: MONTHS_SHORT[d.getMonth()],
+        receitas: monthRevTotal,
+        despesas: monthExpTotal,
       };
     });
-  }, [totalRevenues, totalExpenses, month]);
+  }, [year, month, revenuesLastMonths, expensesLastMonths]);
 
   // Proposal status pie
   const proposalStatusData = useMemo(() => {

@@ -195,6 +195,7 @@ export const useUpdateProposalItems = () => {
       }
     },
     onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["proposals"] });
       qc.invalidateQueries({ queryKey: ["proposal", vars.proposalId] });
     },
     onError: () => toast.error("Erro ao atualizar itens da proposta"),

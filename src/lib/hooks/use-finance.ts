@@ -54,7 +54,8 @@ export const useRevenues = (year?: number, month?: number) => {
       let query = supabase.from("revenues").select("*").order("due_date", { ascending: false });
       if (year && month) {
         const from = `${year}-${String(month).padStart(2, "0")}-01`;
-        const to = `${year}-${String(month).padStart(2, "0")}-31`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const to = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
         query = query.gte("due_date", from).lte("due_date", to);
       }
       const { data, error } = await query;
@@ -72,12 +73,67 @@ export const useExpenses = (year?: number, month?: number) => {
       let query = supabase.from("expenses").select("*").order("due_date", { ascending: false });
       if (year && month) {
         const from = `${year}-${String(month).padStart(2, "0")}-01`;
-        const to = `${year}-${String(month).padStart(2, "0")}-31`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const to = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
         query = query.gte("due_date", from).lte("due_date", to);
       }
       const { data, error } = await query;
       if (error) throw error;
       return data as Expense[];
+    },
+  });
+};
+
+export const useRevenuesLastMonths = (year: number, month: number, months = 6) => {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["revenues", "months", year, month, months],
+    queryFn: async () => {
+      const result: Record<string, Revenue[]> = {};
+      for (let i = months - 1; i >= 0; i--) {
+        const d = new Date(year, month - 1 - i, 1);
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const from = `${y}-${String(m).padStart(2, "0")}-01`;
+        const lastDay = new Date(y, m, 0).getDate();
+        const to = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        const { data, error } = await supabase
+          .from("revenues")
+          .select("*")
+          .gte("due_date", from)
+          .lte("due_date", to)
+          .order("due_date", { ascending: false });
+        if (error) throw error;
+        result[`${y}-${String(m).padStart(2, "0")}`] = data as Revenue[];
+      }
+      return result;
+    },
+  });
+};
+
+export const useExpensesLastMonths = (year: number, month: number, months = 6) => {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["expenses", "months", year, month, months],
+    queryFn: async () => {
+      const result: Record<string, Expense[]> = {};
+      for (let i = months - 1; i >= 0; i--) {
+        const d = new Date(year, month - 1 - i, 1);
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const from = `${y}-${String(m).padStart(2, "0")}-01`;
+        const lastDay = new Date(y, m, 0).getDate();
+        const to = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        const { data, error } = await supabase
+          .from("expenses")
+          .select("*")
+          .gte("due_date", from)
+          .lte("due_date", to)
+          .order("due_date", { ascending: false });
+        if (error) throw error;
+        result[`${y}-${String(m).padStart(2, "0")}`] = data as Expense[];
+      }
+      return result;
     },
   });
 };

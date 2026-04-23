@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
-import { useRevenues, useExpenses, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, type Revenue, type Expense } from "@/lib/hooks/use-finance";
+import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, type Revenue, type Expense } from "@/lib/hooks/use-finance";
 import { useUser } from "@/lib/hooks/use-user";
 
 const revenueStatusStyles: Record<string, string> = {
@@ -80,6 +80,8 @@ export default function FinancePage() {
   const { user } = useUser();
   const { data: revenues = [], isLoading: revLoading } = useRevenues(year, month);
   const { data: expenses = [], isLoading: expLoading } = useExpenses(year, month);
+  const { data: revenuesLastMonths = {} } = useRevenuesLastMonths(year, month, 6);
+  const { data: expensesLastMonths = {} } = useExpensesLastMonths(year, month, 6);
   const deleteRevenue = useDeleteRevenue();
   const deleteExpense = useDeleteExpense();
   const updateRevenue = useUpdateRevenue();
@@ -149,15 +151,22 @@ export default function FinancePage() {
     }));
   }, [expenses]);
 
-  // Month-over-month chart data (uses current month data only — real multi-month requires separate fetches)
+  // Month-over-month chart data with actual multi-month data
   const cashFlowData = useMemo(() => {
-    return monthsBack.map((m, i) => ({
-      name: m.label,
-      receitas: i === 5 ? totalRevenues : 0,
-      despesas: i === 5 ? totalExpenses : 0,
-      saldo: i === 5 ? balance : 0,
-    }));
-  }, [monthsBack, totalRevenues, totalExpenses, balance]);
+    return monthsBack.map((m) => {
+      const key = `${m.year}-${String(m.month).padStart(2, "0")}`;
+      const monthRevenues = revenuesLastMonths[key] ?? [];
+      const monthExpenses = expensesLastMonths[key] ?? [];
+      const monthRevTotal = monthRevenues.reduce((s, r) => s + r.value, 0);
+      const monthExpTotal = monthExpenses.reduce((s, e) => s + e.value, 0);
+      return {
+        name: m.label,
+        receitas: monthRevTotal,
+        despesas: monthExpTotal,
+        saldo: monthRevTotal - monthExpTotal,
+      };
+    });
+  }, [monthsBack, revenuesLastMonths, expensesLastMonths]);
 
   // Status distribution for current month revenues
   const revStatusData = useMemo(() => {

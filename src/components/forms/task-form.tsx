@@ -147,7 +147,7 @@ export const TaskForm = ({
         });
       }
     }
-  }, [open, initialData, reset]);
+  }, [open, initialData, reset, user]);
 
   const onSubmit = async (values: TaskFormValues) => {
     if (isEditing && initialData) {
