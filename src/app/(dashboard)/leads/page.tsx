@@ -27,6 +27,8 @@ import { KanbanBoard } from "@/components/leads/kanban-board";
 import { LeadsTable } from "@/components/leads/leads-table";
 import { LeadForm } from "@/components/forms/lead-form";
 import { ContactForm } from "@/components/forms/contact-form";
+import { TaskForm } from "@/components/forms/task-form";
+import { LeadDetailSheet } from "@/components/leads/lead-detail-sheet";
 import { useLeads, useDeleteLead, useMoveLead, type LeadWithRelations } from "@/lib/hooks/use-leads";
 import { usePipelines } from "@/lib/hooks/use-pipelines";
 import { useContacts, useDeleteContact } from "@/lib/hooks/use-contacts";
@@ -48,6 +50,9 @@ export default function LeadsPage() {
   const [editingLead, setEditingLead] = useState<LeadWithRelations | undefined>();
   const [deletingLead, setDeletingLead] = useState<LeadWithRelations | undefined>();
   const [defaultStageId, setDefaultStageId] = useState<string>("");
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [taskLeadId, setTaskLeadId] = useState<string | null>(null);
+  const [detailLead, setDetailLead] = useState<LeadWithRelations | null>(null);
 
   const { data: pipelines, isLoading: pipelinesLoading } = usePipelines();
   const activePipelineId = selectedPipelineId || pipelines?.[0]?.id || "";
@@ -91,6 +96,13 @@ export default function LeadsPage() {
   };
   const handleMoveLead = (leadId: string, stageId: string) => {
     moveLead.mutate({ id: leadId, stage_id: stageId });
+  };
+  const handleQuickTask = (lead: LeadWithRelations) => {
+    setTaskLeadId(lead.id);
+    setTaskFormOpen(true);
+  };
+  const handleOpenLead = (lead: LeadWithRelations) => {
+    setDetailLead(lead);
   };
 
   // --- Contact handlers ---
@@ -198,7 +210,7 @@ export default function LeadsPage() {
           ) : !pipelines?.length ? (
             <EmptyState icon={LayoutGrid} title="Nenhum pipeline encontrado" description="Os pipelines são criados automaticamente ao registrar-se." />
           ) : view === "kanban" && activePipeline ? (
-            <KanbanBoard pipeline={activePipeline} leads={leads} onMoveLead={handleMoveLead} onEditLead={handleEditLead} onDeleteLead={setDeletingLead} onAddLead={handleAddLead} />
+            <KanbanBoard pipeline={activePipeline} leads={leads} onMoveLead={handleMoveLead} onEditLead={handleEditLead} onDeleteLead={setDeletingLead} onAddLead={handleAddLead} onQuickTask={handleQuickTask} onOpenLead={handleOpenLead} />
           ) : leads.length === 0 ? (
             <EmptyState icon={LayoutGrid} title="Nenhum lead encontrado" description={search ? "Tente outro termo de busca." : "Crie seu primeiro lead."} action={{ label: "Novo Lead", onClick: () => setFormOpen(true) }} />
           ) : (
@@ -345,6 +357,20 @@ export default function LeadsPage() {
         open={contactFormOpen}
         onClose={() => { setContactFormOpen(false); setEditingContact(undefined); }}
         contact={editingContact}
+      />
+
+      <TaskForm
+        open={taskFormOpen}
+        onClose={() => { setTaskFormOpen(false); setTaskLeadId(null); }}
+        leadId={taskLeadId ?? undefined}
+      />
+
+      <LeadDetailSheet
+        lead={detailLead}
+        open={!!detailLead}
+        onClose={() => setDetailLead(null)}
+        onEdit={handleEditLead}
+        onQuickTask={handleQuickTask}
       />
 
       <AlertDialog open={!!deletingLead} onOpenChange={(v) => !v && setDeletingLead(undefined)}>

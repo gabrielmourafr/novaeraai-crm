@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, User, Calendar, Pencil, Trash2, TrendingUp } from "lucide-react";
+import { Building2, User, Calendar, Pencil, Trash2, TrendingUp, CalendarPlus } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import type { LeadWithRelations } from "@/lib/hooks/use-leads";
 import { TEMPERATURES } from "@/lib/utils/constants";
@@ -16,15 +16,19 @@ interface LeadCardProps {
   lead: LeadWithRelations;
   onEdit: (lead: LeadWithRelations) => void;
   onDelete: (lead: LeadWithRelations) => void;
+  onQuickTask?: (lead: LeadWithRelations) => void;
+  onOpen?: (lead: LeadWithRelations) => void;
 }
 
-export const LeadCard = ({ lead, onEdit, onDelete }: LeadCardProps) => {
+export const LeadCard = ({ lead, onEdit, onDelete, onQuickTask, onOpen }: LeadCardProps) => {
   const tempLabel = TEMPERATURES.find((t) => t.value === lead.temperature)?.label;
 
   return (
-    <div className="bg-card rounded-lg border border-border p-3 hover:border-primary/30 transition-all duration-200 group cursor-pointer"
-      style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
-
+    <div
+      className="bg-card rounded-lg border border-border p-3 hover:border-primary/30 transition-all duration-200 group cursor-pointer"
+      style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}
+      onClick={() => onOpen?.(lead)}
+    >
       {/* Header: title + actions */}
       <div className="flex items-start justify-between gap-2">
         <Link
@@ -35,6 +39,15 @@ export const LeadCard = ({ lead, onEdit, onDelete }: LeadCardProps) => {
           {lead.title}
         </Link>
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          {onQuickTask && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onQuickTask(lead); }}
+              className="p-1 rounded hover:bg-green-950/40 text-text-muted hover:text-green-400 transition-colors"
+              title="Criar follow-up"
+            >
+              <CalendarPlus size={11} />
+            </button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(lead); }}
             className="p-1 rounded hover:bg-primary/10 text-text-muted hover:text-primary transition-colors"

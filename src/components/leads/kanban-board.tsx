@@ -15,6 +15,8 @@ interface KanbanBoardProps {
   onEditLead: (lead: LeadWithRelations) => void;
   onDeleteLead: (lead: LeadWithRelations) => void;
   onAddLead: (stageId: string) => void;
+  onQuickTask?: (lead: LeadWithRelations) => void;
+  onOpenLead?: (lead: LeadWithRelations) => void;
 }
 
 export const KanbanBoard = ({
@@ -24,6 +26,8 @@ export const KanbanBoard = ({
   onEditLead,
   onDeleteLead,
   onAddLead,
+  onQuickTask,
+  onOpenLead,
 }: KanbanBoardProps) => {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -109,6 +113,8 @@ export const KanbanBoard = ({
                               lead={lead}
                               onEdit={onEditLead}
                               onDelete={onDeleteLead}
+                              onQuickTask={onQuickTask}
+                              onOpen={onOpenLead}
                             />
                           </div>
                         )}

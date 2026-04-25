@@ -18,12 +18,13 @@ export type DocumentWithRelations = Document & {
 interface UseDocumentsFilters {
   companyId?: string;
   projectId?: string;
+  leadId?: string;
 }
 
 export const useDocuments = (filters?: UseDocumentsFilters) => {
   const supabase = createClient();
   return useQuery({
-    queryKey: ["documents", filters?.companyId, filters?.projectId],
+    queryKey: ["documents", filters?.companyId, filters?.projectId, filters?.leadId],
     queryFn: async () => {
       let query = supabase
         .from("documents")
@@ -33,6 +34,7 @@ export const useDocuments = (filters?: UseDocumentsFilters) => {
         .order("created_at", { ascending: false });
       if (filters?.companyId) query = query.eq("company_id", filters.companyId);
       if (filters?.projectId) query = query.eq("project_id", filters.projectId);
+      if (filters?.leadId) query = query.eq("lead_id", filters.leadId);
       const { data, error } = await query;
       if (error) throw error;
       return data as DocumentWithRelations[];
@@ -44,9 +46,10 @@ export interface UploadDocumentInput {
   file: File;
   name: string;
   type: DocumentType;
-  companyId: string;
+  companyId?: string;
   projectId?: string;
   phaseId?: string;
+  leadId?: string;
   description?: string;
   orgId: string;
   uploadedBy: string;
@@ -59,11 +62,20 @@ export const useUploadDocument = () => {
 
   return useMutation({
     mutationFn: async (input: UploadDocumentInput) => {
-      const { file, name, type, companyId, projectId, phaseId, description, orgId, uploadedBy, onProgress } = input;
+      const { file, name, type, companyId, projectId, phaseId, leadId, description, orgId, uploadedBy, onProgress } = input;
 
       const ext = file.name.split(".").pop() ?? "";
       const safeFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-      const folder = projectId ? `${orgId}/${companyId}/${projectId}` : `${orgId}/${companyId}/general`;
+      let folder: string;
+      if (projectId && companyId) {
+        folder = `${orgId}/${companyId}/${projectId}`;
+      } else if (leadId && companyId) {
+        folder = `${orgId}/${companyId}/leads/${leadId}`;
+      } else if (companyId) {
+        folder = `${orgId}/${companyId}/general`;
+      } else {
+        folder = `${orgId}/leads/${leadId}`;
+      }
       const storagePath = `${folder}/${safeFileName}`;
 
       onProgress?.(10);
@@ -76,22 +88,22 @@ export const useUploadDocument = () => {
 
       onProgress?.(70);
 
-      const record: DocumentInsert = {
+      const record = {
         org_id: orgId,
-        company_id: companyId,
-        project_id: projectId ?? null,
-        phase_id: phaseId ?? null,
-        lead_id: null,
+        company_id: companyId || null,
+        project_id: projectId || null,
+        phase_id: phaseId || null,
+        lead_id: leadId || null,
         name,
         file_path: storagePath,
         file_size: file.size,
         file_type: file.type || (ext ? `.${ext}` : null),
         type,
         version: 1,
-        description: description ?? null,
+        description: description || null,
         tags: [],
         uploaded_by: uploadedBy,
-      };
+      } as DocumentInsert;
 
       const { data, error: dbError } = await supabase
         .from("documents")

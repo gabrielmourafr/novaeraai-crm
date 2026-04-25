@@ -626,7 +626,7 @@ export default function CalendarPage() {
 
       {/* ─── DIALOG: Novo Follow-up ─── */}
       <Dialog open={fuFormOpen} onOpenChange={(v) => { if (!v) { setFuFormOpen(false); resetFuForm(); } }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bell size={16} className="text-green-400" /> Novo Follow-up

@@ -20,6 +20,10 @@ import {
   AlertCircle,
   Mail,
   Phone,
+  File,
+  Download,
+  Trash2,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -64,6 +68,7 @@ import { useProposals } from "@/lib/hooks/use-proposals";
 import { useContact } from "@/lib/hooks/use-contacts";
 import { useCompany } from "@/lib/hooks/use-companies";
 import { useUser } from "@/lib/hooks/use-user";
+import { useDocuments, useUploadDocument, useDeleteDocument, getDocumentUrl } from "@/lib/hooks/use-documents";
 import { cn } from "@/lib/utils";
 import { parseISO, isPast } from "date-fns";
 
@@ -112,6 +117,12 @@ export default function LeadDetailPage() {
   const [noteText, setNoteText] = useState("");
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState("");
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadFileName, setUploadFileName] = useState("");
+  const [uploadFileType, setUploadFileType] = useState<"proposta" | "briefing" | "contrato" | "outro">("proposta");
+  const [uploadDescription, setUploadDescription] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const { data: lead, isLoading } = useLead(id);
   const { data: pipeline } = usePipeline(lead?.pipeline_id ?? "");
@@ -120,12 +131,15 @@ export default function LeadDetailPage() {
   const { data: allProposals } = useProposals();
   const { data: contact } = useContact(lead?.contact_id ?? "");
   const { data: company } = useCompany(lead?.company_id ?? "");
+  const { data: documents = [] } = useDocuments({ leadId: id });
 
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
   const moveLead = useMoveLead();
   const addActivity = useAddActivity();
   const updateTask = useUpdateTask();
+  const uploadDocument = useUploadDocument();
+  const deleteDocument = useDeleteDocument();
 
   const leadProposals = allProposals?.filter((p) => p.lead_id === id) ?? [];
 
@@ -182,6 +196,32 @@ export default function LeadDetailPage() {
     if (!lead) return;
     await updateLead.mutateAsync({ id: lead.id, notes: notesText });
     setEditingNotes(false);
+  };
+
+  // ─── Upload document ────────────────────────────────────────────────────────
+  const handleUploadDocument = async () => {
+    if (!uploadFile || !uploadFileName.trim() || !lead || !user) return;
+    const companyId = lead.company_id || "";
+    await uploadDocument.mutateAsync({
+      file: uploadFile,
+      name: uploadFileName,
+      type: uploadFileType as "proposta" | "briefing" | "contrato" | "outro",
+      leadId: id,
+      companyId: companyId || undefined,
+      description: uploadDescription || undefined,
+      orgId: user.org_id,
+      uploadedBy: user.id,
+      onProgress: setUploadProgress,
+    });
+    setUploadOpen(false);
+    setUploadFile(null);
+    setUploadFileName("");
+    setUploadDescription("");
+    setUploadProgress(0);
+  };
+
+  const handleDeleteDocument = async (docId: string, filePath: string) => {
+    await deleteDocument.mutateAsync({ id: docId, filePath });
   };
 
   // ─── Toggle task status ──────────────────────────────────────────────────────
@@ -390,6 +430,10 @@ export default function LeadDetailPage() {
                 <ClipboardList size={14} className="mr-1.5" />
                 Tarefas
               </TabsTrigger>
+              <TabsTrigger value="documents">
+                <File size={14} className="mr-1.5" />
+                Documentos
+              </TabsTrigger>
               <TabsTrigger value="notes">
                 <Pencil size={14} className="mr-1.5" />
                 Notas
@@ -570,6 +614,139 @@ export default function LeadDetailPage() {
                   </div>
                 )}
               </div>
+            </TabsContent>
+
+            {/* ── Tab: Documentos ── */}
+            <TabsContent value="documents">
+              <div className="rounded-xl border border-border bg-card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-text-primary">Documentos</h3>
+                  <Button size="sm" onClick={() => setUploadOpen(true)} style={{ background: "var(--primary)" }}>
+                    <Upload size={14} className="mr-1.5" />
+                    Enviar Documento
+                  </Button>
+                </div>
+
+                {documents.length === 0 ? (
+                  <EmptyState icon={File} title="Nenhum documento" description="Envie documentos, propostas ou diagnósticos para este lead." />
+                ) : (
+                  <div className="space-y-2">
+                    {documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-white/5 transition-colors">
+                        <div className="flex items-center gap-3 flex-1">
+                          <File size={16} className="text-text-muted shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-text-primary truncate">{doc.name}</p>
+                            <p className="text-xs text-text-muted capitalize">{doc.type} • {formatDate(doc.created_at)}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <a href={getDocumentUrl(doc.file_path)} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Baixar">
+                              <Download size={14} />
+                            </Button>
+                          </a>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-red-400 hover:text-red-300"
+                            onClick={() => handleDeleteDocument(doc.id, doc.file_path)}
+                            disabled={deleteDocument.isPending}
+                            title="Deletar"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Dialog */}
+              {uploadOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 rounded-xl">
+                  <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+                    <h3 className="text-lg font-semibold text-text-primary mb-4">Enviar Documento</h3>
+
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Nome do arquivo *</Label>
+                        <input
+                          type="text"
+                          value={uploadFileName}
+                          onChange={(e) => setUploadFileName(e.target.value)}
+                          placeholder="Ex: Proposta - Q1 2026"
+                          className="w-full px-3 py-2 rounded-lg border border-border bg-white/5 text-text-primary text-sm mt-1"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Tipo de documento</Label>
+                        <select
+                          value={uploadFileType}
+                          onChange={(e) => setUploadFileType(e.target.value as typeof uploadFileType)}
+                          className="w-full px-3 py-2 rounded-lg border border-border bg-white/5 text-text-primary text-sm mt-1"
+                        >
+                          <option value="proposta">Proposta</option>
+                          <option value="briefing">Briefing</option>
+                          <option value="contrato">Contrato</option>
+                          <option value="outro">Outro</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <Label>Descrição</Label>
+                        <textarea
+                          value={uploadDescription}
+                          onChange={(e) => setUploadDescription(e.target.value)}
+                          placeholder="Descrição opcional..."
+                          rows={3}
+                          className="w-full px-3 py-2 rounded-lg border border-border bg-white/5 text-text-primary text-sm mt-1"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Arquivo *</Label>
+                        <div className="mt-1 border-2 border-dashed border-border rounded-lg p-4 text-center">
+                          <input
+                            type="file"
+                            onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                            className="hidden"
+                            id="file-input"
+                          />
+                          <label htmlFor="file-input" className="cursor-pointer">
+                            {uploadFile ? (
+                              <div className="text-sm text-text-primary font-medium">{uploadFile.name}</div>
+                            ) : (
+                              <div className="text-sm text-text-muted">Clique ou arraste um arquivo</div>
+                            )}
+                          </label>
+                        </div>
+                      </div>
+
+                      {uploadProgress > 0 && uploadProgress < 100 && (
+                        <div className="w-full bg-white/10 rounded-full h-1.5">
+                          <div className="bg-primary h-1.5 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 justify-end pt-4 border-t border-border">
+                        <Button variant="outline" onClick={() => setUploadOpen(false)} disabled={uploadDocument.isPending}>
+                          Cancelar
+                        </Button>
+                        <Button
+                          onClick={handleUploadDocument}
+                          disabled={!uploadFile || !uploadFileName.trim() || uploadDocument.isPending}
+                          style={{ background: "var(--primary)" }}
+                        >
+                          {uploadDocument.isPending ? "Enviando..." : "Enviar"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             {/* ── Tab: Notas ── */}
