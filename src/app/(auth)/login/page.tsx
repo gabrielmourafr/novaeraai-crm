@@ -28,11 +28,33 @@ export default function LoginPage() {
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       });
       if (error) throw error;
+
+      const authUser = signInData.user;
+      if (authUser) {
+        const { data: profile } = await supabase
+          .from("users")
+          .select("org_id, full_name, email")
+          .eq("id", authUser.id)
+          .single();
+        if (profile) {
+          await supabase.from("audit_logs").insert({
+            org_id: profile.org_id,
+            actor_id: authUser.id,
+            actor_name: profile.full_name,
+            actor_email: profile.email,
+            action: "login",
+            entity_type: "users",
+            entity_id: authUser.id,
+            entity_label: profile.full_name,
+          });
+        }
+      }
+
       router.push("/dashboard");
       router.refresh();
     } catch (err: unknown) {

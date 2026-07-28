@@ -600,6 +600,24 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["proposal_views"]["Insert"]>;
         Relationships: [];
       };
+      audit_logs: {
+        Row: {
+          id: string;
+          org_id: string;
+          actor_id: string | null;
+          actor_name: string | null;
+          actor_email: string | null;
+          action: "created" | "updated" | "deleted" | "login";
+          entity_type: string;
+          entity_id: string | null;
+          entity_label: string | null;
+          changes: Json | null;
+          created_at: string;
+        };
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["audit_logs"]["Row"], "id" | "created_at">>;
+        Update: Partial<Database["public"]["Tables"]["audit_logs"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
