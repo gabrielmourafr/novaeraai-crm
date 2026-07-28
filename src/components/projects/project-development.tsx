@@ -128,9 +128,14 @@ export function ProjectDevelopment({ project }: Props) {
             project.promised_delivery_date ? (
               <span>
                 {formatDate(project.promised_delivery_date)}
+                {slipDays !== null && slipDays > 7 && (
+                  <span className="ml-2 text-[10px] text-text-muted font-medium">
+                    faltam {slipDays}d
+                  </span>
+                )}
                 {slipDays !== null && slipDays >= 0 && slipDays <= 7 && (
                   <span className="ml-2 text-[10px] text-amber-600 font-medium">
-                    em {slipDays}d
+                    {slipDays === 0 ? "entrega hoje" : `faltam ${slipDays}d`}
                   </span>
                 )}
                 {slipDays !== null && slipDays < 0 && (

@@ -219,6 +219,7 @@ export interface Database {
             | "contrato_assinado"
             | "em_desenvolvimento"
             | "em_validacao_interna"
+            | "pronto_para_entrega"
             | "entregue_tet"
             | "ativo_mensalidade"
             | "upsell_identificado"

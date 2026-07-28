@@ -181,12 +181,21 @@ function ProjectCard({
             </div>
           )}
 
-          <div className="flex items-center justify-between text-[10px]">
+          <div className="flex items-center justify-between text-[10px] gap-2">
             {dev && <span className="text-text-muted truncate">DEV: {dev.full_name}</span>}
             {slipDays !== null && (
-              <span className={slipDays < 0 ? "text-red-600 font-medium flex items-center gap-0.5" : slipDays <= 7 ? "text-amber-600" : "text-text-muted"}>
+              <span
+                className={`flex items-center gap-0.5 whitespace-nowrap flex-shrink-0 ${
+                  slipDays < 0 ? "text-red-600 font-semibold" : slipDays <= 7 ? "text-amber-600 font-medium" : "text-text-muted"
+                }`}
+                title={project.promised_delivery_date ? formatDate(project.promised_delivery_date) : undefined}
+              >
                 {slipDays < 0 && <AlertTriangle size={9} />}
-                {project.promised_delivery_date && formatDate(project.promised_delivery_date)}
+                {slipDays < 0
+                  ? `Atrasado ${Math.abs(slipDays)}d`
+                  : slipDays === 0
+                  ? "Entrega hoje"
+                  : `Faltam ${slipDays}d`}
               </span>
             )}
           </div>

@@ -175,7 +175,7 @@ export default function DashboardPage() {
   // Projetos em desenvolvimento/entrega ativa (exclui pausado, concluído, cancelado, churned, mensalidade)
   const inDeliveryProjects = useMemo(() => {
     const activeStatuses = new Set([
-      "contrato_assinado", "em_desenvolvimento", "em_validacao_interna", "entregue_tet",
+      "contrato_assinado", "em_desenvolvimento", "em_validacao_interna", "pronto_para_entrega", "entregue_tet",
       "kickoff", "em_andamento",
     ]);
     return projects
@@ -242,7 +242,7 @@ export default function DashboardPage() {
             Ver Kanban <ArrowRight size={11} />
           </Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
           {deliveryFunnel.map((stage) => (
             <div
               key={stage.value}
@@ -282,6 +282,9 @@ export default function DashboardPage() {
             {inDeliveryProjects.slice(0, 6).map((proj) => {
               const meta = PROJECT_STATUSES.find((s) => s.value === proj.status);
               const daysSinceStart = proj.start_date ? differenceInDays(new Date(), parseISO(proj.start_date)) : null;
+              const deadlineDays = proj.promised_delivery_date
+                ? differenceInDays(parseISO(proj.promised_delivery_date), now)
+                : null;
               return (
                 <Link
                   key={proj.id}
@@ -298,10 +301,26 @@ export default function DashboardPage() {
                       >
                         {meta?.label ?? proj.status}
                       </span>
+                      {deadlineDays !== null && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1 flex-shrink-0"
+                          style={{
+                            background: deadlineDays < 0 ? "rgba(239,68,68,0.15)" : deadlineDays <= 7 ? "rgba(245,158,11,0.15)" : "rgba(123,163,198,0.1)",
+                            color: deadlineDays < 0 ? "#ef4444" : deadlineDays <= 7 ? "#f59e0b" : "#7BA3C6",
+                          }}
+                        >
+                          {deadlineDays < 0 && <AlertCircle size={9} />}
+                          {deadlineDays < 0
+                            ? `Atrasado ${Math.abs(deadlineDays)}d`
+                            : deadlineDays === 0
+                            ? "Entrega hoje"
+                            : `Faltam ${deadlineDays}d p/ entrega`}
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] mt-0.5" style={{ color: "#7BA3C6" }}>
                       {proj.company?.name ?? "—"}
-                      {daysSinceStart !== null && ` · há ${daysSinceStart} dia${daysSinceStart !== 1 ? "s" : ""}`}
+                      {daysSinceStart !== null && ` · início há ${daysSinceStart} dia${daysSinceStart !== 1 ? "s" : ""}`}
                     </p>
                     <div className="h-1 rounded-full overflow-hidden mt-2" style={{ background: "rgba(11,135,195,0.1)" }}>
                       <div
