@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,8 @@ import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues, type Revenue, type Expense } from "@/lib/hooks/use-finance";
 import { useAllInstallments, useMarkInstallmentPaid, INSTALLMENT_STATUS_META } from "@/lib/hooks/use-installments";
-import { useActiveSubscriptions, useEnsureMonthlyBilling, nextBillingDate, RENEWAL_LABEL } from "@/lib/hooks/use-subscriptions";
+import { useActiveSubscriptions, useEnsureMonthlyBilling, nextBillingDate, RENEWAL_LABEL, type ActiveSubscription } from "@/lib/hooks/use-subscriptions";
+import { useUpdateProject } from "@/lib/hooks/use-projects";
 import { useUser } from "@/lib/hooks/use-user";
 import Link from "next/link";
 
@@ -85,6 +86,42 @@ export default function FinancePage() {
   const { data: totalRevenuesAllTime = 0 } = useTotalRevenues();
   const { data: activeSubscriptions = [], isLoading: subscriptionsLoading } = useActiveSubscriptions();
   const totalMonthlyRecurring = activeSubscriptions.reduce((s, p) => s + Number(p.billing_amount ?? 0), 0);
+  const updateProject = useUpdateProject();
+  const [editingSubscription, setEditingSubscription] = useState<ActiveSubscription | undefined>();
+  const [removingSubscription, setRemovingSubscription] = useState<ActiveSubscription | undefined>();
+  const [subAmount, setSubAmount] = useState("");
+  const [subDay, setSubDay] = useState("");
+  const [subContractStart, setSubContractStart] = useState("");
+  const [subContractEnd, setSubContractEnd] = useState("");
+  const [subRenewal, setSubRenewal] = useState<"auto" | "manual" | "no_renewal">("manual");
+
+  const openEditSubscription = (sub: ActiveSubscription) => {
+    setEditingSubscription(sub);
+    setSubAmount(sub.billing_amount?.toString() ?? "");
+    setSubDay(sub.billing_day?.toString() ?? "");
+    setSubContractStart(sub.contract_start ?? "");
+    setSubContractEnd(sub.contract_end ?? "");
+    setSubRenewal(sub.renewal_type ?? "manual");
+  };
+
+  const handleSaveSubscription = async () => {
+    if (!editingSubscription) return;
+    await updateProject.mutateAsync({
+      id: editingSubscription.id,
+      billing_amount: subAmount ? parseFloat(subAmount) : null,
+      billing_day: subDay ? parseInt(subDay) : null,
+      contract_start: subContractStart || null,
+      contract_end: subContractEnd || null,
+      renewal_type: subRenewal,
+    });
+    setEditingSubscription(undefined);
+  };
+
+  const handleRemoveSubscription = async () => {
+    if (!removingSubscription) return;
+    await updateProject.mutateAsync({ id: removingSubscription.id, billing_status: "encerrado" });
+    setRemovingSubscription(undefined);
+  };
   const { data: revenues = [], isLoading: revLoading } = useRevenues(year, month);
   const { data: expenses = [], isLoading: expLoading } = useExpenses(year, month);
   const { data: revenuesLastMonths = {} } = useRevenuesLastMonths(year, month, 6);
@@ -367,6 +404,7 @@ export default function FinancePage() {
                     <TableHead style={{ color: "#7BA3C6" }}>Próxima Cobrança</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Início do Contrato</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Renovação</TableHead>
+                    <TableHead className="w-[100px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -398,6 +436,26 @@ export default function FinancePage() {
                         </TableCell>
                         <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>
                           {RENEWAL_LABEL[sub.renewal_type ?? "manual"]}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-[#7BA3C6] hover:text-[#0B87C3]"
+                              onClick={() => openEditSubscription(sub)}
+                            >
+                              <Pencil size={13} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-[#7BA3C6] hover:text-red-400"
+                              onClick={() => setRemovingSubscription(sub)}
+                            >
+                              <Trash2 size={13} />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -772,6 +830,74 @@ export default function FinancePage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={async () => { if (deletingExpense) { await deleteExpense.mutateAsync(deletingExpense.id); setDeletingExpense(undefined); }}}>Remover</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ─── DIALOG: Editar Mensalidade ─── */}
+      <Dialog open={!!editingSubscription} onOpenChange={(v) => !v && setEditingSubscription(undefined)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Mensalidade</DialogTitle>
+            <DialogDescription>{editingSubscription?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Valor mensal (R$)</Label>
+                <Input type="number" step="0.01" value={subAmount} onChange={(e) => setSubAmount(e.target.value)} placeholder="0,00" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Dia de cobrança</Label>
+                <Input type="number" min={1} max={31} value={subDay} onChange={(e) => setSubDay(e.target.value)} placeholder="10" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Início do contrato</Label>
+                <Input type="date" value={subContractStart} onChange={(e) => setSubContractStart(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Término do contrato</Label>
+                <Input type="date" value={subContractEnd} onChange={(e) => setSubContractEnd(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tipo de renovação</Label>
+              <Select value={subRenewal} onValueChange={(v) => setSubRenewal(v as typeof subRenewal)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Renovação automática</SelectItem>
+                  <SelectItem value="manual">Renovação manual</SelectItem>
+                  <SelectItem value="no_renewal">Sem renovação</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setEditingSubscription(undefined)}>Cancelar</Button>
+              <Button onClick={handleSaveSubscription} disabled={updateProject.isPending} style={{ background: "var(--primary)" }}>
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── ALERT: Remover Mensalidade ─── */}
+      <AlertDialog open={!!removingSubscription} onOpenChange={(v) => !v && setRemovingSubscription(undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover mensalidade?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A mensalidade de <strong>{removingSubscription?.name}</strong> será encerrada e a cobrança pendente do mês
+              será removida do Financeiro. Receitas já pagas no histórico não são afetadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleRemoveSubscription}>
+              Remover
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
