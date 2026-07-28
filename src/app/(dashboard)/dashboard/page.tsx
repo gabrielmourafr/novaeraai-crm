@@ -282,9 +282,8 @@ export default function DashboardPage() {
             {inDeliveryProjects.slice(0, 6).map((proj) => {
               const meta = PROJECT_STATUSES.find((s) => s.value === proj.status);
               const daysSinceStart = proj.start_date ? differenceInDays(new Date(), parseISO(proj.start_date)) : null;
-              const deadlineDays = proj.promised_delivery_date
-                ? differenceInDays(parseISO(proj.promised_delivery_date), now)
-                : null;
+              const deadlineDate = proj.promised_delivery_date ?? proj.expected_end_date;
+              const deadlineDays = deadlineDate ? differenceInDays(parseISO(deadlineDate), now) : null;
               return (
                 <Link
                   key={proj.id}

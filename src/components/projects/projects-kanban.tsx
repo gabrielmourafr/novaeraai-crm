@@ -139,9 +139,10 @@ function ProjectCard({
   compact?: boolean;
 }) {
   const dev = project.developer_user_id ? orgUsers.find((u) => u.id === project.developer_user_id) : null;
+  const deadlineDate = project.promised_delivery_date ?? project.expected_end_date;
   const slipDays =
-    project.promised_delivery_date && project.status !== "ativo_mensalidade" && project.status !== "churned"
-      ? differenceInDays(parseISO(project.promised_delivery_date), new Date())
+    deadlineDate && project.status !== "ativo_mensalidade" && project.status !== "churned"
+      ? differenceInDays(parseISO(deadlineDate), new Date())
       : null;
 
   return (
@@ -188,7 +189,7 @@ function ProjectCard({
                 className={`flex items-center gap-0.5 whitespace-nowrap flex-shrink-0 ${
                   slipDays < 0 ? "text-red-600 font-semibold" : slipDays <= 7 ? "text-amber-600 font-medium" : "text-text-muted"
                 }`}
-                title={project.promised_delivery_date ? formatDate(project.promised_delivery_date) : undefined}
+                title={deadlineDate ? formatDate(deadlineDate) : undefined}
               >
                 {slipDays < 0 && <AlertTriangle size={9} />}
                 {slipDays < 0
