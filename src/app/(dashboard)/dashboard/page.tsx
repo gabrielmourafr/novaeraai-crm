@@ -4,8 +4,9 @@ import { useMemo } from "react";
 import Link from "next/link";
 import {
   TrendingUp, TrendingDown, Briefcase, FileText,
-  CheckSquare, DollarSign, Target, ArrowRight, Clock, AlertCircle, CalendarClock
+  CheckSquare, DollarSign, Target, ArrowRight, Clock, AlertCircle, CalendarClock, Layers, Code2
 } from "lucide-react";
+import { PROJECT_STATUSES, PROJECT_PIPELINE_V2 } from "@/lib/utils/constants";
 import { differenceInDays, parseISO } from "date-fns";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -154,17 +155,32 @@ export default function DashboardPage() {
     }));
   }, [proposals]);
 
-  // Project status breakdown
+  // Project status breakdown (todos os status, incluindo pipeline V2)
   const projectStatusData = useMemo(() => {
-    const map: Record<string, { label: string; color: string; count: number }> = {
-      planejamento: { label: "Planejamento", color: "#7BA3C6", count: 0 },
-      em_andamento: { label: "Em Andamento", color: "#0B87C3", count: 0 },
-      pausado: { label: "Pausado", color: "#f59e0b", count: 0 },
-      concluido: { label: "Concluído", color: "#22c55e", count: 0 },
-      cancelado: { label: "Cancelado", color: "#ef4444", count: 0 },
-    };
-    projects.forEach((p) => { if (p.status in map) map[p.status].count++; });
-    return Object.values(map).filter((v) => v.count > 0);
+    const counts: Record<string, number> = {};
+    projects.forEach((p) => { counts[p.status] = (counts[p.status] ?? 0) + 1; });
+    return PROJECT_STATUSES
+      .filter((s) => counts[s.value] > 0)
+      .map((s) => ({ label: s.label, color: s.color, count: counts[s.value] }));
+  }, [projects]);
+
+  // Processo de entrega do cliente — pipeline V2 (kanban de projetos)
+  const deliveryFunnel = useMemo(() => {
+    return PROJECT_PIPELINE_V2.map((value) => {
+      const meta = PROJECT_STATUSES.find((s) => s.value === value)!;
+      return { value, label: meta.label, color: meta.color, count: projects.filter((p) => p.status === value).length };
+    });
+  }, [projects]);
+
+  // Projetos em desenvolvimento/entrega ativa (exclui pausado, concluído, cancelado, churned, mensalidade)
+  const inDeliveryProjects = useMemo(() => {
+    const activeStatuses = new Set([
+      "contrato_assinado", "em_desenvolvimento", "em_validacao_interna", "entregue_tet",
+      "kickoff", "em_andamento",
+    ]);
+    return projects
+      .filter((p) => activeStatuses.has(p.status))
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   }, [projects]);
 
   const recentTasks = [...tasks]
@@ -207,6 +223,101 @@ export default function DashboardPage() {
         <StatCard label="Projetos Ativos" value={activeProjects.length} sub={`${projects.length} total`} icon={Briefcase} color="#22c55e" />
         <StatCard label="Propostas Enviadas" value={sentProposals.length} sub={`${proposals.length} total`} icon={FileText} color="#f59e0b" />
         <StatCard label="Saldo do Mês" value={formatCurrency(balance)} sub={`Receitas: ${formatCurrency(totalRevenues)}`} icon={DollarSign} color={balance >= 0 ? "#22c55e" : "#ef4444"} />
+      </div>
+
+      {/* Processo de Entrega do Cliente (pipeline V2) */}
+      <div
+        className="rounded-xl p-5"
+        style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Layers size={16} style={{ color: "#0B87C3" }} />
+            <div>
+              <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Processo de Entrega do Cliente</h3>
+              <p className="text-xs" style={{ color: "#7BA3C6" }}>Onde cada projeto está no funil, do contrato à mensalidade ativa</p>
+            </div>
+          </div>
+          <Link href="/projects" className="text-xs flex items-center gap-1 hover:underline flex-shrink-0" style={{ color: "#0B87C3" }}>
+            Ver Kanban <ArrowRight size={11} />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          {deliveryFunnel.map((stage) => (
+            <div
+              key={stage.value}
+              className="rounded-lg p-3"
+              style={{ background: `${stage.color}0E`, border: `1px solid ${stage.color}30` }}
+            >
+              <p className="font-display font-bold text-xl" style={{ color: stage.color }}>{stage.count}</p>
+              <p className="text-[10px] leading-tight mt-1" style={{ color: "#7BA3C6" }}>{stage.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Projetos Ativos / Em Desenvolvimento */}
+      <div
+        className="rounded-xl p-5"
+        style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Code2 size={16} style={{ color: "#22c55e" }} />
+            <div>
+              <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Projetos em Andamento</h3>
+              <p className="text-xs" style={{ color: "#7BA3C6" }}>{inDeliveryProjects.length} em desenvolvimento ou entrega ativa</p>
+            </div>
+          </div>
+          <Link href="/projects" className="text-xs flex items-center gap-1 hover:underline flex-shrink-0" style={{ color: "#0B87C3" }}>
+            Ver todos <ArrowRight size={11} />
+          </Link>
+        </div>
+        {inDeliveryProjects.length === 0 ? (
+          <div className="flex items-center justify-center h-20 text-xs" style={{ color: "#3D5A78" }}>
+            Nenhum projeto em desenvolvimento no momento
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {inDeliveryProjects.slice(0, 6).map((proj) => {
+              const meta = PROJECT_STATUSES.find((s) => s.value === proj.status);
+              const daysSinceStart = proj.start_date ? differenceInDays(new Date(), parseISO(proj.start_date)) : null;
+              return (
+                <Link
+                  key={proj.id}
+                  href={`/projects/${proj.id}`}
+                  className="flex items-center gap-3 p-3 rounded-lg transition-all hover:bg-white/5"
+                  style={{ background: "rgba(11,135,195,0.04)", border: "1px solid rgba(11,135,195,0.08)" }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium truncate" style={{ color: "#E2EBF8" }}>{proj.name}</p>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0"
+                        style={{ background: `${meta?.color ?? "#7BA3C6"}20`, color: meta?.color ?? "#7BA3C6" }}
+                      >
+                        {meta?.label ?? proj.status}
+                      </span>
+                    </div>
+                    <p className="text-[11px] mt-0.5" style={{ color: "#7BA3C6" }}>
+                      {proj.company?.name ?? "—"}
+                      {daysSinceStart !== null && ` · há ${daysSinceStart} dia${daysSinceStart !== 1 ? "s" : ""}`}
+                    </p>
+                    <div className="h-1 rounded-full overflow-hidden mt-2" style={{ background: "rgba(11,135,195,0.1)" }}>
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${proj.progress ?? 0}%`, background: meta?.color ?? "#0B87C3" }}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold flex-shrink-0" style={{ color: "#7BA3C6" }}>
+                    {proj.progress ?? 0}%
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Secondary KPIs */}
