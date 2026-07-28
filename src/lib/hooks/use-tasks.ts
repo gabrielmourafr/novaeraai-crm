@@ -39,7 +39,7 @@ export const useAllTasks = (filters?: UseAllTasksFilters) => {
           `*,
            lead:leads(id, title),
            project:projects(id, name),
-           assignee:users(id, full_name, avatar_url)`
+           assignee:users!tasks_assignee_id_fkey(id, full_name, avatar_url)`
         )
         .order("due_date", { ascending: true });
 
