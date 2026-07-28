@@ -56,7 +56,6 @@ import {
   LOSS_REASONS,
   PROPOSAL_STATUSES,
   PROJECT_STATUSES,
-  BUSINESS_UNITS,
 } from "@/lib/utils/constants";
 
 const getProjectStatusMeta = (v: string) =>
@@ -79,12 +78,6 @@ const temperatureColors: Record<string, string> = {
   frio: "bg-blue-950/60 text-blue-300 border-blue-200",
   morno: "bg-amber-100 text-amber-700 border-amber-200",
   quente: "bg-red-950/60 text-red-300 border-red-200",
-};
-
-const businessUnitColors: Record<string, string> = {
-  labs: "bg-violet-100 text-violet-700",
-  advisory: "bg-sky-100 text-sky-700",
-  enterprise: "bg-emerald-100 text-emerald-700",
 };
 
 const proposalStatusColors: Record<string, string> = {
@@ -217,7 +210,6 @@ export default function LeadDetailPage() {
 
   const tempMeta = TEMPERATURES.find((t) => t.value === lead.temperature);
   const originLabel = LEAD_ORIGINS.find((o) => o.value === lead.origin)?.label;
-  const buLabel = BUSINESS_UNITS.find((b) => b.value === lead.business_unit)?.label;
 
   const isFollowupOverdue =
     lead.next_followup && isPast(parseISO(lead.next_followup));
@@ -732,20 +724,6 @@ export default function LeadDetailPage() {
               Detalhes
             </h3>
 
-            {/* Business Unit */}
-            {lead.business_unit && (
-              <div>
-                <p className="text-xs text-text-muted mb-1">Frente</p>
-                <span
-                  className={cn(
-                    "inline-flex px-2.5 py-1 rounded-lg text-xs font-medium",
-                    businessUnitColors[lead.business_unit]
-                  )}
-                >
-                  {buLabel}
-                </span>
-              </div>
-            )}
 
             {/* Value */}
             {lead.value != null && (

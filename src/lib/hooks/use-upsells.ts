@@ -100,8 +100,7 @@ export const UPSELL_PRIORITY_META: Record<UpsellSuggestion["priority"], { label:
 type AutoUpsellInput = {
   companyId: string;
   companyName: string;
-  companyProjectsBusinessUnits: Set<string>;
-  catalogProducts: { id: string; name: string; business_unit: string; base_price: number; status: string }[];
+  catalogProducts: { id: string; name: string; base_price: number; status: string }[];
   contractEndingSoonDays?: number | null;
 };
 
@@ -118,40 +117,20 @@ export type AutoSuggestion = {
 
 export function computeAutoSuggestions(input: AutoUpsellInput): AutoSuggestion[] {
   const suggestions: AutoSuggestion[] = [];
-  const { companyId, companyName, companyProjectsBusinessUnits, catalogProducts, contractEndingSoonDays } = input;
+  const { companyId, companyName, catalogProducts, contractEndingSoonDays } = input;
 
-  // 1) Sugerir produtos do catálogo das business_units que o cliente NÃO tem ainda
-  const activeProducts = catalogProducts.filter((p) => p.status === "ativo");
-  const missingUnits = ["labs", "advisory", "enterprise"].filter(
-    (u) => !companyProjectsBusinessUnits.has(u)
-  );
-  for (const unit of missingUnits) {
-    const candidate = activeProducts.find((p) => p.business_unit === unit);
-    if (candidate) {
-      suggestions.push({
-        key: `${companyId}-missing-${unit}`,
-        companyId,
-        companyName,
-        productId: candidate.id,
-        productName: candidate.name,
-        reason: `Cliente ainda não tem nenhum projeto na frente ${unit.toUpperCase()}`,
-        estimatedValue: candidate.base_price,
-        priority: "media",
-      });
-    }
-  }
-
-  // 2) Se contrato está prestes a vencer (≤60 dias), sugerir renovação/upgrade
+  // Se o contrato está prestes a vencer (≤60 dias), sugerir renovação/upgrade
   if (contractEndingSoonDays !== null && contractEndingSoonDays !== undefined && contractEndingSoonDays >= 0 && contractEndingSoonDays <= 60) {
-    const enterprise = activeProducts.find((p) => p.business_unit === "enterprise");
+    const activeProducts = catalogProducts.filter((p) => p.status === "ativo");
+    const topProduct = [...activeProducts].sort((a, b) => b.base_price - a.base_price)[0];
     suggestions.push({
       key: `${companyId}-renewal`,
       companyId,
       companyName,
-      productId: enterprise?.id,
-      productName: enterprise?.name ?? "Renovação Premium",
+      productId: topProduct?.id,
+      productName: topProduct?.name ?? "Renovação Premium",
       reason: `Contrato vence em ${contractEndingSoonDays} dias — oportunidade de renovação/upgrade`,
-      estimatedValue: enterprise?.base_price ?? 0,
+      estimatedValue: topProduct?.base_price ?? 0,
       priority: contractEndingSoonDays <= 30 ? "alta" : "media",
     });
   }

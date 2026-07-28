@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { BUSINESS_UNITS, BUSINESS_UNIT_PREFIX, PROJECT_STATUSES } from "@/lib/utils/constants";
+import { BUSINESS_UNIT_PREFIX, PROJECT_STATUSES } from "@/lib/utils/constants";
 import { useCreateProject, useUpdateProject, useProjects } from "@/lib/hooks/use-projects";
 import { useCompanies } from "@/lib/hooks/use-companies";
 import { useContacts } from "@/lib/hooks/use-contacts";
@@ -230,35 +230,19 @@ export const ProjectForm = ({ open, onClose, project }: ProjectFormProps) => {
             {errors.company_id && <p className="text-xs text-danger">{errors.company_id.message}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Contato</Label>
-              <Select value={contactIdValue ?? "__none__"} onValueChange={(v) => setValue("contact_id", v === "__none__" ? undefined : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Nenhum" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Nenhum</SelectItem>
-                  {contacts?.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Unidade de Negócio *</Label>
-              <Select value={businessUnitValue ?? "__none__"} onValueChange={(v) => setValue("business_unit", v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {BUSINESS_UNITS.map((u) => (
-                    <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.business_unit && <p className="text-xs text-danger">{errors.business_unit.message}</p>}
-            </div>
+          <div className="space-y-1.5">
+            <Label>Contato</Label>
+            <Select value={contactIdValue ?? "__none__"} onValueChange={(v) => setValue("contact_id", v === "__none__" ? undefined : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Nenhum" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Nenhum</SelectItem>
+                {contacts?.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

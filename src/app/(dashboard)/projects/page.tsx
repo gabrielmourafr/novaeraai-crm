@@ -117,12 +117,6 @@ function groupByCompany(projects: ProjectWithRelations[]) {
   return map;
 }
 
-const FRENTES = [
-  { value: "labs", label: "Nova Era Labs" },
-  { value: "advisory", label: "Nova Era Advisory" },
-  { value: "enterprise", label: "Nova Era Enterprise" },
-];
-
 export default function ProjectsPage() {
   const router = useRouter();
   const [view, setView] = useState<"kanban" | "por_cliente" | "todos">("kanban");
@@ -131,7 +125,6 @@ export default function ProjectsPage() {
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
 
   const [filterStatus, setFilterStatus] = useState("all");
-  const [filterFrente, setFilterFrente] = useState("all");
   const [filterProgram, setFilterProgram] = useState("all");
   const [filterAssignee, setFilterAssignee] = useState("all");
 
@@ -169,12 +162,11 @@ export default function ProjectsPage() {
   const filtered = useMemo(() => {
     return projects.filter((p) => {
       if (filterStatus !== "all" && p.status !== filterStatus) return false;
-      if (filterFrente !== "all" && p.business_unit !== filterFrente) return false;
       if (filterProgram !== "all" && p.program !== filterProgram) return false;
       if (filterAssignee !== "all" && p.assignee_id !== filterAssignee) return false;
       return true;
     });
-  }, [projects, filterStatus, filterFrente, filterProgram, filterAssignee]);
+  }, [projects, filterStatus, filterProgram, filterAssignee]);
 
   const grouped = useMemo(() => groupByCompany(filtered), [filtered]);
 
@@ -251,18 +243,6 @@ export default function ProjectsPage() {
             <SelectItem value="all">Todos os status</SelectItem>
             {PROJECT_STATUSES.map((s) => (
               <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={filterFrente} onValueChange={setFilterFrente}>
-          <SelectTrigger className="w-44 ">
-            <SelectValue placeholder="Frente" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as frentes</SelectItem>
-            {FRENTES.map((f) => (
-              <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>

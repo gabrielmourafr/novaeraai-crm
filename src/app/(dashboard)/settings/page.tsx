@@ -46,7 +46,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { formatDate, formatInitials } from "@/lib/utils/format";
-import { PROJECT_TEMPLATES, PROGRAMS, BUSINESS_UNITS } from "@/lib/utils/constants";
+import { PROJECT_TEMPLATES, PROGRAMS } from "@/lib/utils/constants";
 import {
   usePipelines,
   useCreateStage,
@@ -61,15 +61,6 @@ import {
   useUpdateUserRole,
   useUpdateOrg,
 } from "@/lib/hooks/use-user";
-import { cn } from "@/lib/utils";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const businessUnitColors: Record<string, string> = {
-  labs: "bg-violet-100 text-violet-700",
-  advisory: "bg-sky-100 text-sky-700",
-  enterprise: "bg-emerald-100 text-emerald-700",
-};
 
 // ─── Tab: Organização ─────────────────────────────────────────────────────────
 
@@ -334,14 +325,6 @@ const PipelinesTab = () => {
         >
           <div className="flex items-center gap-3 mb-4">
             <h3 className="font-semibold text-text-primary">{pipeline.name}</h3>
-            <span
-              className={cn(
-                "px-2 py-0.5 rounded text-xs font-medium",
-                businessUnitColors[pipeline.business_unit]
-              )}
-            >
-              {BUSINESS_UNITS.find((b) => b.value === pipeline.business_unit)?.label}
-            </span>
           </div>
 
           <div className="space-y-0.5 mb-4">

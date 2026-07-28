@@ -140,7 +140,7 @@ export default function LeadsPage() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             {/* Toolbar */}
             <div className="flex flex-wrap gap-3 items-center flex-1">
-              {pipelines && pipelines.length > 0 && (
+              {pipelines && pipelines.length > 1 && (
                 <Select value={activePipelineId} onValueChange={setSelectedPipelineId}>
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Selecionar pipeline" />

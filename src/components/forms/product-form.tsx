@@ -22,7 +22,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { BUSINESS_UNITS } from "@/lib/utils/constants";
 import { useCreateProduct, useUpdateProduct } from "@/lib/hooks/use-products";
 import { useUser } from "@/lib/hooks/use-user";
 import type { Product } from "@/lib/hooks/use-products";
@@ -50,7 +49,6 @@ const STATUSES = [
 
 const productSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
-  business_unit: z.string().min(1, "Unidade de negócio é obrigatória"),
   category: z.string().min(1, "Categoria é obrigatória"),
   description: z.string().optional(),
   base_price: z.string().min(1, "Preço é obrigatório"),
@@ -82,7 +80,6 @@ export const ProductForm = ({ open, onClose, product }: ProductFormProps) => {
     resolver: zodResolver(productSchema),
   });
 
-  const businessUnitValue = watch("business_unit");
   const categoryValue = watch("category");
   const recurrenceValue = watch("recurrence");
   const statusValue = watch("status");
@@ -91,7 +88,6 @@ export const ProductForm = ({ open, onClose, product }: ProductFormProps) => {
     if (product) {
       reset({
         name: product.name,
-        business_unit: product.business_unit,
         category: product.category,
         description: product.description ?? "",
         base_price: product.base_price.toString(),
@@ -106,7 +102,7 @@ export const ProductForm = ({ open, onClose, product }: ProductFormProps) => {
   const onSubmit = async (values: ProductFormValues) => {
     const payload = {
       name: values.name,
-      business_unit: values.business_unit as Product["business_unit"],
+      business_unit: "intelligence" as Product["business_unit"],
       category: values.category as Product["category"],
       description: values.description || null,
       base_price: parseFloat(values.base_price),
@@ -139,36 +135,19 @@ export const ProductForm = ({ open, onClose, product }: ProductFormProps) => {
             {errors.name && <p className="text-xs text-danger">{errors.name.message}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Unidade de Negócio *</Label>
-              <Select value={businessUnitValue ?? "__none__"} onValueChange={(v) => setValue("business_unit", v === "__none__" ? "" : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {BUSINESS_UNITS.map((u) => (
-                    <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.business_unit && <p className="text-xs text-danger">{errors.business_unit.message}</p>}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Categoria *</Label>
-              <Select value={categoryValue ?? "__none__"} onValueChange={(v) => setValue("category", v === "__none__" ? "" : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.category && <p className="text-xs text-danger">{errors.category.message}</p>}
-            </div>
+          <div className="space-y-1.5">
+            <Label>Categoria *</Label>
+            <Select value={categoryValue ?? "__none__"} onValueChange={(v) => setValue("category", v === "__none__" ? "" : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecionar" />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.category && <p className="text-xs text-danger">{errors.category.message}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

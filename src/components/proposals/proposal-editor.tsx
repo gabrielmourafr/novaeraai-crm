@@ -18,7 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/utils/format";
-import { BUSINESS_UNITS } from "@/lib/utils/constants";
 import {
   useCreateProposal,
   useUpdateProposal,
@@ -32,14 +31,12 @@ import { useUser } from "@/lib/hooks/use-user";
 
 const proposalSchema = z.object({
   number: z.string().min(1, "Número é obrigatório"),
-  business_unit: z.string().min(1, "Unidade de negócio é obrigatória"),
   lead_id: z.string().optional(),
   company_name: z.string().optional(),
   contact_name: z.string().optional(),
   discount: z.string().optional(),
   valid_until: z.string().optional(),
   conditions: z.string().optional(),
-  template: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof proposalSchema>;
@@ -92,13 +89,10 @@ export function ProposalEditor({ proposal }: Props) {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(proposalSchema),
-    defaultValues: { number: generateNumber(), business_unit: "labs" },
+    defaultValues: { number: generateNumber() },
   });
 
-  const businessUnitValue = watch("business_unit");
   const leadIdValue = watch("lead_id");
-  const templateValue = watch("template");
-
   function generateNumber() {
     const year = new Date().getFullYear();
     const seq = String(Math.floor(Math.random() * 9000) + 1000);
@@ -109,14 +103,12 @@ export function ProposalEditor({ proposal }: Props) {
     if (proposal) {
       reset({
         number: proposal.number,
-        business_unit: proposal.business_unit,
         lead_id: proposal.lead_id ?? "__none__",
         company_name: proposal.company?.name ?? "",
         contact_name: proposal.contact?.full_name ?? "",
         discount: proposal.discount?.toString() ?? "",
         valid_until: proposal.valid_until ? proposal.valid_until.split("T")[0] : "",
         conditions: proposal.conditions ?? "",
-        template: proposal.template ?? "__none__",
       });
       setGlobalDiscount(proposal.discount ?? 0);
       if (proposal.items && proposal.items.length > 0) {
@@ -148,14 +140,11 @@ export function ProposalEditor({ proposal }: Props) {
     const lead = leads.find((l) => l.id === leadIdValue);
     if (lead) {
       setSelectedLead(lead);
-      // Only auto-fill business_unit/company/contact when CREATING a new proposal,
+      // Only auto-fill company/contact when CREATING a new proposal,
       // otherwise we'd overwrite the proposal's own data on every edit re-render
       if (!proposal) {
         setValue("company_name", lead.company?.name ?? "");
         setValue("contact_name", lead.contact?.full_name ?? "");
-        if (lead.business_unit) {
-          setValue("business_unit", lead.business_unit);
-        }
       }
     }
   }, [leadIdValue, leads, setValue, proposal]);
@@ -200,16 +189,9 @@ export function ProposalEditor({ proposal }: Props) {
   const total = subtotal * (1 - globalDiscount / 100);
 
   const buildPayload = (status: Proposal["status"]) => {
-    const businessUnitValue = watch("business_unit");
-    const validBU = (["labs", "advisory", "enterprise"] as const).includes(
-      businessUnitValue as "labs" | "advisory" | "enterprise"
-    )
-      ? (businessUnitValue as Proposal["business_unit"])
-      : "labs";
-    const templateValue = watch("template");
     return {
       number: watch("number"),
-      business_unit: validBU,
+      business_unit: "intelligence" as Proposal["business_unit"],
       // Preserve existing IDs from the proposal when no lead is currently selected
       lead_id: selectedLead?.id ?? proposal?.lead_id ?? null,
       company_id: selectedLead?.company_id ?? proposal?.company_id ?? null,
@@ -218,7 +200,7 @@ export function ProposalEditor({ proposal }: Props) {
       valid_until: watch("valid_until") || null,
       status,
       conditions: watch("conditions") || null,
-      template: templateValue && templateValue !== "__none__" ? templateValue : null,
+      template: proposal?.template ?? null,
       total,
     };
   };
@@ -315,32 +297,10 @@ export function ProposalEditor({ proposal }: Props) {
           Lead & Cliente
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="number">Número da Proposta *</Label>
-            <Input id="number" {...register("number")} placeholder="PROP-2025-0001" />
-            {errors.number && <p className="text-xs text-danger">{errors.number.message}</p>}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Frente *</Label>
-            <Select
-              value={businessUnitValue ?? ""}
-              onValueChange={(v) => setValue("business_unit", v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar frente" />
-              </SelectTrigger>
-              <SelectContent>
-                {BUSINESS_UNITS.map((u) => (
-                  <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.business_unit && (
-              <p className="text-xs text-danger">{errors.business_unit.message}</p>
-            )}
-          </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="number">Número da Proposta *</Label>
+          <Input id="number" {...register("number")} placeholder="PROP-2025-0001" />
+          {errors.number && <p className="text-xs text-danger">{errors.number.message}</p>}
         </div>
 
         <div className="space-y-1.5">
@@ -534,26 +494,9 @@ export function ProposalEditor({ proposal }: Props) {
           Detalhes
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="valid_until">Validade</Label>
-            <Input id="valid_until" type="date" {...register("valid_until")} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Template</Label>
-            <Select value={templateValue ?? "__none__"} onValueChange={(v) => setValue("template", v === "__none__" ? undefined : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar template" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Padrão</SelectItem>
-                {BUSINESS_UNITS.map((u) => (
-                  <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="valid_until">Validade</Label>
+          <Input id="valid_until" type="date" {...register("valid_until")} />
         </div>
 
         <div className="space-y-1.5">

@@ -35,7 +35,6 @@ import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { useProposals, useDeleteProposal, useAutoExpireProposals, type ProposalWithRelations } from "@/lib/hooks/use-proposals";
-import { BUSINESS_UNITS } from "@/lib/utils/constants";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   rascunho: { label: "Rascunho", className: "bg-white/5 text-gray-400" },
@@ -44,12 +43,6 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   aceita: { label: "Aceita", className: "bg-emerald-100 text-emerald-700" },
   recusada: { label: "Recusada", className: "bg-red-950/60 text-red-300" },
   expirada: { label: "Expirada", className: "bg-amber-100 text-amber-700" },
-};
-
-const unitConfig: Record<string, { label: string; className: string }> = {
-  labs: { label: "Labs", className: "bg-blue-950/60 text-blue-300" },
-  advisory: { label: "Advisory", className: "bg-indigo-100 text-indigo-700" },
-  enterprise: { label: "Enterprise", className: "bg-emerald-100 text-emerald-700" },
 };
 
 const MONTHS = [
@@ -61,7 +54,6 @@ export default function ProposalsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("active");
-  const [filterFrente, setFilterFrente] = useState<string>("all");
   const [filterMonth, setFilterMonth] = useState<string>("all");
   const [filterYear, setFilterYear] = useState<string>("all");
   const [deletingProposal, setDeletingProposal] = useState<ProposalWithRelations | undefined>();
@@ -131,7 +123,6 @@ export default function ProposalsPage() {
       } else if (filterStatus !== "all" && p.status !== filterStatus) {
         return false;
       }
-      if (filterFrente !== "all" && p.business_unit !== filterFrente) return false;
       if (filterMonth !== "all") {
         const month = new Date(p.created_at).getMonth().toString();
         if (month !== filterMonth) return false;
@@ -142,7 +133,7 @@ export default function ProposalsPage() {
       }
       return true;
     });
-  }, [proposals, search, filterStatus, filterFrente, filterMonth, filterYear]);
+  }, [proposals, search, filterStatus, filterMonth, filterYear]);
 
   const isExpiredValidity = (valid_until: string | null) => {
     if (!valid_until) return false;
@@ -210,18 +201,6 @@ export default function ProposalsPage() {
           </SelectContent>
         </Select>
 
-        <Select value={filterFrente} onValueChange={setFilterFrente}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Frente" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as frentes</SelectItem>
-            {BUSINESS_UNITS.map((u) => (
-              <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         <Select value={filterMonth} onValueChange={setFilterMonth}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="Mês" />
@@ -270,7 +249,6 @@ export default function ProposalsPage() {
               <TableRow>
                 <TableHead>Número</TableHead>
                 <TableHead>Empresa</TableHead>
-                <TableHead>Frente</TableHead>
                 <TableHead>Valor Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Validade</TableHead>
@@ -281,7 +259,6 @@ export default function ProposalsPage() {
             <TableBody>
               {filtered.map((proposal) => {
                 const statusCfg = statusConfig[proposal.status] ?? statusConfig.rascunho;
-                const unitCfg = unitConfig[proposal.business_unit] ?? { label: proposal.business_unit, className: "bg-white/5 text-gray-400" };
                 const expired = isExpiredValidity(proposal.valid_until);
                 return (
                   <TableRow
@@ -312,11 +289,6 @@ export default function ProposalsPage() {
                           <span className="text-sm text-text-muted">—</span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${unitCfg.className}`}>
-                        {unitCfg.label}
-                      </span>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm font-bold text-primary">

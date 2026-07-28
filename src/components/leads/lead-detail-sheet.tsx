@@ -91,12 +91,6 @@ export const LeadDetailSheet = ({
           {/* Details */}
           <div className="space-y-3 p-3 rounded-lg" style={{ background: "rgba(12,21,38,0.5)" }}>
             <p className="text-xs font-semibold uppercase text-text-muted">Detalhes</p>
-            {displayLead.business_unit && (
-              <div className="text-sm">
-                <p className="text-xs text-text-muted">Unidade</p>
-                <p className="text-text-primary capitalize">{displayLead.business_unit}</p>
-              </div>
-            )}
             {displayLead.probability !== undefined && (
               <div className="text-sm">
                 <p className="text-xs text-text-muted">Probabilidade</p>

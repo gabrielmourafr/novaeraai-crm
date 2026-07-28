@@ -35,9 +35,8 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ProductForm } from "@/components/forms/product-form";
 import { formatCurrency } from "@/lib/utils/format";
 import { useProducts, useDeleteProduct, type Product } from "@/lib/hooks/use-products";
-import { BUSINESS_UNITS } from "@/lib/utils/constants";
 
-type ViewMode = "frente" | "tabela";
+type ViewMode = "grade" | "tabela";
 
 const categoryLabels: Record<string, string> = {
   saas_plan: "SaaS Plan",
@@ -60,23 +59,15 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   desenvolvimento: { label: "Em desenvolvimento", className: "bg-amber-100 text-amber-700" },
 };
 
-const unitColors: Record<string, string> = {
-  labs: "bg-blue-950/60 text-blue-300",
-  advisory: "bg-indigo-100 text-indigo-700",
-  enterprise: "bg-emerald-100 text-emerald-700",
-};
-
 export default function CatalogPage() {
-  const [view, setView] = useState<ViewMode>("frente");
+  const [view, setView] = useState<ViewMode>("grade");
   const [search, setSearch] = useState("");
-  const [filterFrente, setFilterFrente] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [sortField, setSortField] = useState<keyof Product>("name");
   const [sortAsc, setSortAsc] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [deletingProduct, setDeletingProduct] = useState<Product | undefined>();
-  const [, setDefaultUnit] = useState<string>("");
 
   const { data: products = [], isLoading } = useProducts(search);
   const deleteProduct = useDeleteProduct();
@@ -92,32 +83,15 @@ export default function CatalogPage() {
     setDeletingProduct(undefined);
   };
 
-  const handleAddToUnit = (unit: string) => {
-    setDefaultUnit(unit);
-    setEditingProduct(undefined);
-    setFormOpen(true);
-  };
-
   const handleOpenNew = () => {
-    setDefaultUnit("");
     setEditingProduct(undefined);
     setFormOpen(true);
   };
 
-  const grouped = BUSINESS_UNITS.reduce(
-    (acc, unit) => {
-      acc[unit.value] = products.filter((p) => p.business_unit === unit.value);
-      return acc;
-    },
-    {} as Record<string, Product[]>
-  );
+  const filteredForGrid = products.filter((p) => filterStatus === "all" || p.status === filterStatus);
 
   const filteredForTable = products
-    .filter((p) => {
-      if (filterFrente !== "all" && p.business_unit !== filterFrente) return false;
-      if (filterStatus !== "all" && p.status !== filterStatus) return false;
-      return true;
-    })
+    .filter((p) => filterStatus === "all" || p.status === filterStatus)
     .sort((a, b) => {
       const av = a[sortField];
       const bv = b[sortField];
@@ -166,44 +140,28 @@ export default function CatalogPage() {
           />
         </div>
 
-        {view === "tabela" && (
-          <>
-            <Select value={filterFrente} onValueChange={setFilterFrente}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Frente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as frentes</SelectItem>
-                {BUSINESS_UNITS.map((u) => (
-                  <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
-                <SelectItem value="ativo">Ativo</SelectItem>
-                <SelectItem value="inativo">Inativo</SelectItem>
-                <SelectItem value="desenvolvimento">Em desenvolvimento</SelectItem>
-              </SelectContent>
-            </Select>
-          </>
-        )}
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            <SelectItem value="ativo">Ativo</SelectItem>
+            <SelectItem value="inativo">Inativo</SelectItem>
+            <SelectItem value="desenvolvimento">Em desenvolvimento</SelectItem>
+          </SelectContent>
+        </Select>
 
         <div className="flex gap-1 border border-border rounded-lg p-1 bg-white/5 ml-auto">
           <button
-            onClick={() => setView("frente")}
+            onClick={() => setView("grade")}
             className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              view === "frente" ? "bg-primary text-white" : "text-text-muted hover:text-text-primary"
+              view === "grade" ? "bg-primary text-white" : "text-text-muted hover:text-text-primary"
             }`}
           >
             <span className="flex items-center gap-1.5">
               <LayoutGrid size={14} />
-              Por Frente
+              Grade
             </span>
           </button>
           <button
@@ -231,108 +189,64 @@ export default function CatalogPage() {
           description={search ? "Tente outro termo de busca." : "Adicione produtos ao catálogo."}
           action={{ label: "Novo Produto", onClick: handleOpenNew }}
         />
-      ) : view === "frente" ? (
-        /* ── Por Frente View ── */
-        <div className="space-y-10">
-          {BUSINESS_UNITS.map((unit) => {
-            const unitProducts = grouped[unit.value] ?? [];
+      ) : view === "grade" ? (
+        /* ── Grade View ── */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredForGrid.map((product) => {
+            const statusCfg = statusConfig[product.status] ?? statusConfig.inativo;
             return (
-              <div key={unit.value}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-base font-semibold text-text-primary">{unit.label}</h2>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${unitColors[unit.value]}`}
-                    >
-                      {unitProducts.length} {unitProducts.length === 1 ? "produto" : "produtos"}
+              <div
+                key={product.id}
+                className="bg-card rounded-xl border border-border p-5 hover:shadow-md transition-shadow group"
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-text-primary truncate">{product.name}</p>
+                    <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-gray-400">
+                      {categoryLabels[product.category] ?? product.category}
                     </span>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleAddToUnit(unit.value)}
-                    className="h-7 text-xs"
-                  >
-                    <Plus size={13} className="mr-1" />
-                    Adicionar
-                  </Button>
-                </div>
-
-                {unitProducts.length === 0 ? (
-                  <div className="border border-dashed border-border rounded-xl p-8 text-center">
-                    <p className="text-sm text-text-muted">Nenhum produto nesta frente.</p>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="mt-2 text-primary"
-                      onClick={() => handleAddToUnit(unit.value)}
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleEdit(product)}
                     >
-                      <Plus size={13} className="mr-1" />
-                      Adicionar produto
+                      <Pencil size={13} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-danger hover:text-danger"
+                      onClick={() => setDeletingProduct(product)}
+                    >
+                      <Trash2 size={13} />
                     </Button>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {unitProducts.map((product) => {
-                      const statusCfg = statusConfig[product.status] ?? statusConfig.inativo;
-                      return (
-                        <div
-                          key={product.id}
-                          className="bg-card rounded-xl border border-border p-5 hover:shadow-md transition-shadow group"
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-text-primary truncate">{product.name}</p>
-                              <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-gray-400">
-                                {categoryLabels[product.category] ?? product.category}
-                              </span>
-                            </div>
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => handleEdit(product)}
-                              >
-                                <Pencil size={13} />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-danger hover:text-danger"
-                                onClick={() => setDeletingProduct(product)}
-                              >
-                                <Trash2 size={13} />
-                              </Button>
-                            </div>
-                          </div>
+                </div>
 
-                          {product.description && (
-                            <p className="text-xs text-text-muted line-clamp-2 mb-3">
-                              {product.description}
-                            </p>
-                          )}
-
-                          <div className="flex items-center justify-between mt-auto pt-3 border-t border-border">
-                            <div>
-                              <p className="text-lg font-bold text-primary">
-                                {formatCurrency(product.base_price)}
-                              </p>
-                              <p className="text-[10px] text-text-muted">
-                                / {recurrenceLabels[product.recurrence]}
-                              </p>
-                            </div>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusCfg.className}`}
-                            >
-                              {statusCfg.label}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                {product.description && (
+                  <p className="text-xs text-text-muted line-clamp-2 mb-3">
+                    {product.description}
+                  </p>
                 )}
+
+                <div className="flex items-center justify-between mt-auto pt-3 border-t border-border">
+                  <div>
+                    <p className="text-lg font-bold text-primary">
+                      {formatCurrency(product.base_price)}
+                    </p>
+                    <p className="text-[10px] text-text-muted">
+                      / {recurrenceLabels[product.recurrence]}
+                    </p>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusCfg.className}`}
+                  >
+                    {statusCfg.label}
+                  </span>
+                </div>
               </div>
             );
           })}
@@ -353,12 +267,6 @@ export default function CatalogPage() {
                     onClick={() => handleSort("name")}
                   >
                     Nome <SortIndicator field="name" />
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none"
-                    onClick={() => handleSort("business_unit")}
-                  >
-                    Frente <SortIndicator field="business_unit" />
                   </TableHead>
                   <TableHead
                     className="cursor-pointer select-none"
@@ -390,7 +298,6 @@ export default function CatalogPage() {
               <TableBody>
                 {filteredForTable.map((product) => {
                   const statusCfg = statusConfig[product.status] ?? statusConfig.inativo;
-                  const unit = BUSINESS_UNITS.find((u) => u.value === product.business_unit);
                   return (
                     <TableRow key={product.id} className="hover:bg-white/5/50">
                       <TableCell>
@@ -402,15 +309,6 @@ export default function CatalogPage() {
                             </p>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            unitColors[product.business_unit] ?? "bg-white/5 text-gray-400"
-                          }`}
-                        >
-                          {unit?.label ?? product.business_unit}
-                        </span>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-text-secondary">
@@ -468,7 +366,6 @@ export default function CatalogPage() {
         onClose={() => {
           setFormOpen(false);
           setEditingProduct(undefined);
-          setDefaultUnit("");
         }}
         product={editingProduct}
       />

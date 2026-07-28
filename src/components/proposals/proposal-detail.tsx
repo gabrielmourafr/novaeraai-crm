@@ -43,12 +43,6 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   expirada: { label: "Expirada", className: "bg-amber-100 text-amber-700" },
 };
 
-const unitConfig: Record<string, { label: string; className: string }> = {
-  labs: { label: "Nova Era Labs", className: "bg-blue-950/60 text-blue-300" },
-  advisory: { label: "Nova Era Advisory", className: "bg-indigo-100 text-indigo-700" },
-  enterprise: { label: "Nova Era Enterprise", className: "bg-emerald-100 text-emerald-700" },
-};
-
 interface Props {
   proposal: ProposalWithRelations;
 }
@@ -63,7 +57,6 @@ export function ProposalDetail({ proposal }: Props) {
   const [confirmDecline, setConfirmDecline] = useState(false);
 
   const statusCfg = statusConfig[proposal.status] ?? statusConfig.rascunho;
-  const unitCfg = unitConfig[proposal.business_unit] ?? { label: proposal.business_unit, className: "bg-white/5 text-gray-400" };
 
   const items = proposal.items ?? [];
 
@@ -108,9 +101,6 @@ export function ProposalDetail({ proposal }: Props) {
               <h1 className="font-mono text-2xl font-bold text-text-primary">{proposal.number}</h1>
               <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusCfg.className}`}>
                 {statusCfg.label}
-              </span>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${unitCfg.className}`}>
-                {unitCfg.label}
               </span>
             </div>
             <p className="text-sm text-text-muted mt-0.5">Proposta Comercial</p>

@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/dialog";
 import { useUpdateProject, type ProjectWithRelations } from "@/lib/hooks/use-projects";
 import { useOrgUsers } from "@/lib/hooks/use-user";
-import { BUSINESS_UNITS } from "@/lib/utils/constants";
 
 interface Props {
   project: ProjectWithRelations;
@@ -39,7 +38,6 @@ export function ProjectIdentification({ project }: Props) {
     closed_by_user_id: project.closed_by_user_id ?? "",
     closed_by_external_label: project.closed_by_external_label ?? "",
     developer_user_id: project.developer_user_id ?? "",
-    business_unit: project.business_unit,
   });
 
   const handleOpen = () => {
@@ -50,7 +48,6 @@ export function ProjectIdentification({ project }: Props) {
       closed_by_user_id: project.closed_by_user_id ?? "",
       closed_by_external_label: project.closed_by_external_label ?? "",
       developer_user_id: project.developer_user_id ?? "",
-      business_unit: project.business_unit,
     });
     setOpen(true);
   };
@@ -64,7 +61,6 @@ export function ProjectIdentification({ project }: Props) {
       closed_by_user_id: form.closed_by_user_id || null,
       closed_by_external_label: form.closed_by_external_label.trim() || null,
       developer_user_id: form.developer_user_id || null,
-      business_unit: form.business_unit,
     });
     setOpen(false);
   };
@@ -76,8 +72,6 @@ export function ProjectIdentification({ project }: Props) {
   const developerLabel = project.developer_user_id
     ? orgUsers.find((u) => u.id === project.developer_user_id)?.full_name
     : null;
-
-  const buLabel = BUSINESS_UNITS.find((b) => b.value === project.business_unit)?.label ?? project.business_unit;
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
@@ -96,7 +90,6 @@ export function ProjectIdentification({ project }: Props) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field icon={Hash} label="ID do Projeto" value={project.code || "—"} mono />
-        <Field icon={Tag} label="Frente" value={buLabel} />
         <Field icon={Building2} label="Empresa" value={project.company?.name ?? "—"} />
         <Field icon={Tag} label="Nicho / Setor" value={project.niche ?? "—"} />
         <Field
@@ -121,21 +114,6 @@ export function ProjectIdentification({ project }: Props) {
           </DialogHeader>
 
           <div className="space-y-3">
-            <div>
-              <Label>Frente *</Label>
-              <Select
-                value={form.business_unit}
-                onValueChange={(v) => setForm((f) => ({ ...f, business_unit: v as typeof f.business_unit }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {BUSINESS_UNITS.map((u) => (
-                    <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div>
               <Label>Nicho / Setor</Label>
               <Input

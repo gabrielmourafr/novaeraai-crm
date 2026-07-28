@@ -75,7 +75,6 @@ export function UpsellList({ scope, companyId, projectId, orgId }: Props) {
       : companies;
     for (const c of targetCompanies) {
       const companyProjects = projects.filter((p) => p.company_id === c.id);
-      const businessUnits = new Set(companyProjects.map((p) => p.business_unit));
       const nearestContractEnd = companyProjects
         .filter((p) => p.contract_end && p.billing_status === "ativo")
         .map((p) => differenceInDays(parseISO(p.contract_end!), new Date()))
@@ -84,11 +83,9 @@ export function UpsellList({ scope, companyId, projectId, orgId }: Props) {
       const auto = computeAutoSuggestions({
         companyId: c.id,
         companyName: c.name,
-        companyProjectsBusinessUnits: businessUnits,
         catalogProducts: products.map((p) => ({
           id: p.id,
           name: p.name,
-          business_unit: p.business_unit,
           base_price: p.base_price,
           status: p.status,
         })),

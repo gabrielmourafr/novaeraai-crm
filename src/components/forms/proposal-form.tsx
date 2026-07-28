@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { BUSINESS_UNITS, PROPOSAL_STATUSES } from "@/lib/utils/constants";
+import { PROPOSAL_STATUSES } from "@/lib/utils/constants";
 import { useCreateProposal, useUpdateProposal } from "@/lib/hooks/use-proposals";
 import { useLeads } from "@/lib/hooks/use-leads";
 import { useCompanies } from "@/lib/hooks/use-companies";
@@ -35,7 +35,6 @@ import type { ProposalWithRelations, Proposal } from "@/lib/hooks/use-proposals"
 
 const proposalSchema = z.object({
   number: z.string().min(1, "Número é obrigatório"),
-  business_unit: z.string().min(1, "Unidade de negócio é obrigatória"),
   lead_id: z.string().optional(),
   company_id: z.string().optional(),
   contact_id: z.string().optional(),
@@ -86,7 +85,6 @@ export const ProposalForm = ({ open, onClose, proposal }: ProposalFormProps) => 
     defaultValues: { status: "rascunho" },
   });
 
-  const businessUnitValue = watch("business_unit");
   const statusValue = watch("status");
   const leadIdValue = watch("lead_id");
   const companyIdValue = watch("company_id");
@@ -97,7 +95,6 @@ export const ProposalForm = ({ open, onClose, proposal }: ProposalFormProps) => 
     if (proposal) {
       reset({
         number: proposal.number,
-        business_unit: proposal.business_unit,
         lead_id: proposal.lead_id ?? "",
         company_id: proposal.company_id ?? "",
         contact_id: proposal.contact_id ?? "",
@@ -162,7 +159,7 @@ export const ProposalForm = ({ open, onClose, proposal }: ProposalFormProps) => 
   const onSubmit = async (values: ProposalFormValues) => {
     const payload = {
       number: values.number,
-      business_unit: values.business_unit as Proposal["business_unit"],
+      business_unit: "intelligence" as Proposal["business_unit"],
       lead_id: values.lead_id || null,
       company_id: values.company_id || null,
       contact_id: values.contact_id || null,
@@ -225,21 +222,6 @@ export const ProposalForm = ({ open, onClose, proposal }: ProposalFormProps) => 
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Unidade de Negócio *</Label>
-            <Select value={businessUnitValue ?? "__none__"} onValueChange={(v) => setValue("business_unit", v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar" />
-              </SelectTrigger>
-              <SelectContent>
-                {BUSINESS_UNITS.map((u) => (
-                  <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.business_unit && <p className="text-xs text-danger">{errors.business_unit.message}</p>}
           </div>
 
           <div className="grid grid-cols-3 gap-4">

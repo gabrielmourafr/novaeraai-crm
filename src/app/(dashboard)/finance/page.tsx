@@ -70,7 +70,6 @@ export default function FinancePage() {
   const [revValue, setRevValue] = useState("");
   const [revDueDate, setRevDueDate] = useState("");
   const [revStatus, setRevStatus] = useState<"pendente" | "pago" | "atrasado" | "cancelado">("pendente");
-  const [revUnit, setRevUnit] = useState<"labs" | "advisory" | "enterprise">("labs");
   const [revRecurrence, setRevRecurrence] = useState<"pontual" | "mensal" | "trimestral" | "anual">("pontual");
 
   // Expense form state
@@ -149,7 +148,7 @@ export default function FinancePage() {
       value: parseFloat(revValue.replace(",", ".")),
       status: revStatus,
       due_date: revDueDate || null,
-      business_unit: revUnit,
+      business_unit: "intelligence",
       recurrence: revRecurrence,
       company_id: null, contact_id: null, proposal_id: null, project_id: null,
       payment_method: null, installment: null, paid_at: null,
@@ -701,30 +700,17 @@ export default function FinancePage() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Unidade</Label>
-                <Select value={revUnit} onValueChange={(v) => setRevUnit(v as typeof revUnit)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="labs">Nova Era Labs</SelectItem>
-                    <SelectItem value="advisory">Nova Era Advisory</SelectItem>
-                    <SelectItem value="enterprise">Nova Era Enterprise</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Recorrência</Label>
-                <Select value={revRecurrence} onValueChange={(v) => setRevRecurrence(v as typeof revRecurrence)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pontual">Pontual</SelectItem>
-                    <SelectItem value="mensal">Mensal</SelectItem>
-                    <SelectItem value="trimestral">Trimestral</SelectItem>
-                    <SelectItem value="anual">Anual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1.5">
+              <Label>Recorrência</Label>
+              <Select value={revRecurrence} onValueChange={(v) => setRevRecurrence(v as typeof revRecurrence)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pontual">Pontual</SelectItem>
+                  <SelectItem value="mensal">Mensal</SelectItem>
+                  <SelectItem value="trimestral">Trimestral</SelectItem>
+                  <SelectItem value="anual">Anual</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setCreateRevenueOpen(false)}>Cancelar</Button>
