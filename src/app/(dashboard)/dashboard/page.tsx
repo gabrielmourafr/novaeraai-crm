@@ -94,7 +94,10 @@ export default function DashboardPage() {
     if (!t.due_date || t.status === "concluida" || t.status === "cancelada") return false;
     return new Date(t.due_date) < now;
   });
-  const activeProjects = projects.filter((p) => p.status === "em_andamento");
+  // "Ativo" = qualquer projeto que não terminou (cobre o pipeline V2 inteiro,
+  // não só o status legado "em_andamento" que os projetos reais não usam mais)
+  const inactiveProjectStatuses = new Set(["cancelado", "concluido", "churned", "pausado"]);
+  const activeProjects = projects.filter((p) => !inactiveProjectStatuses.has(p.status));
   const projectsWithContract = projects.filter(
     (p) => p.contract_end && p.billing_status === "ativo"
   );
