@@ -9,10 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { TaskForm, type TaskInitialData } from "@/components/forms/task-form";
 import { useAllTasks, useToggleTask, useDeleteTask, type TaskWithRelations } from "@/lib/hooks/use-tasks";
-import { formatDate, formatInitials } from "@/lib/utils/format";
+import { formatDate, formatInitials, isPastDate } from "@/lib/utils/format";
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  critica: { label: "Crítica", color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
+  urgente: { label: "Urgente", color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
   alta:    { label: "Alta",    color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
   media:   { label: "Média",   color: "#0B87C3", bg: "rgba(11,135,195,0.12)" },
   baixa:   { label: "Baixa",   color: "#22c55e", bg: "rgba(34,197,94,0.12)" },
@@ -32,16 +32,15 @@ const STATUS_TABS = [
 ];
 
 function TaskRow({
-  task, now, onEdit, onDelete, onToggle,
+  task, onEdit, onDelete, onToggle,
 }: {
   task: TaskWithRelations;
-  now: Date;
   onEdit: (t: TaskWithRelations) => void;
   onDelete: (t: TaskWithRelations) => void;
   onToggle: (id: string, status: string) => void;
 }) {
   const prio = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.media;
-  const isOverdue = task.due_date && new Date(task.due_date) < now && task.status !== "concluida" && task.status !== "cancelada";
+  const isOverdue = task.due_date && isPastDate(task.due_date) && task.status !== "concluida" && task.status !== "cancelada";
   const isDone = task.status === "concluida";
 
   return (
@@ -152,7 +151,6 @@ function TaskRow({
 }
 
 export default function TasksPage() {
-  const now = new Date();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
@@ -170,7 +168,7 @@ export default function TasksPage() {
 
   const pendingCount = allTasks.filter((t) => t.status === "pendente").length;
   const overdueCount = allTasks.filter((t) =>
-    t.due_date && new Date(t.due_date) < now && t.status !== "concluida" && t.status !== "cancelada"
+    t.due_date && isPastDate(t.due_date) && t.status !== "concluida" && t.status !== "cancelada"
   ).length;
 
   const handleEdit = (task: TaskWithRelations) => {
@@ -311,7 +309,6 @@ export default function TasksPage() {
                     <TaskRow
                       key={task.id}
                       task={task}
-                      now={now}
                       onEdit={handleEdit}
                       onDelete={setDeletingTask}
                       onToggle={(id, status) => toggleTask.mutate({ id, currentStatus: status as "pendente" | "concluida" | "em_andamento" | "cancelada" })}

@@ -24,7 +24,7 @@ import { useUser, useOrgUsers } from "@/lib/hooks/use-user";
 import { useLeads } from "@/lib/hooks/use-leads";
 import { useContacts } from "@/lib/hooks/use-contacts";
 import { useProjects } from "@/lib/hooks/use-projects";
-import { formatDate } from "@/lib/utils/format";
+import { formatDate, isPastDate } from "@/lib/utils/format";
 
 const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const DAYS = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
@@ -565,12 +565,12 @@ export default function CalendarPage() {
               {/* Próximos follow-ups */}
               <div className="rounded-xl p-5" style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(34,197,94,0.15)" }}>
                 <h3 className="font-semibold text-sm mb-3" style={{ color: "#E2EBF8" }}>Próximos Follow-ups</h3>
-                {allFollowUps.filter((t) => t.status === "pendente" && t.due_date && new Date(t.due_date) >= now).slice(0, 6).length === 0 ? (
+                {allFollowUps.filter((t) => t.status === "pendente" && t.due_date && !isPastDate(t.due_date)).slice(0, 6).length === 0 ? (
                   <p className="text-xs text-center py-4" style={{ color: "#3D5A78" }}>Nenhum follow-up futuro</p>
                 ) : (
                   <div className="space-y-2">
                     {allFollowUps
-                      .filter((t) => t.status === "pendente" && t.due_date && new Date(t.due_date) >= now)
+                      .filter((t) => t.status === "pendente" && t.due_date && !isPastDate(t.due_date))
                       .slice(0, 6)
                       .map((t) => (
                         <div key={t.id} className="flex items-center gap-2.5 cursor-pointer" onClick={() => setFuDetailTask(t)}>

@@ -11,7 +11,7 @@ import { useProjects } from "@/lib/hooks/use-projects";
 import { useProposals } from "@/lib/hooks/use-proposals";
 import { useAllTasks } from "@/lib/hooks/use-tasks";
 import { useRevenues, useExpenses } from "@/lib/hooks/use-finance";
-import { formatCurrency, formatDate } from "@/lib/utils/format";
+import { formatCurrency, formatDate, isPastDate } from "@/lib/utils/format";
 
 export function OverviewTab() {
   const now = new Date();
@@ -33,7 +33,7 @@ export function OverviewTab() {
   const pendingTasks = tasks.filter((t) => t.status === "pendente");
   const overdueTasks = tasks.filter((t) => {
     if (!t.due_date || t.status === "concluida" || t.status === "cancelada") return false;
-    return new Date(t.due_date) < now;
+    return isPastDate(t.due_date);
   });
   const inactiveProjectStatuses = new Set(["cancelado", "concluido", "churned", "pausado"]);
   const activeProjects = projects.filter((p) => !inactiveProjectStatuses.has(p.status));
@@ -55,7 +55,7 @@ export function OverviewTab() {
     .slice(0, 6);
 
   const priorityColor: Record<string, string> = {
-    critica: "#ef4444", alta: "#f59e0b", media: "#0B87C3", baixa: "#22c55e",
+    urgente: "#ef4444", alta: "#f59e0b", media: "#0B87C3", baixa: "#22c55e",
   };
 
   return (
@@ -96,7 +96,7 @@ export function OverviewTab() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {recentTasks.map((task) => {
-              const isOverdue = task.due_date && new Date(task.due_date) < now;
+              const isOverdue = task.due_date && isPastDate(task.due_date);
               return (
                 <div
                   key={task.id}

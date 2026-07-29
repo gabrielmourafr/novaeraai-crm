@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 import { useUser } from "@/lib/hooks/use-user";
 import { useAllTasks, useUpdateTask, type TaskWithRelations } from "@/lib/hooks/use-tasks";
-import { formatInitials, formatDate } from "@/lib/utils/format";
+import { formatInitials, formatDate, isPastDate, dateStringOf } from "@/lib/utils/format";
 
 const BREADCRUMBS: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -71,12 +71,14 @@ export const TopBar = () => {
     return due <= in7Days;
   });
 
-  const overdue = pending.filter((t) => t.due_date && new Date(t.due_date) < new Date());
-  const todayTasks = pending.filter((t) => t.due_date && new Date(t.due_date).toDateString() === new Date().toDateString());
+  const todayStr = dateStringOf(new Date());
+  const overdue = pending.filter((t) => t.due_date && isPastDate(t.due_date));
+  const todayTasks = pending.filter((t) => t.due_date && dateStringOf(t.due_date) === todayStr);
   const upcoming = pending.filter((t) => {
     if (!t.due_date) return false;
+    if (isPastDate(t.due_date) || dateStringOf(t.due_date) === todayStr) return false;
     const due = new Date(t.due_date);
-    return due > today && due <= in7Days;
+    return due <= in7Days;
   });
 
   // Fechar ao clicar fora
