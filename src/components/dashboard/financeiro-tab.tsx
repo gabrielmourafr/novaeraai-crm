@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Flame, Building2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PageHeader } from "@/components/shared/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { StatCard } from "@/components/shared/stat-card";
@@ -20,6 +19,8 @@ import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues, type Revenue, type Expense } from "@/lib/hooks/use-finance";
 import { useAllInstallments, useMarkInstallmentPaid, INSTALLMENT_STATUS_META } from "@/lib/hooks/use-installments";
 import { useActiveSubscriptions, useEnsureMonthlyBilling, nextBillingDate, RENEWAL_LABEL, type ActiveSubscription } from "@/lib/hooks/use-subscriptions";
+import { useClientsFinancialSummary } from "@/lib/hooks/use-client-summary";
+import { useLeads } from "@/lib/hooks/use-leads";
 import { useUpdateProject } from "@/lib/hooks/use-projects";
 import { useUser } from "@/lib/hooks/use-user";
 import Link from "next/link";
@@ -55,7 +56,7 @@ const EXPENSE_CATEGORY_COLORS: Record<string, string> = {
   outro: "#3D5A78",
 };
 
-export default function FinancePage() {
+export function FinanceiroTab() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -63,6 +64,7 @@ export default function FinancePage() {
   const [deletingExpense, setDeletingExpense] = useState<Expense | undefined>();
   const [createRevenueOpen, setCreateRevenueOpen] = useState(false);
   const [createExpenseOpen, setCreateExpenseOpen] = useState(false);
+  const [mensalidadesBreakdownOpen, setMensalidadesBreakdownOpen] = useState(false);
 
   // Revenue form state
   const [revDesc, setRevDesc] = useState("");
@@ -84,7 +86,15 @@ export default function FinancePage() {
   useEnsureMonthlyBilling();
   const { data: totalRevenuesAllTime = 0 } = useTotalRevenues();
   const { data: activeSubscriptions = [], isLoading: subscriptionsLoading } = useActiveSubscriptions();
+  const { data: clientsSummary = [] } = useClientsFinancialSummary();
+  const { data: leads = [] } = useLeads();
   const totalMonthlyRecurring = activeSubscriptions.reduce((s, p) => s + Number(p.billing_amount ?? 0), 0);
+  const totalImplementacao = clientsSummary.reduce((s, c) => s + c.implementacao, 0);
+  const hotLeadsPipeline = useMemo(
+    () => leads.filter((l) => l.temperature === "quente").reduce((s, l) => s + (l.value ?? 0), 0),
+    [leads]
+  );
+  const hotLeadsCount = leads.filter((l) => l.temperature === "quente").length;
   const updateProject = useUpdateProject();
   const [editingSubscription, setEditingSubscription] = useState<ActiveSubscription | undefined>();
   const [removingSubscription, setRemovingSubscription] = useState<ActiveSubscription | undefined>();
@@ -230,8 +240,6 @@ export default function FinancePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Financeiro" description="Controle de receitas e despesas" />
-
       {/* Month/Year Filter */}
       <div className="flex gap-3 items-center">
         <Select value={month.toString()} onValueChange={(v) => setMonth(parseInt(v))}>
@@ -244,10 +252,21 @@ export default function FinancePage() {
         </Select>
       </div>
 
-      {/* Faturamento Total (sem período) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Acumulados (sem período) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Faturamento Total (todos os períodos)" value={formatCurrency(totalRevenuesAllTime)} icon={Wallet} />
-        <StatCard label={`Mensalidades Ativas (${activeSubscriptions.length})`} value={formatCurrency(totalMonthlyRecurring)} icon={TrendingUp} />
+        <StatCard label="Implementação Acumulada (clientes)" value={formatCurrency(totalImplementacao)} icon={Building2} />
+        <StatCard
+          label={`Mensalidades Acumuladas (${activeSubscriptions.length})`}
+          value={formatCurrency(totalMonthlyRecurring)}
+          icon={TrendingUp}
+          onClick={() => setMensalidadesBreakdownOpen(true)}
+        />
+        <StatCard
+          label={`Pipeline Quente — Projeção (${hotLeadsCount})`}
+          value={formatCurrency(hotLeadsPipeline)}
+          icon={Flame}
+        />
       </div>
 
       {/* KPI Cards (mês selecionado) */}
@@ -887,6 +906,42 @@ export default function FinancePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ─── DIALOG: Breakdown de Mensalidades por Cliente ─── */}
+      <Dialog open={mensalidadesBreakdownOpen} onOpenChange={setMensalidadesBreakdownOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Mensalidade por Cliente</DialogTitle>
+            <DialogDescription>
+              Total acumulado: <strong>{formatCurrency(totalMonthlyRecurring)}</strong> — valor unitário de cada cliente abaixo
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {clientsSummary.filter((c) => c.mensalidade > 0).length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-6">Nenhuma mensalidade ativa ainda.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="text-right">Mensalidade</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientsSummary.filter((c) => c.mensalidade > 0).map((c) => (
+                    <TableRow key={c.companyId}>
+                      <TableCell className="text-sm font-medium text-text-primary">{c.companyName}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-green-500">
+                        {formatCurrency(c.mensalidade)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

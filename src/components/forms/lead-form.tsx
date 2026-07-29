@@ -15,12 +15,12 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Building2 } from "lucide-react";
 import { TEMPERATURES, LEAD_ORIGINS } from "@/lib/utils/constants";
 import { useCreateLead, useUpdateLead } from "@/lib/hooks/use-leads";
 import { useCreateContact } from "@/lib/hooks/use-contacts";
 import { usePipelines } from "@/lib/hooks/use-pipelines";
-import { useCompanies } from "@/lib/hooks/use-companies";
+import { useCompanies, useCreateCompany } from "@/lib/hooks/use-companies";
 import { useContacts } from "@/lib/hooks/use-contacts";
 import { useUser } from "@/lib/hooks/use-user";
 import type { LeadWithRelations, Lead } from "@/lib/hooks/use-leads";
@@ -42,6 +42,8 @@ const leadSchema = z.object({
   new_contact_email: z.string().optional(),
   new_contact_phone: z.string().optional(),
   new_contact_job_title: z.string().optional(),
+  // Nova empresa inline
+  new_company_name: z.string().optional(),
 });
 
 type LeadFormValues = z.infer<typeof leadSchema>;
@@ -61,11 +63,13 @@ export const LeadForm = ({
   const createLead = useCreateLead();
   const updateLead = useUpdateLead();
   const createContact = useCreateContact();
+  const createCompany = useCreateCompany();
   const { data: pipelines } = usePipelines();
   const { data: companies } = useCompanies();
   const { data: contacts } = useContacts();
 
   const [createNewContact, setCreateNewContact] = useState(false);
+  const [createNewCompany, setCreateNewCompany] = useState(false);
 
   const {
     register, handleSubmit, reset, setValue, watch,
@@ -82,7 +86,7 @@ export const LeadForm = ({
   const selectedPipeline = pipelines?.find((p) => p.id === pipelineId);
 
   useEffect(() => {
-    if (open) setCreateNewContact(false);
+    if (open) { setCreateNewContact(false); setCreateNewCompany(false); }
     if (lead) {
       reset({
         title: lead.title,
@@ -104,6 +108,7 @@ export const LeadForm = ({
         title: "", company_id: "", contact_id: "", value: "",
         temperature: "", origin: "", expected_close_date: "", notes: "", tags: "",
         new_contact_name: "", new_contact_email: "", new_contact_phone: "", new_contact_job_title: "",
+        new_company_name: "",
       });
     }
   }, [lead, defaultPipelineId, defaultStageId, reset, open]);
@@ -114,6 +119,17 @@ export const LeadForm = ({
       : [];
 
     let contactId = values.contact_id || null;
+    let companyId = values.company_id || null;
+
+    // Auto-criar empresa se o toggle estiver ativo e nome preenchido
+    if (createNewCompany && values.new_company_name?.trim()) {
+      const newCompany = await createCompany.mutateAsync({
+        org_id: user?.org_id ?? "",
+        name: values.new_company_name.trim(),
+        tags: [],
+      });
+      companyId = (newCompany as { id: string })?.id ?? null;
+    }
 
     // Auto-criar contato se o toggle estiver ativo e nome preenchido
     if (createNewContact && values.new_contact_name?.trim()) {
@@ -123,7 +139,7 @@ export const LeadForm = ({
         email: values.new_contact_email?.trim() || null,
         phone: values.new_contact_phone?.trim() || null,
         job_title: values.new_contact_job_title?.trim() || null,
-        company_id: values.company_id || null,
+        company_id: companyId,
         origin: values.origin || null,
         tags: [],
       });
@@ -134,7 +150,7 @@ export const LeadForm = ({
       title: values.title,
       pipeline_id: values.pipeline_id,
       stage_id: values.stage_id,
-      company_id: values.company_id || null,
+      company_id: companyId,
       contact_id: contactId,
       value: values.value ? parseFloat(values.value) : null,
       temperature: (values.temperature || null) as Lead["temperature"],
@@ -153,7 +169,7 @@ export const LeadForm = ({
     onClose();
   };
 
-  const isPending = isSubmitting || createLead.isPending || updateLead.isPending || createContact.isPending;
+  const isPending = isSubmitting || createLead.isPending || updateLead.isPending || createContact.isPending || createCompany.isPending;
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -196,16 +212,43 @@ export const LeadForm = ({
             {errors.stage_id && <p className="text-xs text-danger">{errors.stage_id.message}</p>}
           </div>
 
-          {/* Empresa */}
+          {/* Empresa existente OU nova */}
           <div className="space-y-1.5">
-            <Label>Empresa</Label>
-            <Select value={companyIdValue ?? "__none__"} onValueChange={(v) => setValue("company_id", v === "__none__" ? undefined : v)}>
-              <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Nenhuma</SelectItem>
-                {companies?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center justify-between">
+              <Label>Empresa</Label>
+              {!lead && (
+                <button
+                  type="button"
+                  onClick={() => setCreateNewCompany((v) => !v)}
+                  className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border transition-colors ${
+                    createNewCompany
+                      ? "border-primary/50 bg-primary/10 text-primary"
+                      : "border-border text-text-muted hover:border-primary/40 hover:text-primary"
+                  }`}
+                >
+                  <Building2 size={12} />
+                  {createNewCompany ? "Usar empresa existente" : "Criar nova empresa"}
+                </button>
+              )}
+            </div>
+
+            {!createNewCompany ? (
+              <Select value={companyIdValue ?? "__none__"} onValueChange={(v) => setValue("company_id", v === "__none__" ? undefined : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhuma</SelectItem>
+                  {companies?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-1">
+                <p className="text-xs text-primary font-medium flex items-center gap-1.5">
+                  <Building2 size={12} />
+                  Nova empresa — será criada junto com o lead
+                </p>
+                <Input {...register("new_company_name")} placeholder="Nome da empresa" className="h-8 text-sm" />
+              </div>
+            )}
           </div>
 
           {/* Contato existente OU novo */}

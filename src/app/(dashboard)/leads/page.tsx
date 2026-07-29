@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, LayoutGrid, List, Search,
-  Users, Mail, Phone, MessageCircle, Pencil, Trash2,
+  Users, Mail, Phone, MessageCircle, Pencil, Trash2, Building2, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ import { TaskForm } from "@/components/forms/task-form";
 import { useLeads, useDeleteLead, useMoveLead, type LeadWithRelations } from "@/lib/hooks/use-leads";
 import { usePipelines } from "@/lib/hooks/use-pipelines";
 import { useContacts, useDeleteContact } from "@/lib/hooks/use-contacts";
-import { formatInitials } from "@/lib/utils/format";
+import { formatInitials, formatCurrency } from "@/lib/utils/format";
 import { LEAD_ORIGINS } from "@/lib/utils/constants";
 import type { Database } from "@/types/database";
 
@@ -51,6 +51,7 @@ export default function LeadsPage() {
   const [defaultStageId, setDefaultStageId] = useState<string>("");
   const [taskFormOpen, setTaskFormOpen] = useState(false);
   const [taskLeadId, setTaskLeadId] = useState<string | null>(null);
+  const [showByClient, setShowByClient] = useState(false);
 
   const { data: pipelines, isLoading: pipelinesLoading } = usePipelines();
   const activePipelineId = selectedPipelineId || pipelines?.[0]?.id || "";
@@ -62,6 +63,26 @@ export default function LeadsPage() {
   );
   const deleteLead = useDeleteLead();
   const moveLead = useMoveLead();
+
+  // Acumulado por cliente (empresa) — soma do valor dos leads em aberto
+  const leadsByClient = useMemo(() => {
+    const map = new Map<string, { companyId: string; companyName: string; total: number; count: number }>();
+    let semEmpresa = { total: 0, count: 0 };
+    for (const l of leads) {
+      if (!l.company) {
+        semEmpresa = { total: semEmpresa.total + (l.value ?? 0), count: semEmpresa.count + 1 };
+        continue;
+      }
+      const key = l.company.id;
+      const entry = map.get(key) ?? { companyId: key, companyName: l.company.name, total: 0, count: 0 };
+      entry.total += l.value ?? 0;
+      entry.count += 1;
+      map.set(key, entry);
+    }
+    const list = Array.from(map.values()).sort((a, b) => b.total - a.total);
+    if (semEmpresa.count > 0) list.push({ companyId: "__none__", companyName: "Sem empresa", total: semEmpresa.total, count: semEmpresa.count });
+    return list;
+  }, [leads]);
 
   // --- Contacts state ---
   const [contactSearch, setContactSearch] = useState("");
@@ -194,6 +215,48 @@ export default function LeadsPage() {
                   leads.reduce((acc, l) => acc + (l.value ?? 0), 0)
                 )}{" "}em aberto
               </span>
+            </div>
+          )}
+
+          {leadsByClient.length > 0 && (
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowByClient((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3"
+              >
+                <div className="flex items-center gap-2">
+                  <Building2 size={14} style={{ color: "#0B87C3" }} />
+                  <span className="text-sm font-semibold" style={{ color: "#E2EBF8" }}>
+                    Acumulado por Cliente
+                  </span>
+                  <span className="text-xs" style={{ color: "#7BA3C6" }}>
+                    ({leadsByClient.length} {leadsByClient.length === 1 ? "cliente" : "clientes"})
+                  </span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  style={{ color: "#7BA3C6", transform: showByClient ? "rotate(180deg)" : undefined, transition: "transform 0.2s" }}
+                />
+              </button>
+              {showByClient && (
+                <div className="border-t px-4 py-3 space-y-1.5" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                  {leadsByClient.map((c) => (
+                    <div key={c.companyId} className="flex items-center justify-between text-sm py-1">
+                      <span style={{ color: "#E2EBF8" }}>
+                        {c.companyName}
+                        <span className="ml-1.5 text-xs" style={{ color: "#3D5A78" }}>
+                          ({c.count} {c.count === 1 ? "lead" : "leads"})
+                        </span>
+                      </span>
+                      <span className="font-semibold" style={{ color: "#22c55e" }}>{formatCurrency(c.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

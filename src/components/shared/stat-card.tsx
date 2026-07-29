@@ -9,12 +9,15 @@ interface StatCardProps {
   icon: LucideIcon;
   trend?: { value: number; label: string };
   className?: string;
+  onClick?: () => void;
 }
 
-export const StatCard = ({ label, value, icon: Icon, trend, className }: StatCardProps) => (
+export const StatCard = ({ label, value, icon: Icon, trend, className, onClick }: StatCardProps) => (
   <div
+    onClick={onClick}
     className={cn(
       "rounded-xl border p-6 transition-all duration-200 hover:scale-[1.01]",
+      onClick && "cursor-pointer hover:border-primary/40",
       className
     )}
     style={{

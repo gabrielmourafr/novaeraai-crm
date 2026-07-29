@@ -20,7 +20,6 @@ const BREADCRUMBS: Record<string, string> = {
   "/catalog": "Catálogo",
   "/projects": "Projetos",
   "/documents": "Documentos",
-  "/finance": "Financeiro",
   "/tasks": "Tarefas",
   "/calendar": "Agenda",
   "/settings": "Configurações",

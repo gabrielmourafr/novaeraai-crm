@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Target, Building2, FileText, Package,
-  Rocket, FolderOpen, DollarSign, CheckSquare, Calendar, Settings,
+  Rocket, FolderOpen, CheckSquare, Calendar, Settings,
   ChevronLeft, ChevronRight, LogOut, TrendingUp, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -42,7 +42,6 @@ const NAV_GROUPS = [
   {
     label: "GESTÃO",
     items: [
-      { icon: DollarSign, label: "Financeiro", href: "/finance" },
       { icon: CheckSquare, label: "Tarefas", href: "/tasks" },
       { icon: Calendar, label: "Agenda", href: "/calendar" },
     ],
