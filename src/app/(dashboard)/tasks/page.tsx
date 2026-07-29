@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { TaskForm, type TaskInitialData } from "@/components/forms/task-form";
 import { useAllTasks, useToggleTask, useDeleteTask, type TaskWithRelations } from "@/lib/hooks/use-tasks";
-import { formatDate } from "@/lib/utils/format";
+import { formatDate, formatInitials } from "@/lib/utils/format";
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   critica: { label: "Crítica", color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
@@ -80,6 +80,25 @@ function TaskRow({
             <span className="text-[11px]" style={{ color: "#3D5A78" }}>• Projeto: {task.project.name}</span>
           )}
         </div>
+      </div>
+
+      {/* Responsável */}
+      <div className="hidden md:flex items-center gap-1.5 flex-shrink-0" title={task.assignee?.full_name ?? "Sem responsável"}>
+        {task.assignee ? (
+          <>
+            <div
+              className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+              style={{ background: "rgba(11,135,195,0.15)", color: "#0CA8F5" }}
+            >
+              {formatInitials(task.assignee.full_name)}
+            </div>
+            <span className="text-[11px] truncate max-w-[100px]" style={{ color: "#7BA3C6" }}>
+              {task.assignee.full_name}
+            </span>
+          </>
+        ) : (
+          <span className="text-[11px]" style={{ color: "#3D5A78" }}>Sem responsável</span>
+        )}
       </div>
 
       {/* Due date */}
@@ -282,6 +301,7 @@ export default function TasksPage() {
                     <span className="w-5 flex-shrink-0" />
                     <span className="w-2 flex-shrink-0" />
                     <span className="flex-1">Tarefa</span>
+                    <span className="hidden md:inline w-[124px]">Responsável</span>
                     <span className="hidden sm:inline w-24 text-right">Prazo</span>
                     <span className="hidden md:inline w-16 text-right">Prioridade</span>
                     <span className="hidden lg:inline w-24 text-right">Status</span>
