@@ -77,6 +77,12 @@ export const useEvent = (id: string) => {
   });
 };
 
+// Dispara a sincronização com o Google Calendar em segundo plano, sem travar
+// a UI — se o usuário não tiver conectado, a rota só retorna 404 e ignoramos.
+const triggerGoogleSync = () => {
+  fetch("/api/calendar/sync", { method: "POST" }).catch(() => {});
+};
+
 export const useCreateEvent = () => {
   const supabase = createClient();
   const qc = useQueryClient();
@@ -89,6 +95,7 @@ export const useCreateEvent = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["events"] });
       toast.success("Evento criado!");
+      triggerGoogleSync();
     },
     onError: () => toast.error("Erro ao criar evento"),
   });
@@ -106,18 +113,22 @@ export const useUpdateEvent = () => {
       qc.invalidateQueries({ queryKey: ["events"] });
       qc.invalidateQueries({ queryKey: ["event", vars.id] });
       toast.success("Evento atualizado!");
+      triggerGoogleSync();
     },
     onError: () => toast.error("Erro ao atualizar evento"),
   });
 };
 
 export const useDeleteEvent = () => {
-  const supabase = createClient();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("events").delete().eq("id", id);
-      if (error) throw error;
+      const res = await fetch("/api/calendar/delete-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Erro ao remover evento");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["events"] });

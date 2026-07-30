@@ -565,11 +565,14 @@ export interface Database {
           meeting_url: string | null;
           agenda: string | null;
           result: string | null;
+          google_event_id: string | null;
+          google_synced_at: string | null;
+          sync_source: "crm" | "google";
           created_at: string;
           updated_at: string;
           created_by: string | null;
         };
-        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["events"]["Row"], "id" | "created_at" | "updated_at">>;
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["events"]["Row"], "id" | "created_at" | "updated_at" | "sync_source">> & { sync_source?: "crm" | "google" };
         Update: Partial<Database["public"]["Tables"]["events"]["Insert"]>;
         Relationships: [];
       };
@@ -599,6 +602,26 @@ export interface Database {
         };
         Insert: Omit<Database["public"]["Tables"]["proposal_views"]["Row"], "id">;
         Update: Partial<Database["public"]["Tables"]["proposal_views"]["Insert"]>;
+        Relationships: [];
+      };
+      google_calendar_connections: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string;
+          google_email: string | null;
+          access_token: string;
+          refresh_token: string;
+          token_expiry: string;
+          calendar_id: string;
+          sync_enabled: boolean;
+          last_synced_at: string | null;
+          sync_token: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["google_calendar_connections"]["Row"], "id" | "created_at" | "updated_at" | "calendar_id" | "sync_enabled">> & { calendar_id?: string; sync_enabled?: boolean };
+        Update: Partial<Database["public"]["Tables"]["google_calendar_connections"]["Insert"]>;
         Relationships: [];
       };
       audit_logs: {
