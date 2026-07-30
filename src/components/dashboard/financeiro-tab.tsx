@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Flame, Building2 } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Flame, Building2, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,8 +21,17 @@ import { useAllInstallments, useMarkInstallmentPaid, INSTALLMENT_STATUS_META } f
 import { useActiveSubscriptions, useEnsureMonthlyBilling, nextBillingDate, RENEWAL_LABEL, type ActiveSubscription } from "@/lib/hooks/use-subscriptions";
 import { useClientsFinancialSummary } from "@/lib/hooks/use-client-summary";
 import { useLeads } from "@/lib/hooks/use-leads";
-import { useUpdateProject } from "@/lib/hooks/use-projects";
+import { useUpdateProject, useProjects } from "@/lib/hooks/use-projects";
 import { useUser } from "@/lib/hooks/use-user";
+import {
+  usePartnerPayments,
+  useCreatePartnerPayment,
+  useMarkPartnerPaymentPaid,
+  useDeletePartnerPayment,
+  RECIPIENT_TYPE_LABEL,
+  PAYMENT_STATUS_META,
+  type PartnerPaymentWithRelations,
+} from "@/lib/hooks/use-partner-payments";
 import Link from "next/link";
 
 const revenueStatusStyles: Record<string, string> = {
@@ -65,6 +74,16 @@ export function FinanceiroTab() {
   const [createRevenueOpen, setCreateRevenueOpen] = useState(false);
   const [createExpenseOpen, setCreateExpenseOpen] = useState(false);
   const [mensalidadesBreakdownOpen, setMensalidadesBreakdownOpen] = useState(false);
+  const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
+  const [deletingPayment, setDeletingPayment] = useState<PartnerPaymentWithRelations | undefined>();
+
+  // Partner/dev payment form state
+  const [payType, setPayType] = useState<"parceiro" | "desenvolvedor">("desenvolvedor");
+  const [payName, setPayName] = useState("");
+  const [payProjectId, setPayProjectId] = useState("__none__");
+  const [payDesc, setPayDesc] = useState("");
+  const [payAmount, setPayAmount] = useState("");
+  const [payDueDate, setPayDueDate] = useState("");
 
   // Revenue form state
   const [revDesc, setRevDesc] = useState("");
@@ -95,6 +114,13 @@ export function FinanceiroTab() {
     [leads]
   );
   const hotLeadsCount = leads.filter((l) => l.temperature === "quente").length;
+  const { data: projects = [] } = useProjects();
+  const { data: partnerPayments = [], isLoading: paymentsLoading } = usePartnerPayments();
+  const createPayment = useCreatePartnerPayment();
+  const markPaymentPaid = useMarkPartnerPaymentPaid();
+  const deletePayment = useDeletePartnerPayment();
+  const pendingPayments = partnerPayments.filter((p) => p.status !== "pago" && p.status !== "cancelado");
+  const totalPendingPayments = pendingPayments.reduce((s, p) => s + Number(p.amount), 0);
   const updateProject = useUpdateProject();
   const [editingSubscription, setEditingSubscription] = useState<ActiveSubscription | undefined>();
   const [removingSubscription, setRemovingSubscription] = useState<ActiveSubscription | undefined>();
@@ -187,6 +213,41 @@ export function FinanceiroTab() {
     setExpCategory("outro"); setExpStatus("pendente"); setExpRecurrence("pontual");
   };
 
+  const handleCreatePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payName || !payDesc || !payAmount || !user) return;
+    await createPayment.mutateAsync({
+      org_id: user.org_id,
+      recipient_type: payType,
+      recipient_name: payName,
+      recipient_user_id: null,
+      project_id: payProjectId !== "__none__" ? payProjectId : null,
+      description: payDesc,
+      amount: parseFloat(payAmount.replace(",", ".")),
+      due_date: payDueDate || null,
+      paid_at: null,
+      status: "pendente",
+      notes: null,
+      created_by: user.id,
+    });
+    setCreatePaymentOpen(false);
+    setPayType("desenvolvedor"); setPayName(""); setPayProjectId("__none__");
+    setPayDesc(""); setPayAmount(""); setPayDueDate("");
+  };
+
+  // Preenche o valor sugerido com base na comissão do projeto selecionado
+  const applyCommissionSuggestion = (projectId: string) => {
+    setPayProjectId(projectId);
+    if (projectId === "__none__") return;
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+    if (payType === "desenvolvedor" && project.contract_value) {
+      const pct = project.dev_commission_pct ?? 20;
+      setPayAmount(((Number(project.contract_value) * pct) / 100).toFixed(2));
+      setPayDesc((d) => d || `Comissão DEV (${pct}%) — ${project.name}`);
+    }
+  };
+
   // Also fetch last 6 months for charts
   const monthsBack = useMemo(() => {
     return Array.from({ length: 6 }, (_, i) => {
@@ -253,7 +314,7 @@ export function FinanceiroTab() {
       </div>
 
       {/* Acumulados (sem período) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard label="Faturamento Total (todos os períodos)" value={formatCurrency(totalRevenuesAllTime)} icon={Wallet} />
         <StatCard label="Implementação Acumulada (clientes)" value={formatCurrency(totalImplementacao)} icon={Building2} />
         <StatCard
@@ -266,6 +327,11 @@ export function FinanceiroTab() {
           label={`Pipeline Quente — Projeção (${hotLeadsCount})`}
           value={formatCurrency(hotLeadsPipeline)}
           icon={Flame}
+        />
+        <StatCard
+          label={`A Pagar — Parceiros/Devs (${pendingPayments.length})`}
+          value={formatCurrency(totalPendingPayments)}
+          icon={Users}
         />
       </div>
 
@@ -398,7 +464,90 @@ export function FinanceiroTab() {
           <TabsTrigger value="subscriptions">Mensalidades Ativas ({activeSubscriptions.length})</TabsTrigger>
           <TabsTrigger value="revenues">Receitas ({revenues.length})</TabsTrigger>
           <TabsTrigger value="expenses">Despesas ({expenses.length})</TabsTrigger>
+          <TabsTrigger value="partner-payments">Parceiros & Devs ({pendingPayments.length})</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="partner-payments" className="mt-4">
+          <div className="flex justify-end mb-3">
+            <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => setCreatePaymentOpen(true)}>
+              <Plus size={14} className="mr-1" />Novo Pagamento
+            </Button>
+          </div>
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+          >
+            {paymentsLoading ? (
+              <div className="p-8 text-center text-sm" style={{ color: "#7BA3C6" }}>Carregando...</div>
+            ) : partnerPayments.length === 0 ? (
+              <div className="p-8 text-center text-sm" style={{ color: "#3D5A78" }}>
+                Nenhum pagamento registrado. Use <b>Novo Pagamento</b> pra lançar comissões de parceiros ou desenvolvedores.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                    <TableHead style={{ color: "#7BA3C6" }}>Recebedor</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Tipo</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Descrição</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Projeto</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Valor</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Vencimento</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Status</TableHead>
+                    <TableHead className="w-[120px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {partnerPayments.map((p) => {
+                    const meta = PAYMENT_STATUS_META[p.status];
+                    const overdue = p.due_date && p.status === "pendente" && new Date(p.due_date) < new Date();
+                    return (
+                      <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                        <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>{p.recipient_name}</TableCell>
+                        <TableCell>
+                          <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "rgba(11,135,195,0.12)", color: "#0CA8F5" }}>
+                            {RECIPIENT_TYPE_LABEL[p.recipient_type]}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{p.description}</TableCell>
+                        <TableCell className="text-sm">
+                          {p.project ? (
+                            <Link href={`/projects/${p.project.id}`} className="hover:underline text-[#0B87C3]">{p.project.name}</Link>
+                          ) : <span style={{ color: "#3D5A78" }}>—</span>}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm font-semibold text-green-400">{formatCurrency(Number(p.amount))}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`text-sm ${overdue ? "text-red-400 font-medium" : ""}`} style={{ color: overdue ? undefined : "#7BA3C6" }}>
+                            {p.due_date ? formatDate(p.due_date) : "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: `${meta.color}20`, color: meta.color }}>
+                            {meta.label}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            {p.status !== "pago" && (
+                              <Button variant="ghost" size="sm" className="h-7 text-xs text-green-400 hover:text-green-300" onClick={() => markPaymentPaid.mutate(p.id)}>
+                                ✓ Pago
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => setDeletingPayment(p)}>
+                              <Trash2 size={13} />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </TabsContent>
 
         <TabsContent value="subscriptions" className="mt-4">
           <div
@@ -811,6 +960,88 @@ export function FinanceiroTab() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Create Partner/Dev Payment Dialog */}
+      <Dialog open={createPaymentOpen} onOpenChange={(v) => !v && setCreatePaymentOpen(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Pagamento</DialogTitle>
+            <DialogDescription>Registre uma comissão ou pagamento a parceiro/desenvolvedor</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreatePayment} className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Tipo *</Label>
+                <Select value={payType} onValueChange={(v) => setPayType(v as typeof payType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desenvolvedor">Desenvolvedor</SelectItem>
+                    <SelectItem value="parceiro">Parceiro Comercial</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nome *</Label>
+                <Input value={payName} onChange={(e) => setPayName(e.target.value)} placeholder="Nome do recebedor" required />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Projeto vinculado (opcional)</Label>
+              <Select value={payProjectId} onValueChange={applyCommissionSuggestion}>
+                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum</SelectItem>
+                  {projects.map((proj) => (
+                    <SelectItem key={proj.id} value={proj.id}>{proj.code} — {proj.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {payType === "desenvolvedor" && payProjectId !== "__none__" && (
+                <p className="text-[11px]" style={{ color: "#7BA3C6" }}>
+                  Valor sugerido com base na comissão DEV cadastrada no projeto — pode ajustar abaixo.
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descrição *</Label>
+              <Input value={payDesc} onChange={(e) => setPayDesc(e.target.value)} placeholder="Ex: Comissão de desenvolvimento" required />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Valor (R$) *</Label>
+                <Input value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="0,00" required />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Vencimento</Label>
+                <Input type="date" value={payDueDate} onChange={(e) => setPayDueDate(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setCreatePaymentOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={createPayment.isPending} style={{ background: "var(--primary)" }}>
+                Salvar Pagamento
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Partner Payment Dialog */}
+      <AlertDialog open={!!deletingPayment} onOpenChange={(v) => !v && setDeletingPayment(undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover pagamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O pagamento de <strong>{formatCurrency(Number(deletingPayment?.amount ?? 0))}</strong> pra{" "}
+              <strong>{deletingPayment?.recipient_name}</strong> será removido.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={async () => { if (deletingPayment) { await deletePayment.mutateAsync(deletingPayment.id); setDeletingPayment(undefined); }}}>Remover</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Dialogs */}
       <AlertDialog open={!!deletingRevenue} onOpenChange={(v) => !v && setDeletingRevenue(undefined)}>

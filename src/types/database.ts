@@ -624,6 +624,28 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["google_calendar_connections"]["Insert"]>;
         Relationships: [];
       };
+      partner_payments: {
+        Row: {
+          id: string;
+          org_id: string;
+          recipient_type: "parceiro" | "desenvolvedor";
+          recipient_name: string;
+          recipient_user_id: string | null;
+          project_id: string | null;
+          description: string;
+          amount: number;
+          due_date: string | null;
+          paid_at: string | null;
+          status: "pendente" | "pago" | "atrasado" | "cancelado";
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+        };
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["partner_payments"]["Row"], "id" | "created_at" | "updated_at" | "status">> & { status?: "pendente" | "pago" | "atrasado" | "cancelado" };
+        Update: Partial<Database["public"]["Tables"]["partner_payments"]["Insert"]>;
+        Relationships: [];
+      };
       audit_logs: {
         Row: {
           id: string;
