@@ -90,7 +90,7 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
-type OrgUser = { id: string; full_name: string; avatar_url: string | null; org_id: string; email: string; role: "admin" | "member"; created_at: string };
+type OrgUser = { id: string; full_name: string; avatar_url: string | null; org_id: string; email: string; role: "admin" | "member" | "developer"; created_at: string };
 
 function UserAvatar({ userId, users }: { userId: string | null; users: OrgUser[] }) {
   if (!userId) return <span className="text-xs text-text-muted">—</span>;

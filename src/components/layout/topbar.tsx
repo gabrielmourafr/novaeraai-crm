@@ -116,7 +116,7 @@ export const TopBar = () => {
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm flex-1">
-        <Link href="/dashboard" className="transition-colors" style={{ color: "var(--text-muted)" }}>Home</Link>
+        <Link href={user?.role === "developer" ? "/projects" : "/dashboard"} className="transition-colors" style={{ color: "var(--text-muted)" }}>Home</Link>
         {breadcrumbs.map((crumb, i) => (
           <span key={crumb.path} className="flex items-center gap-1.5">
             <span style={{ color: "var(--text-muted)" }}>/</span>

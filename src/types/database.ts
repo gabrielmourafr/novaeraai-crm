@@ -36,7 +36,7 @@ export interface Database {
           full_name: string;
           email: string;
           avatar_url: string | null;
-          role: "admin" | "member";
+          role: "admin" | "member" | "developer";
           created_at: string;
         };
         Insert: Omit<Database["public"]["Tables"]["users"]["Row"], "created_at">;

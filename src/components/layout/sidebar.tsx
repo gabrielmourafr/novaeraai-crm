@@ -87,7 +87,7 @@ export const Sidebar = () => {
           "flex items-center h-16 border-b border-sidebar-hover px-4 flex-shrink-0",
           collapsed ? "justify-center" : "justify-between"
         )}>
-          <Link href="/dashboard" className="flex items-center">
+          <Link href={user?.role === "developer" ? "/projects" : "/dashboard"} className="flex items-center">
             <NovaeraLogo collapsed={collapsed} />
           </Link>
           {!collapsed && (
@@ -102,7 +102,7 @@ export const Sidebar = () => {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 space-y-6">
-          {NAV_GROUPS.map((group) => (
+          {(user?.role === "developer" ? NAV_GROUPS.filter((g) => g.label === "ENTREGA") : NAV_GROUPS).map((group) => (
             <div key={group.label}>
               {!collapsed && (
                 <p className="px-4 mb-2 text-[11px] font-semibold tracking-[0.1em] text-sidebar-text/40 uppercase">

@@ -3,11 +3,21 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_ROUTES = ["/login"];
 
+// Papel "developer": acesso restrito só à área de Entrega (Projetos e Documentos)
+const DEVELOPER_ALLOWED_PREFIXES = ["/projects", "/documents"];
+const DEVELOPER_HOME = "/projects";
+
 function isPublicRoute(pathname: string) {
   if (PUBLIC_ROUTES.includes(pathname)) return true;
   // Proposal public page
   if (pathname.match(/^\/proposals\/[^/]+\/public$/)) return true;
   return false;
+}
+
+function isAllowedForDeveloper(pathname: string) {
+  return DEVELOPER_ALLOWED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
 }
 
 export async function middleware(request: NextRequest) {
@@ -46,10 +56,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && PUBLIC_ROUTES.includes(pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+  if (user) {
+    const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single();
+    const isDeveloper = profile?.role === "developer";
+
+    if (PUBLIC_ROUTES.includes(pathname)) {
+      const url = request.nextUrl.clone();
+      url.pathname = isDeveloper ? DEVELOPER_HOME : "/dashboard";
+      return NextResponse.redirect(url);
+    }
+
+    if (isDeveloper && !isAllowedForDeveloper(pathname)) {
+      const url = request.nextUrl.clone();
+      url.pathname = DEVELOPER_HOME;
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;
