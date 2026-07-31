@@ -32,6 +32,7 @@ export const TEMPERATURES = [
 
 export const LEAD_ORIGINS = [
   { value: "site", label: "Site" },
+  { value: "relacionamento", label: "Relacionamento" },
   { value: "indicacao_relacionamento", label: "Indicação Relacionamento" },
   { value: "indicacao_parceiro_comercial", label: "Indicação Parceiro Comercial" },
   { value: "indicacao_cliente", label: "Indicação Cliente" },
