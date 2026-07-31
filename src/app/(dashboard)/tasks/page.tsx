@@ -6,9 +6,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { TaskForm, type TaskInitialData } from "@/components/forms/task-form";
 import { useAllTasks, useToggleTask, useDeleteTask, type TaskWithRelations } from "@/lib/hooks/use-tasks";
+import { useOrgUsers } from "@/lib/hooks/use-user";
 import { formatDate, formatInitials, isPastDate } from "@/lib/utils/format";
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -153,21 +155,26 @@ function TaskRow({
 export default function TasksPage() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
+  const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskInitialData | undefined>();
   const [deletingTask, setDeletingTask] = useState<TaskWithRelations | undefined>();
 
   const { data: allTasks = [], isLoading } = useAllTasks({ search: search || undefined });
+  const { data: orgUsers = [] } = useOrgUsers();
   const toggleTask = useToggleTask();
   const deleteTask = useDeleteTask();
 
-  const filteredTasks = allTasks.filter((t) => {
-    if (tab === "all") return true;
-    return t.status === tab;
+  const assigneeFilteredTasks = allTasks.filter((t) => {
+    if (assigneeFilter === "unassigned") return !t.assignee_id;
+    if (assigneeFilter !== "all") return t.assignee_id === assigneeFilter;
+    return true;
   });
 
-  const pendingCount = allTasks.filter((t) => t.status === "pendente").length;
-  const overdueCount = allTasks.filter((t) =>
+  const filteredTasks = assigneeFilteredTasks.filter((t) => tab === "all" || t.status === tab);
+
+  const pendingCount = assigneeFilteredTasks.filter((t) => t.status === "pendente").length;
+  const overdueCount = assigneeFilteredTasks.filter((t) =>
     t.due_date && isPastDate(t.due_date) && t.status !== "concluida" && t.status !== "cancelada"
   ).length;
 
@@ -221,10 +228,10 @@ export default function TasksPage() {
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total", count: allTasks.length, color: "#0B87C3" },
-          { label: "Pendentes", count: allTasks.filter((t) => t.status === "pendente").length, color: "#f59e0b" },
-          { label: "Em Andamento", count: allTasks.filter((t) => t.status === "em_andamento").length, color: "#0B87C3" },
-          { label: "Concluídas", count: allTasks.filter((t) => t.status === "concluida").length, color: "#22c55e" },
+          { label: "Total", count: assigneeFilteredTasks.length, color: "#0B87C3" },
+          { label: "Pendentes", count: assigneeFilteredTasks.filter((t) => t.status === "pendente").length, color: "#f59e0b" },
+          { label: "Em Andamento", count: assigneeFilteredTasks.filter((t) => t.status === "em_andamento").length, color: "#0B87C3" },
+          { label: "Concluídas", count: assigneeFilteredTasks.filter((t) => t.status === "concluida").length, color: "#22c55e" },
         ].map((s) => (
           <div
             key={s.label}
@@ -252,6 +259,19 @@ export default function TasksPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+
+        <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Responsável" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os responsáveis</SelectItem>
+            <SelectItem value="unassigned">Sem responsável</SelectItem>
+            {orgUsers.map((u) => (
+              <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Tasks list with tabs */}
@@ -269,7 +289,7 @@ export default function TasksPage() {
               {t.label}
               {t.value !== "all" && (
                 <span className="ml-1.5 text-[10px] opacity-60">
-                  ({allTasks.filter((task) => t.value === "all" || task.status === t.value).length})
+                  ({assigneeFilteredTasks.filter((task) => t.value === "all" || task.status === t.value).length})
                 </span>
               )}
             </TabsTrigger>
