@@ -32,8 +32,11 @@ export const TEMPERATURES = [
 
 export const LEAD_ORIGINS = [
   { value: "site", label: "Site" },
-  { value: "indicacao", label: "Indicação" },
-  { value: "ads", label: "Ads" },
+  { value: "indicacao_relacionamento", label: "Indicação Relacionamento" },
+  { value: "indicacao_parceiro_comercial", label: "Indicação Parceiro Comercial" },
+  { value: "indicacao_cliente", label: "Indicação Cliente" },
+  { value: "meta_ads", label: "Meta Ads" },
+  { value: "google_ads", label: "Google Ads" },
   { value: "evento", label: "Evento" },
   { value: "inbound", label: "Inbound" },
   { value: "advisory", label: "Advisory" },
