@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Flame, Building2, Users } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Flame, Building2, Users, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
+import { exportToCsv } from "@/lib/utils/csv";
 import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues, type Revenue, type Expense } from "@/lib/hooks/use-finance";
 import { useAllInstallments, useMarkInstallmentPaid, INSTALLMENT_STATUS_META } from "@/lib/hooks/use-installments";
 import { useActiveSubscriptions, useEnsureMonthlyBilling, nextBillingDate, RENEWAL_LABEL, type ActiveSubscription } from "@/lib/hooks/use-subscriptions";
@@ -246,6 +247,30 @@ export function FinanceiroTab() {
       setPayAmount(((Number(project.contract_value) * pct) / 100).toFixed(2));
       setPayDesc((d) => d || `Comissão DEV (${pct}%) — ${project.name}`);
     }
+  };
+
+  const handleExportRevenues = () => {
+    exportToCsv(`receitas-${months[month - 1].toLowerCase()}-${year}`, revenues.map((r) => ({
+      Descrição: r.description,
+      Categoria: r.category,
+      Valor: r.value,
+      Vencimento: r.due_date ? formatDate(r.due_date) : "",
+      "Pago em": r.paid_at ? formatDate(r.paid_at) : "",
+      Status: r.status,
+      Recorrência: r.recurrence,
+    })));
+  };
+
+  const handleExportExpenses = () => {
+    exportToCsv(`despesas-${months[month - 1].toLowerCase()}-${year}`, expenses.map((e) => ({
+      Descrição: e.description,
+      Categoria: e.category,
+      Valor: e.value,
+      Vencimento: e.due_date ? formatDate(e.due_date) : "",
+      "Pago em": e.paid_at ? formatDate(e.paid_at) : "",
+      Status: e.status,
+      Recorrência: e.recurrence,
+    })));
   };
 
   // Also fetch last 6 months for charts
@@ -713,7 +738,10 @@ export function FinanceiroTab() {
         </TabsContent>
 
         <TabsContent value="revenues" className="mt-4">
-          <div className="flex justify-end mb-3">
+          <div className="flex justify-end gap-2 mb-3">
+            <Button size="sm" variant="outline" onClick={handleExportRevenues} disabled={revenues.length === 0}>
+              <Download size={14} className="mr-1" />Exportar planilha
+            </Button>
             <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => setCreateRevenueOpen(true)}><Plus size={14} className="mr-1" />Nova Receita</Button>
           </div>
           <div
@@ -766,7 +794,10 @@ export function FinanceiroTab() {
         </TabsContent>
 
         <TabsContent value="expenses" className="mt-4">
-          <div className="flex justify-end mb-3">
+          <div className="flex justify-end gap-2 mb-3">
+            <Button size="sm" variant="outline" onClick={handleExportExpenses} disabled={expenses.length === 0}>
+              <Download size={14} className="mr-1" />Exportar planilha
+            </Button>
             <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => setCreateExpenseOpen(true)}><Plus size={14} className="mr-1" />Nova Despesa</Button>
           </div>
           <div
