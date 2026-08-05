@@ -27,7 +27,9 @@ export function OverviewTab() {
 
   const totalRevenues = revenues.reduce((s, r) => s + r.value, 0);
   const totalExpenses = expenses.reduce((s, r) => s + r.value, 0);
-  const balance = totalRevenues - totalExpenses;
+  const paidRevenues = revenues.filter((r) => r.status === "pago").reduce((s, r) => s + r.value, 0);
+  // Saldo é caixa real: só conta receita já recebida, não o que ainda está pendente
+  const balance = paidRevenues - totalExpenses;
 
   const activeLeads = leads.filter((l) => !l.archived);
   const pendingTasks = tasks.filter((t) => t.status === "pendente");

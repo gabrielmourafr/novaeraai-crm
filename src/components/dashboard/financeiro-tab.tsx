@@ -22,6 +22,7 @@ import { useAllInstallments, useMarkInstallmentPaid, INSTALLMENT_STATUS_META } f
 import { useActiveSubscriptions, useEnsureMonthlyBilling, nextBillingDate, RENEWAL_LABEL, type ActiveSubscription } from "@/lib/hooks/use-subscriptions";
 import { useClientsFinancialSummary } from "@/lib/hooks/use-client-summary";
 import { useLeads } from "@/lib/hooks/use-leads";
+import { useCompanies } from "@/lib/hooks/use-companies";
 import { useUpdateProject, useProjects } from "@/lib/hooks/use-projects";
 import { useUser } from "@/lib/hooks/use-user";
 import {
@@ -75,6 +76,8 @@ export function FinanceiroTab() {
   const [createRevenueOpen, setCreateRevenueOpen] = useState(false);
   const [createExpenseOpen, setCreateExpenseOpen] = useState(false);
   const [mensalidadesBreakdownOpen, setMensalidadesBreakdownOpen] = useState(false);
+  const [implReceberBreakdownOpen, setImplReceberBreakdownOpen] = useState(false);
+  const [implRecebidaBreakdownOpen, setImplRecebidaBreakdownOpen] = useState(false);
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
   const [deletingPayment, setDeletingPayment] = useState<PartnerPaymentWithRelations | undefined>();
 
@@ -93,6 +96,7 @@ export function FinanceiroTab() {
   const [revDueDate, setRevDueDate] = useState("");
   const [revStatus, setRevStatus] = useState<"pendente" | "pago" | "atrasado" | "cancelado">("pendente");
   const [revRecurrence, setRevRecurrence] = useState<"pontual" | "mensal" | "trimestral" | "anual">("pontual");
+  const [revCompanyId, setRevCompanyId] = useState("__none__");
 
   // Expense form state
   const [expDesc, setExpDesc] = useState("");
@@ -108,8 +112,10 @@ export function FinanceiroTab() {
   const { data: activeSubscriptions = [], isLoading: subscriptionsLoading } = useActiveSubscriptions();
   const { data: clientsSummary = [] } = useClientsFinancialSummary();
   const { data: leads = [] } = useLeads();
+  const { data: companiesList = [] } = useCompanies();
   const totalMonthlyRecurring = activeSubscriptions.reduce((s, p) => s + Number(p.billing_amount ?? 0), 0);
-  const totalImplementacao = clientsSummary.reduce((s, c) => s + c.implementacao, 0);
+  const totalImplementacaoReceber = clientsSummary.reduce((s, c) => s + c.implementacaoReceber, 0);
+  const totalImplementacaoRecebida = clientsSummary.reduce((s, c) => s + c.implementacaoRecebida, 0);
   const hotLeadsPipeline = useMemo(
     () => leads.filter((l) => l.temperature === "quente").reduce((s, l) => s + (l.value ?? 0), 0),
     [leads]
@@ -187,11 +193,12 @@ export function FinanceiroTab() {
       due_date: revDueDate || null,
       business_unit: "intelligence",
       recurrence: revRecurrence,
-      company_id: null, contact_id: null, proposal_id: null, project_id: null,
+      company_id: revCompanyId !== "__none__" ? revCompanyId : null,
+      contact_id: null, proposal_id: null, project_id: null,
       payment_method: null, installment: null, paid_at: null,
     });
     setCreateRevenueOpen(false);
-    setRevDesc(""); setRevValue(""); setRevDueDate("");
+    setRevDesc(""); setRevValue(""); setRevDueDate(""); setRevCompanyId("__none__");
     setRevCategory("consultoria"); setRevStatus("pendente"); setRevRecurrence("pontual");
   };
 
@@ -283,8 +290,9 @@ export function FinanceiroTab() {
 
   const totalRevenues = revenues.reduce((s, r) => s + r.value, 0);
   const totalExpenses = expenses.reduce((s, e) => s + e.value, 0);
-  const balance = totalRevenues - totalExpenses;
   const paidRevenues = revenues.filter((r) => r.status === "pago").reduce((s, r) => s + r.value, 0);
+  // Saldo é caixa real: só conta receita já recebida, não o que ainda está pendente
+  const balance = paidRevenues - totalExpenses;
 
 
   // Expense by category for pie
@@ -339,9 +347,20 @@ export function FinanceiroTab() {
       </div>
 
       {/* Acumulados (sem período) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard label="Faturamento Total (todos os períodos)" value={formatCurrency(totalRevenuesAllTime)} icon={Wallet} />
-        <StatCard label="Implementação Acumulada (clientes)" value={formatCurrency(totalImplementacao)} icon={Building2} />
+        <StatCard
+          label="Implementação a Receber (clientes)"
+          value={formatCurrency(totalImplementacaoReceber)}
+          icon={Building2}
+          onClick={() => setImplReceberBreakdownOpen(true)}
+        />
+        <StatCard
+          label="Implementação Recebida (clientes)"
+          value={formatCurrency(totalImplementacaoRecebida)}
+          icon={Building2}
+          onClick={() => setImplRecebidaBreakdownOpen(true)}
+        />
         <StatCard
           label={`Mensalidades Acumuladas (${activeSubscriptions.length})`}
           value={formatCurrency(totalMonthlyRecurring)}
@@ -862,6 +881,21 @@ export function FinanceiroTab() {
               <Label>Descrição *</Label>
               <Input value={revDesc} onChange={(e) => setRevDesc(e.target.value)} placeholder="Ex: Contrato mensal cliente X" required />
             </div>
+            <div className="space-y-1.5">
+              <Label>Empresa (opcional)</Label>
+              <Select value={revCompanyId} onValueChange={setRevCompanyId}>
+                <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhuma</SelectItem>
+                  {companiesList.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px]" style={{ color: "#7BA3C6" }}>
+                Vincular a uma empresa faz essa receita entrar no acumulado por cliente
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Valor (R$) *</Label>
@@ -1195,6 +1229,78 @@ export function FinanceiroTab() {
                       <TableCell className="text-sm font-medium text-text-primary">{c.companyName}</TableCell>
                       <TableCell className="text-right text-sm font-semibold text-green-500">
                         {formatCurrency(c.mensalidade)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: Breakdown de Implementação a Receber por Cliente ─── */}
+      <Dialog open={implReceberBreakdownOpen} onOpenChange={setImplReceberBreakdownOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Implementação a Receber por Cliente</DialogTitle>
+            <DialogDescription>
+              Total acumulado: <strong>{formatCurrency(totalImplementacaoReceber)}</strong> — ainda pendente, não conta no faturamento
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {clientsSummary.filter((c) => c.implementacaoReceber > 0).length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-6">Nenhuma implementação pendente no momento.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="text-right">A Receber</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientsSummary.filter((c) => c.implementacaoReceber > 0).map((c) => (
+                    <TableRow key={c.companyId}>
+                      <TableCell className="text-sm font-medium text-text-primary">{c.companyName}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-amber-500">
+                        {formatCurrency(c.implementacaoReceber)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: Breakdown de Implementação Recebida por Cliente ─── */}
+      <Dialog open={implRecebidaBreakdownOpen} onOpenChange={setImplRecebidaBreakdownOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Implementação Recebida por Cliente</DialogTitle>
+            <DialogDescription>
+              Total acumulado: <strong>{formatCurrency(totalImplementacaoRecebida)}</strong> — já caiu, conta no faturamento
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {clientsSummary.filter((c) => c.implementacaoRecebida > 0).length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-6">Nenhuma implementação recebida ainda.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="text-right">Recebido</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientsSummary.filter((c) => c.implementacaoRecebida > 0).map((c) => (
+                    <TableRow key={c.companyId}>
+                      <TableCell className="text-sm font-medium text-text-primary">{c.companyName}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-green-500">
+                        {formatCurrency(c.implementacaoRecebida)}
                       </TableCell>
                     </TableRow>
                   ))}

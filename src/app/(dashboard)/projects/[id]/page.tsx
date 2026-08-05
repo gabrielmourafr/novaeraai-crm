@@ -48,6 +48,7 @@ import { UpsellList } from "@/components/upsells/upsell-list";
 import { ProjectIdentification } from "@/components/projects/project-identification";
 import { ProjectDevelopment } from "@/components/projects/project-development";
 import { ProjectAftercare } from "@/components/projects/project-aftercare";
+import { ProjectRoadmap } from "@/components/projects/project-roadmap";
 import { ProjectFinancialSummary } from "@/components/projects/project-financial-summary";
 import { useDocuments, useUploadDocument, useDeleteDocument, getDocumentSignedUrl, DOCUMENT_TYPES } from "@/lib/hooks/use-documents";
 import { useOrgUsers } from "@/lib/hooks/use-user";
@@ -396,10 +397,11 @@ export default function ProjectDetailPage() {
       {/* Tabs */}
       <Tabs defaultValue="overview">
         <TabsList className="bg-card border border-border rounded-xl p-1 h-auto flex flex-wrap gap-1">
-          {["overview", "desenvolvimento", "pos_entrega", "produtos", "melhorias", "kanban", "upsell", "tarefas", "documentos", "financeiro", "timeline"].map((tab) => {
+          {["overview", "desenvolvimento", "roadmap", "pos_entrega", "produtos", "melhorias", "kanban", "upsell", "tarefas", "documentos", "financeiro", "timeline"].map((tab) => {
             const labels: Record<string, string> = {
               overview: "Visão Geral",
               desenvolvimento: "Desenvolvimento",
+              roadmap: "Roadmap",
               pos_entrega: "Pós-Entrega",
               produtos: "Produtos",
               melhorias: "Melhorias",
@@ -499,6 +501,11 @@ export default function ProjectDetailPage() {
         {/* ── Desenvolvimento ── */}
         <TabsContent value="desenvolvimento" className="mt-4">
           <ProjectDevelopment project={project} />
+        </TabsContent>
+
+        {/* ── Roadmap ── */}
+        <TabsContent value="roadmap" className="mt-4">
+          <ProjectRoadmap project={project} />
         </TabsContent>
 
         {/* ── Pós-Entrega (Mensalidade) ── */}

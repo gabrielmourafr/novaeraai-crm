@@ -220,6 +220,7 @@ export interface Database {
             | "em_desenvolvimento"
             | "em_validacao_interna"
             | "pronto_para_entrega"
+            | "roadmap"
             | "entregue_tet"
             | "ativo_mensalidade"
             | "upsell_identificado"
@@ -279,6 +280,10 @@ export interface Database {
           crs_resolved_count: number | null;
           upsell_opportunity_note: string | null;
           churn_risk: "baixo" | "medio" | "alto" | null;
+          // V2: roadmap
+          roadmap_html: string | null;
+          roadmap_filename: string | null;
+          roadmap_updated_at: string | null;
           created_at: string;
           updated_at: string;
           created_by: string | null;

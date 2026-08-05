@@ -86,11 +86,12 @@ export const PROPOSAL_STATUSES = [
 ] as const;
 
 export const PROJECT_STATUSES = [
-  // Novo pipeline V2 (8 estágios)
+  // Novo pipeline V2 (9 estágios)
   { value: "contrato_assinado",     label: "Contrato Assinado",     color: "#6366F1" },
   { value: "em_desenvolvimento",    label: "Em Desenvolvimento",    color: "#0B87C3" },
   { value: "em_validacao_interna",  label: "Em Validação Interna",  color: "#8B5CF6" },
   { value: "pronto_para_entrega",   label: "Pronto para Entrega",   color: "#14B8A6" },
+  { value: "roadmap",               label: "Roadmap",                color: "#0EA5E9" },
   { value: "entregue_tet",          label: "Entregue (Período TET)", color: "#F59E0B" },
   { value: "ativo_mensalidade",     label: "Ativo — Mensalidade",   color: "#10B981" },
   { value: "upsell_identificado",   label: "Upsell Identificado",   color: "#EC4899" },
@@ -110,6 +111,7 @@ export const PROJECT_PIPELINE_V2 = [
   "em_desenvolvimento",
   "em_validacao_interna",
   "pronto_para_entrega",
+  "roadmap",
   "entregue_tet",
   "ativo_mensalidade",
   "upsell_identificado",
