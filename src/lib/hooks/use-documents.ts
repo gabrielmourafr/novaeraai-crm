@@ -171,6 +171,8 @@ export const getDocumentSignedUrl = async (filePath: string) => {
 
 export const DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
   { value: "contrato", label: "Contrato" },
+  { value: "arquitetura_inicial", label: "Arquitetura Inicial" },
+  { value: "arquitetura_tecnica", label: "Arquitetura Técnica" },
   { value: "proposta", label: "Proposta" },
   { value: "briefing", label: "Briefing" },
   { value: "ata", label: "Ata" },

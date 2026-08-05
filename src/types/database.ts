@@ -473,7 +473,7 @@ export interface Database {
           file_path: string;
           file_size: number | null;
           file_type: string | null;
-          type: "contrato" | "proposta" | "briefing" | "ata" | "apresentacao" | "entrega" | "nda" | "outro";
+          type: "contrato" | "arquitetura_inicial" | "arquitetura_tecnica" | "proposta" | "briefing" | "ata" | "apresentacao" | "entrega" | "nda" | "outro";
           version: number;
           description: string | null;
           tags: string[];

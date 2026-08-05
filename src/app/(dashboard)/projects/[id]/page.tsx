@@ -40,11 +40,9 @@ import { useProjectTasks, useUpdateTask } from "@/lib/hooks/use-tasks";
 import { useActivities } from "@/lib/hooks/use-activities";
 import { useProjectRevenues, useUpdateRevenue } from "@/lib/hooks/use-finance";
 import { ProjectInstallments } from "@/components/projects/project-installments";
-import { ProjectProducts } from "@/components/projects/project-products";
 import { ProjectCosts } from "@/components/projects/project-costs";
 import { ProjectBilling } from "@/components/projects/project-billing";
 import { ProjectImprovements } from "@/components/projects/project-improvements";
-import { UpsellList } from "@/components/upsells/upsell-list";
 import { ProjectIdentification } from "@/components/projects/project-identification";
 import { ProjectDevelopment } from "@/components/projects/project-development";
 import { ProjectAftercare } from "@/components/projects/project-aftercare";
@@ -397,16 +395,14 @@ export default function ProjectDetailPage() {
       {/* Tabs */}
       <Tabs defaultValue="overview">
         <TabsList className="bg-card border border-border rounded-xl p-1 h-auto flex flex-wrap gap-1">
-          {["overview", "desenvolvimento", "roadmap", "pos_entrega", "produtos", "melhorias", "kanban", "upsell", "tarefas", "documentos", "financeiro", "timeline"].map((tab) => {
+          {["overview", "desenvolvimento", "roadmap", "pos_entrega", "melhorias", "kanban", "tarefas", "documentos", "financeiro", "timeline"].map((tab) => {
             const labels: Record<string, string> = {
               overview: "Visão Geral",
               desenvolvimento: "Desenvolvimento",
               roadmap: "Roadmap",
               pos_entrega: "Pós-Entrega",
-              produtos: "Produtos",
               melhorias: "Melhorias",
               kanban: "Fases & Kanban",
-              upsell: "Upsell",
               tarefas: "Tarefas",
               documentos: "Documentos",
               financeiro: "Financeiro",
@@ -619,21 +615,11 @@ export default function ProjectDetailPage() {
           )}
         </TabsContent>
 
-        {/* ── Tarefas ── */}
-        <TabsContent value="produtos" className="mt-4">
-          {user?.org_id && <ProjectProducts projectId={project.id} orgId={user.org_id} />}
-        </TabsContent>
-
         <TabsContent value="melhorias" className="mt-4">
           {user?.org_id && <ProjectImprovements projectId={project.id} orgId={user.org_id} />}
         </TabsContent>
 
-        <TabsContent value="upsell" className="mt-4">
-          {user?.org_id && project.company_id && (
-            <UpsellList scope="project" companyId={project.company_id} projectId={project.id} orgId={user.org_id} />
-          )}
-        </TabsContent>
-
+        {/* ── Tarefas ── */}
         <TabsContent value="tarefas" className="mt-4">
           <div className="space-y-4">
             {/* Filter */}
@@ -802,7 +788,7 @@ export default function ProjectDetailPage() {
               </div>
             )}
 
-            {/* Documents grid */}
+            {/* Documents grid, agrupados por categoria */}
             {documents.length === 0 && uploadFiles.length === 0 ? (
               <EmptyState
                 icon={FileText}
@@ -810,65 +796,89 @@ export default function ProjectDetailPage() {
                 description="Faça upload do primeiro documento deste projeto."
               />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {documents.map((doc) => {
-                  const DocIcon = getFileIcon(doc.file_type);
-                  const iconColor = getFileIconColor(doc.file_type);
-                  const isPreviewable =
-                    doc.file_type?.includes("pdf") || doc.file_type?.includes("image");
-                  const docTypeLabel = DOCUMENT_TYPES.find((t) => t.value === doc.type)?.label ?? doc.type;
-
+              <div className="space-y-6">
+                {(
+                  [
+                    { key: "contrato", label: "Contratos" },
+                    { key: "arquitetura_inicial", label: "Arquitetura Inicial" },
+                    { key: "arquitetura_tecnica", label: "Arquitetura Técnica" },
+                    { key: "outros", label: "Outros Documentos" },
+                  ] as const
+                ).map((group) => {
+                  const groupDocs = documents.filter((doc) =>
+                    group.key === "outros"
+                      ? !["contrato", "arquitetura_inicial", "arquitetura_tecnica"].includes(doc.type)
+                      : doc.type === group.key
+                  );
+                  if (groupDocs.length === 0) return null;
                   return (
-                    <div
-                      key={doc.id}
-                      className="rounded-xl border border-border bg-card p-4 space-y-3 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <DocIcon size={28} className={iconColor} />
-                        <span className="text-[10px] font-medium bg-white/5 text-text-muted px-1.5 py-0.5 rounded">
-                          v{doc.version}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-text-primary line-clamp-2">{doc.name}</p>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-text-muted mt-1">
-                          {docTypeLabel}
-                        </span>
-                      </div>
-                      <p className="text-xs text-text-muted">
-                        {formatDate(doc.created_at)}
-                        {doc.uploader && ` · ${doc.uploader.full_name}`}
-                      </p>
-                      <div className="flex items-center gap-1.5 pt-1 border-t border-border">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => handleDownload(doc.file_path, doc.name)}
-                          title="Download"
-                        >
-                          <Download size={13} />
-                        </Button>
-                        {isPreviewable && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => handlePreview(doc.file_path)}
-                            title="Preview"
-                          >
-                            <Eye size={13} />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-red-400 hover:text-red-600 ml-auto"
-                          onClick={() => deleteDocument.mutate({ id: doc.id, filePath: doc.file_path })}
-                          title="Remover"
-                        >
-                          <Trash2 size={13} />
-                        </Button>
+                    <div key={group.key}>
+                      <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
+                        {group.label} <span className="text-text-muted/60 font-normal">({groupDocs.length})</span>
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {groupDocs.map((doc) => {
+                          const DocIcon = getFileIcon(doc.file_type);
+                          const iconColor = getFileIconColor(doc.file_type);
+                          const isPreviewable =
+                            doc.file_type?.includes("pdf") || doc.file_type?.includes("image");
+                          const docTypeLabel = DOCUMENT_TYPES.find((t) => t.value === doc.type)?.label ?? doc.type;
+
+                          return (
+                            <div
+                              key={doc.id}
+                              className="rounded-xl border border-border bg-card p-4 space-y-3 hover:shadow-md transition-shadow"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <DocIcon size={28} className={iconColor} />
+                                <span className="text-[10px] font-medium bg-white/5 text-text-muted px-1.5 py-0.5 rounded">
+                                  v{doc.version}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-text-primary line-clamp-2">{doc.name}</p>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-text-muted mt-1">
+                                  {docTypeLabel}
+                                </span>
+                              </div>
+                              <p className="text-xs text-text-muted">
+                                {formatDate(doc.created_at)}
+                                {doc.uploader && ` · ${doc.uploader.full_name}`}
+                              </p>
+                              <div className="flex items-center gap-1.5 pt-1 border-t border-border">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleDownload(doc.file_path, doc.name)}
+                                  title="Download"
+                                >
+                                  <Download size={13} />
+                                </Button>
+                                {isPreviewable && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => handlePreview(doc.file_path)}
+                                    title="Preview"
+                                  >
+                                    <Eye size={13} />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-red-400 hover:text-red-600 ml-auto"
+                                  onClick={() => deleteDocument.mutate({ id: doc.id, filePath: doc.file_path })}
+                                  title="Remover"
+                                >
+                                  <Trash2 size={13} />
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
