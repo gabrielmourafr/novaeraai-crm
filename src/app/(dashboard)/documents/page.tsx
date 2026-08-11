@@ -89,7 +89,7 @@ interface StagedFile {
 function DocumentCard({ doc, onDelete }: { doc: DocumentWithRelations; onDelete: () => void }) {
   const DocIcon = getFileIcon(doc.file_type);
   const iconColor = getFileIconColor(doc.file_type);
-  const isPreviewable = doc.file_type?.includes("pdf") || doc.file_type?.includes("image");
+  const isPreviewable = doc.file_type?.includes("pdf") || doc.file_type?.includes("image") || doc.file_type?.includes("html");
   const docTypeLabel = DOCUMENT_TYPES.find((t) => t.value === doc.type)?.label ?? doc.type;
 
   const handleDownload = async () => {
@@ -102,6 +102,17 @@ function DocumentCard({ doc, onDelete }: { doc: DocumentWithRelations; onDelete:
 
   const handlePreview = async () => {
     const url = await getDocumentSignedUrl(doc.file_path);
+    // Supabase Storage serve HTML como text/plain por segurança — refaz
+    // como Blob com o tipo certo pra abrir renderizado.
+    if (doc.file_type?.includes("html")) {
+      const res = await fetch(url);
+      const text = await res.text();
+      const blob = new Blob([text], { type: "text/html" });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, "_blank");
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      return;
+    }
     window.open(url, "_blank");
   };
 

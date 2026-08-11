@@ -239,8 +239,20 @@ export default function ProjectDetailPage() {
     a.click();
   };
 
-  const handlePreview = async (filePath: string) => {
+  const handlePreview = async (filePath: string, fileType?: string | null) => {
     const url = await getDocumentSignedUrl(filePath);
+    // Supabase Storage serve HTML como text/plain por segurança (evita XSS
+    // ao abrir direto do domínio do storage) — refaz como Blob com o tipo
+    // certo pra abrir renderizado, igual ao roadmap do projeto.
+    if (fileType?.includes("html")) {
+      const res = await fetch(url);
+      const text = await res.text();
+      const blob = new Blob([text], { type: "text/html" });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, "_blank");
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      return;
+    }
     window.open(url, "_blank");
   };
 
@@ -873,7 +885,7 @@ export default function ProjectDetailPage() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7"
-                                  onClick={() => handlePreview(doc.file_path)}
+                                  onClick={() => handlePreview(doc.file_path, doc.file_type)}
                                   title="Abrir documento em outra aba"
                                 >
                                   <ArrowUpRight size={13} />
