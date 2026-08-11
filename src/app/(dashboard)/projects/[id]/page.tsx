@@ -14,7 +14,6 @@ import {
   Clock,
   ListTodo,
   Download,
-  Eye,
   Trash2,
   GripVertical,
   FileText,
@@ -22,6 +21,7 @@ import {
   Presentation,
   Image,
   File,
+  ArrowUpRight,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
@@ -833,8 +833,6 @@ export default function ProjectDetailPage() {
                         {groupDocs.map((doc) => {
                           const DocIcon = getFileIcon(doc.file_type);
                           const iconColor = getFileIconColor(doc.file_type);
-                          const isPreviewable =
-                            doc.file_type?.includes("pdf") || doc.file_type?.includes("image");
                           const docTypeLabel = DOCUMENT_TYPES.find((t) => t.value === doc.type)?.label ?? doc.type;
 
                           return (
@@ -871,17 +869,15 @@ export default function ProjectDetailPage() {
                                 >
                                   <Download size={13} />
                                 </Button>
-                                {isPreviewable && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => handlePreview(doc.file_path)}
-                                    title="Preview"
-                                  >
-                                    <Eye size={13} />
-                                  </Button>
-                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handlePreview(doc.file_path)}
+                                  title="Abrir documento em outra aba"
+                                >
+                                  <ArrowUpRight size={13} />
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="icon"
