@@ -410,51 +410,76 @@ export function FinanceiroTab() {
         </Select>
       </div>
 
-      {/* Acumulados (sem período) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
-        <StatCard label="Faturamento Total (todos os períodos)" value={formatCurrency(totalRevenuesAllTime)} icon={Wallet} />
-        <StatCard
-          label={`Parcelas de Implementação Restantes (${totalParcelasRestantes})`}
-          value={formatCurrency(totalParcelasRestantesValue)}
-          icon={Layers}
-          onClick={() => setParcelasBreakdownOpen(true)}
-        />
-        <StatCard
-          label="Implementação a Receber (clientes)"
-          value={formatCurrency(totalImplementacaoReceber)}
-          icon={Building2}
-          onClick={() => setImplReceberBreakdownOpen(true)}
-        />
-        <StatCard
-          label="Implementação Recebida (clientes)"
-          value={formatCurrency(totalImplementacaoRecebida)}
-          icon={Building2}
-          onClick={() => setImplRecebidaBreakdownOpen(true)}
-        />
-        <StatCard
-          label={`Mensalidades Acumuladas (${activeSubscriptions.length})`}
-          value={formatCurrency(totalMonthlyRecurring)}
-          icon={TrendingUp}
-          onClick={() => setMensalidadesBreakdownOpen(true)}
-        />
-        <StatCard
-          label={`Pipeline Quente — Projeção (${hotLeadsCount})`}
-          value={formatCurrency(hotLeadsPipeline)}
-          icon={Flame}
-        />
-        <StatCard
-          label={`A Pagar — Parceiros/Devs (${pendingPayments.length})`}
-          value={formatCurrency(totalPendingPayments)}
-          icon={Users}
-        />
+      {/* Resumo do mês selecionado */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+          Resumo de {months[month - 1]} / {year}
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label="Receitas (mês)" value={formatCurrency(totalRevenues)} icon={TrendingUp} />
+          <StatCard label="Despesas (mês)" value={formatCurrency(totalExpenses)} icon={TrendingDown} />
+          <StatCard label="Saldo" value={formatCurrency(balance)} icon={DollarSign} />
+          <StatCard label="Recebido" value={formatCurrency(paidRevenues)} icon={TrendingUp} />
+        </div>
       </div>
 
-      {/* KPI Cards (mês selecionado) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Receitas (mês)" value={formatCurrency(totalRevenues)} icon={TrendingUp} />
-        <StatCard label="Despesas (mês)" value={formatCurrency(totalExpenses)} icon={TrendingDown} />
-        <StatCard label="Saldo" value={formatCurrency(balance)} icon={DollarSign} />
-        <StatCard label="Recebido" value={formatCurrency(paidRevenues)} icon={TrendingUp} />
+      {/* Implementação (acumulado, todos os períodos) */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+          Implementação — Acumulado
+        </h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard size="sm" label="Faturamento Total" value={formatCurrency(totalRevenuesAllTime)} icon={Wallet} />
+          <StatCard
+            size="sm"
+            label={`Parcelas Restantes (${totalParcelasRestantes})`}
+            value={formatCurrency(totalParcelasRestantesValue)}
+            icon={Layers}
+            onClick={() => setParcelasBreakdownOpen(true)}
+          />
+          <StatCard
+            size="sm"
+            label="A Receber (clientes)"
+            value={formatCurrency(totalImplementacaoReceber)}
+            icon={Building2}
+            onClick={() => setImplReceberBreakdownOpen(true)}
+          />
+          <StatCard
+            size="sm"
+            label="Recebida (clientes)"
+            value={formatCurrency(totalImplementacaoRecebida)}
+            icon={Building2}
+            onClick={() => setImplRecebidaBreakdownOpen(true)}
+          />
+        </div>
+      </div>
+
+      {/* Recorrência, pipeline e pagamentos */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+          Recorrência &amp; Pipeline
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <StatCard
+            size="sm"
+            label={`Mensalidades Acumuladas (${activeSubscriptions.length})`}
+            value={formatCurrency(totalMonthlyRecurring)}
+            icon={TrendingUp}
+            onClick={() => setMensalidadesBreakdownOpen(true)}
+          />
+          <StatCard
+            size="sm"
+            label={`Pipeline Quente — Projeção (${hotLeadsCount})`}
+            value={formatCurrency(hotLeadsPipeline)}
+            icon={Flame}
+          />
+          <StatCard
+            size="sm"
+            label={`A Pagar — Parceiros/Devs (${pendingPayments.length})`}
+            value={formatCurrency(totalPendingPayments)}
+            icon={Users}
+          />
+        </div>
       </div>
 
       {/* Charts Row */}

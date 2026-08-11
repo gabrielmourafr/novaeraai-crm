@@ -10,13 +10,15 @@ interface StatCardProps {
   trend?: { value: number; label: string };
   className?: string;
   onClick?: () => void;
+  size?: "default" | "sm";
 }
 
-export const StatCard = ({ label, value, icon: Icon, trend, className, onClick }: StatCardProps) => (
+export const StatCard = ({ label, value, icon: Icon, trend, className, onClick, size = "default" }: StatCardProps) => (
   <div
     onClick={onClick}
     className={cn(
-      "rounded-xl border p-6 transition-all duration-200 hover:scale-[1.01]",
+      "rounded-xl border transition-all duration-200 hover:scale-[1.01]",
+      size === "sm" ? "p-4" : "p-6",
       onClick && "cursor-pointer hover:border-primary/40",
       className
     )}
@@ -26,13 +28,28 @@ export const StatCard = ({ label, value, icon: Icon, trend, className, onClick }
       backdropFilter: "blur(8px)",
     }}
   >
-    <div className="flex items-start justify-between mb-4">
-      <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">{label}</span>
-      <div className="p-2 rounded-lg" style={{ background: "var(--primary-light)" }}>
-        <Icon size={18} style={{ color: "var(--primary)" }} />
+    <div className={cn("flex items-start justify-between", size === "sm" ? "mb-2.5" : "mb-4")}>
+      <span
+        className={cn(
+          "font-semibold uppercase tracking-wider text-text-muted",
+          size === "sm" ? "text-[10px] leading-tight" : "text-xs"
+        )}
+      >
+        {label}
+      </span>
+      <div className={cn("rounded-lg flex-shrink-0", size === "sm" ? "p-1.5 ml-2" : "p-2")} style={{ background: "var(--primary-light)" }}>
+        <Icon size={size === "sm" ? 14 : 18} style={{ color: "var(--primary)" }} />
       </div>
     </div>
-    <p className="font-display font-bold text-3xl text-text-primary">{value}</p>
+    <p
+      className={cn(
+        "font-display font-bold text-text-primary truncate",
+        size === "sm" ? "text-xl" : "text-3xl"
+      )}
+      title={typeof value === "string" ? value : undefined}
+    >
+      {value}
+    </p>
     {trend && (
       <p className={cn("text-xs mt-2", trend.value >= 0 ? "text-success" : "text-danger")}>
         {trend.value >= 0 ? "+" : ""}
