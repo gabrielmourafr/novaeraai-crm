@@ -161,11 +161,11 @@ export const getDocumentUrl = (filePath: string) => {
   return data.publicUrl;
 };
 
-export const getDocumentSignedUrl = async (filePath: string) => {
+export const getDocumentSignedUrl = async (filePath: string, downloadName?: string) => {
   const supabase = createClient();
   const { data, error } = await supabase.storage
     .from("documents")
-    .createSignedUrl(filePath, 3600);
+    .createSignedUrl(filePath, 3600, downloadName ? { download: downloadName } : undefined);
   if (error) throw error;
   return data.signedUrl;
 };

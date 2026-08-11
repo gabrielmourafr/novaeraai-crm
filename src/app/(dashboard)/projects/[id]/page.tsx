@@ -232,10 +232,12 @@ export default function ProjectDetailPage() {
   };
 
   const handleDownload = async (filePath: string, name: string) => {
-    const url = await getDocumentSignedUrl(filePath);
+    const ext = filePath.split(".").pop();
+    const fileName = ext ? `${name}.${ext}` : name;
+    const url = await getDocumentSignedUrl(filePath, fileName);
     const a = document.createElement("a");
     a.href = url;
-    a.download = name;
+    a.download = fileName;
     a.click();
   };
 

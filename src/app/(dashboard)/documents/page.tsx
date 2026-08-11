@@ -93,10 +93,12 @@ function DocumentCard({ doc, onDelete }: { doc: DocumentWithRelations; onDelete:
   const docTypeLabel = DOCUMENT_TYPES.find((t) => t.value === doc.type)?.label ?? doc.type;
 
   const handleDownload = async () => {
-    const url = await getDocumentSignedUrl(doc.file_path);
+    const ext = doc.file_path.split(".").pop();
+    const fileName = ext ? `${doc.name}.${ext}` : doc.name;
+    const url = await getDocumentSignedUrl(doc.file_path, fileName);
     const a = document.createElement("a");
     a.href = url;
-    a.download = doc.name;
+    a.download = fileName;
     a.click();
   };
 
