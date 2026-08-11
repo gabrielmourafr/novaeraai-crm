@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { addDays, parseISO } from "date-fns";
+import { toast } from "sonner";
 import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Flame, Building2, Users, Download, Receipt, Layers } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { StatCard } from "@/components/shared/stat-card";
-import { formatCurrency, formatDate } from "@/lib/utils/format";
+import { formatCurrency, formatDate, parseCurrencyInput } from "@/lib/utils/format";
 import { exportToCsv } from "@/lib/utils/csv";
 import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues, type Revenue, type Expense } from "@/lib/hooks/use-finance";
 import { useAllInstallments, useMarkInstallmentPaid, useUpdateInstallment, useClientInstallmentsSummary, INSTALLMENT_STATUS_META, type InstallmentWithRelations } from "@/lib/hooks/use-installments";
@@ -247,12 +248,15 @@ export function FinanceiroTab() {
 
   const handleCreateRevenue = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!revDesc || !revValue || !user) return;
+    if (!user) { toast.error("Sessão não carregada ainda — recarregue a página e tente de novo."); return; }
+    if (!revDesc || !revValue) { toast.error("Preencha descrição e valor."); return; }
+    const parsedValue = parseCurrencyInput(revValue);
+    if (isNaN(parsedValue)) { toast.error("Valor inválido — use um número, ex: 1500,00."); return; }
     await createRevenue.mutateAsync({
       org_id: user.org_id,
       description: revDesc,
       category: revCategory,
-      value: parseFloat(revValue.replace(",", ".")),
+      value: parsedValue,
       status: revStatus,
       due_date: revDueDate || null,
       business_unit: "intelligence",
@@ -268,12 +272,15 @@ export function FinanceiroTab() {
 
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!expDesc || !expValue || !user) return;
+    if (!user) { toast.error("Sessão não carregada ainda — recarregue a página e tente de novo."); return; }
+    if (!expDesc || !expValue) { toast.error("Preencha descrição e valor."); return; }
+    const parsedValue = parseCurrencyInput(expValue);
+    if (isNaN(parsedValue)) { toast.error("Valor inválido — use um número, ex: 1500,00."); return; }
     await createExpense.mutateAsync({
       org_id: user.org_id,
       description: expDesc,
       category: expCategory,
-      value: parseFloat(expValue.replace(",", ".")),
+      value: parsedValue,
       status: expStatus,
       due_date: expDueDate || null,
       recurrence: expRecurrence,
@@ -287,7 +294,10 @@ export function FinanceiroTab() {
 
   const handleCreatePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!payName || !payDesc || !payAmount || !user) return;
+    if (!user) { toast.error("Sessão não carregada ainda — recarregue a página e tente de novo."); return; }
+    if (!payName || !payDesc || !payAmount) { toast.error("Preencha nome, descrição e valor."); return; }
+    const parsedAmount = parseCurrencyInput(payAmount);
+    if (isNaN(parsedAmount)) { toast.error("Valor inválido — use um número, ex: 1500,00."); return; }
     await createPayment.mutateAsync({
       org_id: user.org_id,
       recipient_type: payType,
@@ -295,7 +305,7 @@ export function FinanceiroTab() {
       recipient_user_id: null,
       project_id: payProjectId !== "__none__" ? payProjectId : null,
       description: payDesc,
-      amount: parseFloat(payAmount.replace(",", ".")),
+      amount: parsedAmount,
       due_date: payDueDate || null,
       paid_at: null,
       status: "pendente",

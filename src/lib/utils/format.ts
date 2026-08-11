@@ -4,6 +4,19 @@ import { ptBR } from "date-fns/locale";
 export const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
+// Converte um valor digitado em formato brasileiro (ex: "3.000,00" ou
+// "26,68" ou "3000") pro number que o banco espera. Sem isso, valores com
+// separador de milhar quebravam silenciosamente (ex: "3.000,00" virava
+// 3.00 ou pior).
+export const parseCurrencyInput = (raw: string): number => {
+  const trimmed = raw.trim();
+  if (!trimmed) return NaN;
+  const normalized = trimmed.includes(",")
+    ? trimmed.replace(/\./g, "").replace(",", ".")
+    : trimmed;
+  return parseFloat(normalized);
+};
+
 // Formata só o dia (sem hora). Para strings, usa o ano/mês/dia literal
 // gravado no banco em vez de converter o instante pro fuso do navegador —
 // evita que uma data salva sem hora (ex: due_date em colunas timestamptz)

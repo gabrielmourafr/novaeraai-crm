@@ -18,7 +18,7 @@ import { useAllTasks } from "@/lib/hooks/use-tasks";
 import { useRevenues, useExpenses } from "@/lib/hooks/use-finance";
 import { useGoal, useUpsertGoal } from "@/lib/hooks/use-goals";
 import { useUser } from "@/lib/hooks/use-user";
-import { formatCurrency, formatDate, isPastDate } from "@/lib/utils/format";
+import { formatCurrency, formatDate, isPastDate, parseCurrencyInput } from "@/lib/utils/format";
 
 const monthNames = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
@@ -52,7 +52,7 @@ export function OverviewTab() {
     await upsertGoal.mutateAsync({
       org_id: user.org_id,
       reference_month: `${year}-${String(month).padStart(2, "0")}-01`,
-      revenue_target: revenueTargetInput ? parseFloat(revenueTargetInput.replace(",", ".")) : 0,
+      revenue_target: revenueTargetInput ? parseCurrencyInput(revenueTargetInput) : 0,
       commercial_target: commercialTargetInput ? parseInt(commercialTargetInput) : 0,
       notes: null,
     });
