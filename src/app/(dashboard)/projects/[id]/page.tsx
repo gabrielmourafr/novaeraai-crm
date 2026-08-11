@@ -140,7 +140,7 @@ export default function ProjectDetailPage() {
   const [taskFormPhaseId, setTaskFormPhaseId] = useState<string | undefined>();
   const [editFormOpen, setEditFormOpen] = useState(false);
   const [taskFilter, setTaskFilter] = useState<"all" | "pendente" | "concluida">("all");
-  const [uploadFiles, setUploadFiles] = useState<{ file: File; name: string; type: DocumentType; progress: number }[]>([]);
+  const [uploadFiles, setUploadFiles] = useState<{ file: File; name: string; type: DocumentType; description: string; progress: number }[]>([]);
   const [uploading, setUploading] = useState(false);
 
   const { data: project, isLoading } = useProject(projectId);
@@ -200,6 +200,7 @@ export default function ProjectDetailPage() {
       file,
       name: file.name.replace(/\.[^/.]+$/, ""),
       type: "outro" as DocumentType,
+      description: "",
       progress: 0,
     }));
     setUploadFiles((prev) => [...prev, ...newFiles]);
@@ -216,6 +217,7 @@ export default function ProjectDetailPage() {
         file: f.file,
         name: f.name,
         type: f.type,
+        description: f.description.trim() || undefined,
         companyId: project.company_id,
         projectId: project.id,
         orgId: project.org_id,
@@ -770,6 +772,17 @@ export default function ProjectDetailPage() {
                         <Trash2 size={14} />
                       </button>
                     </div>
+                    <input
+                      type="text"
+                      value={f.description}
+                      onChange={(e) =>
+                        setUploadFiles((prev) =>
+                          prev.map((x, idx) => idx === i ? { ...x, description: e.target.value } : x)
+                        )
+                      }
+                      placeholder="Descrição (opcional) — do que se trata esse documento..."
+                      className="w-full text-xs border border-border rounded px-2 py-1.5 bg-card text-text-primary placeholder:text-text-muted"
+                    />
                     {f.progress > 0 && (
                       <div className="h-1 bg-white/5 rounded-full overflow-hidden">
                         <div className="h-full bg-[#0B87C3] transition-all" style={{ width: `${f.progress}%` }} />
@@ -841,6 +854,9 @@ export default function ProjectDetailPage() {
                                   {docTypeLabel}
                                 </span>
                               </div>
+                              {doc.description && (
+                                <p className="text-xs text-text-muted line-clamp-2">{doc.description}</p>
+                              )}
                               <p className="text-xs text-text-muted">
                                 {formatDate(doc.created_at)}
                                 {doc.uploader && ` · ${doc.uploader.full_name}`}

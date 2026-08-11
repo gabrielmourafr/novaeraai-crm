@@ -126,7 +126,8 @@ export const useUploadDocument = () => {
     },
     onError: (err) => {
       console.error(err);
-      toast.error("Erro ao enviar documento");
+      const message = err instanceof Error ? err.message : "";
+      toast.error(message ? `Erro ao enviar documento: ${message}` : "Erro ao enviar documento");
     },
   });
 };
