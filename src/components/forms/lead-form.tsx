@@ -36,6 +36,8 @@ const leadSchema = z.object({
   origin: z.string().optional(),
   expected_close_date: z.string().optional(),
   notes: z.string().optional(),
+  diagnostico: z.string().optional(),
+  arquitetura_solucao: z.string().optional(),
   tags: z.string().optional(),
   // Novo contato inline
   new_contact_name: z.string().optional(),
@@ -99,6 +101,8 @@ export const LeadForm = ({
         origin: lead.origin ?? "",
         expected_close_date: lead.expected_close_date ?? "",
         notes: lead.notes ?? "",
+        diagnostico: lead.diagnostico ?? "",
+        arquitetura_solucao: lead.arquitetura_solucao ?? "",
         tags: lead.tags?.join(", ") ?? "",
       });
     } else {
@@ -106,7 +110,8 @@ export const LeadForm = ({
         pipeline_id: defaultPipelineId ?? "",
         stage_id: defaultStageId ?? "",
         title: "", company_id: "", contact_id: "", value: "",
-        temperature: "", origin: "", expected_close_date: "", notes: "", tags: "",
+        temperature: "", origin: "", expected_close_date: "", notes: "",
+        diagnostico: "", arquitetura_solucao: "", tags: "",
         new_contact_name: "", new_contact_email: "", new_contact_phone: "", new_contact_job_title: "",
         new_company_name: "",
       });
@@ -157,6 +162,8 @@ export const LeadForm = ({
       origin: values.origin || null,
       expected_close_date: values.expected_close_date || null,
       notes: values.notes || null,
+      diagnostico: values.diagnostico || null,
+      arquitetura_solucao: values.arquitetura_solucao || null,
       tags,
       archived: false,
     };
@@ -354,6 +361,18 @@ export const LeadForm = ({
           <div className="space-y-1.5">
             <Label htmlFor="notes">Observações</Label>
             <Textarea id="notes" {...register("notes")} rows={3} placeholder="Notas internas..." />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="diagnostico">Diagnóstico</Label>
+            <Textarea id="diagnostico" {...register("diagnostico")} rows={3} placeholder="Diagnóstico do cliente/oportunidade..." />
+            <p className="text-[11px] text-text-muted">Copiado automaticamente pro projeto quando o lead for fechado como Ganho.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="arquitetura_solucao">Arquitetura da Solução</Label>
+            <Textarea id="arquitetura_solucao" {...register("arquitetura_solucao")} rows={3} placeholder="Arquitetura proposta / link da documentação..." />
+            <p className="text-[11px] text-text-muted">Também copiada automaticamente pro projeto na conversão.</p>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">

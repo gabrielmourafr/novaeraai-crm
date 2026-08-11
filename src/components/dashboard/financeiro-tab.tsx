@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Flame, Building2, Users, Download } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { addDays, parseISO } from "date-fns";
+import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Flame, Building2, Users, Download, Receipt, Layers } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,7 +19,7 @@ import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { exportToCsv } from "@/lib/utils/csv";
 import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues, type Revenue, type Expense } from "@/lib/hooks/use-finance";
-import { useAllInstallments, useMarkInstallmentPaid, INSTALLMENT_STATUS_META } from "@/lib/hooks/use-installments";
+import { useAllInstallments, useMarkInstallmentPaid, useUpdateInstallment, useClientInstallmentsSummary, INSTALLMENT_STATUS_META, type InstallmentWithRelations } from "@/lib/hooks/use-installments";
 import { useActiveSubscriptions, useEnsureMonthlyBilling, nextBillingDate, RENEWAL_LABEL, type ActiveSubscription } from "@/lib/hooks/use-subscriptions";
 import { useClientsFinancialSummary } from "@/lib/hooks/use-client-summary";
 import { useLeads } from "@/lib/hooks/use-leads";
@@ -78,8 +79,21 @@ export function FinanceiroTab() {
   const [mensalidadesBreakdownOpen, setMensalidadesBreakdownOpen] = useState(false);
   const [implReceberBreakdownOpen, setImplReceberBreakdownOpen] = useState(false);
   const [implRecebidaBreakdownOpen, setImplRecebidaBreakdownOpen] = useState(false);
+  const [parcelasBreakdownOpen, setParcelasBreakdownOpen] = useState(false);
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
   const [deletingPayment, setDeletingPayment] = useState<PartnerPaymentWithRelations | undefined>();
+
+  // Nota fiscal (parcela de implementação)
+  const [editingInstallmentNF, setEditingInstallmentNF] = useState<InstallmentWithRelations | undefined>();
+  const [nfNumber, setNfNumber] = useState("");
+  const [nfIssuedAt, setNfIssuedAt] = useState("");
+  const [nfInvoiceUrl, setNfInvoiceUrl] = useState("");
+
+  // Nota fiscal (receita / mensalidade)
+  const [editingRevenueNF, setEditingRevenueNF] = useState<Revenue | undefined>();
+  const [revNfNumber, setRevNfNumber] = useState("");
+  const [revNfIssuedAt, setRevNfIssuedAt] = useState("");
+  const [revNfLink, setRevNfLink] = useState("");
 
   // Partner/dev payment form state
   const [payType, setPayType] = useState<"parceiro" | "desenvolvedor">("desenvolvedor");
@@ -111,6 +125,28 @@ export function FinanceiroTab() {
   const { data: totalRevenuesAllTime = 0 } = useTotalRevenues();
   const { data: activeSubscriptions = [], isLoading: subscriptionsLoading } = useActiveSubscriptions();
   const { data: clientsSummary = [] } = useClientsFinancialSummary();
+  const { data: clientInstallmentsSummary = [] } = useClientInstallmentsSummary();
+  const updateInstallment = useUpdateInstallment();
+  const totalParcelasRestantes = clientInstallmentsSummary.reduce((s, c) => s + c.remainingCount, 0);
+  const totalParcelasRestantesValue = clientInstallmentsSummary.reduce((s, c) => s + c.remainingValue, 0);
+
+  const openInstallmentNF = (inst: InstallmentWithRelations) => {
+    setEditingInstallmentNF(inst);
+    setNfNumber(inst.nf_number ?? "");
+    setNfIssuedAt(inst.nf_issued_at ?? "");
+    setNfInvoiceUrl(inst.invoice_url ?? "");
+  };
+  const handleSaveInstallmentNF = async () => {
+    if (!editingInstallmentNF) return;
+    await updateInstallment.mutateAsync({
+      id: editingInstallmentNF.id,
+      nf_number: nfNumber.trim() || null,
+      nf_issued_at: nfIssuedAt || null,
+      invoice_url: nfInvoiceUrl.trim() || null,
+    });
+    setEditingInstallmentNF(undefined);
+  };
+
   const { data: leads = [] } = useLeads();
   const { data: companiesList = [] } = useCompanies();
   const totalMonthlyRecurring = activeSubscriptions.reduce((s, p) => s + Number(p.billing_amount ?? 0), 0);
@@ -122,6 +158,17 @@ export function FinanceiroTab() {
   );
   const hotLeadsCount = leads.filter((l) => l.temperature === "quente").length;
   const { data: projects = [] } = useProjects();
+  const upcomingMensalidades = useMemo(() => {
+    return projects
+      .filter((p) => (p.billing_status ?? "sem_mensalidade") === "sem_mensalidade")
+      .map((p) => {
+        const deliveryDate = p.promised_delivery_date ?? p.expected_end_date;
+        if (!deliveryDate) return null;
+        return { project: p, predicted: addDays(parseISO(deliveryDate), 30) };
+      })
+      .filter((x): x is { project: (typeof projects)[number]; predicted: Date } => x !== null)
+      .sort((a, b) => a.predicted.getTime() - b.predicted.getTime());
+  }, [projects]);
   const { data: partnerPayments = [], isLoading: paymentsLoading } = usePartnerPayments();
   const createPayment = useCreatePartnerPayment();
   const markPaymentPaid = useMarkPartnerPaymentPaid();
@@ -180,6 +227,23 @@ export function FinanceiroTab() {
   const updateExpense = useUpdateExpense();
   const createRevenue = useCreateRevenue();
   const createExpense = useCreateExpense();
+
+  const openRevenueNF = (rev: Revenue) => {
+    setEditingRevenueNF(rev);
+    setRevNfNumber(rev.nf_number ?? "");
+    setRevNfIssuedAt(rev.nf_issued_at ?? "");
+    setRevNfLink(rev.nf_link ?? "");
+  };
+  const handleSaveRevenueNF = async () => {
+    if (!editingRevenueNF) return;
+    await updateRevenue.mutateAsync({
+      id: editingRevenueNF.id,
+      nf_number: revNfNumber.trim() || null,
+      nf_issued_at: revNfIssuedAt || null,
+      nf_link: revNfLink.trim() || null,
+    });
+    setEditingRevenueNF(undefined);
+  };
 
   const handleCreateRevenue = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -347,8 +411,14 @@ export function FinanceiroTab() {
       </div>
 
       {/* Acumulados (sem período) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
         <StatCard label="Faturamento Total (todos os períodos)" value={formatCurrency(totalRevenuesAllTime)} icon={Wallet} />
+        <StatCard
+          label={`Parcelas de Implementação Restantes (${totalParcelasRestantes})`}
+          value={formatCurrency(totalParcelasRestantesValue)}
+          icon={Layers}
+          onClick={() => setParcelasBreakdownOpen(true)}
+        />
         <StatCard
           label="Implementação a Receber (clientes)"
           value={formatCurrency(totalImplementacaoReceber)}
@@ -593,7 +663,44 @@ export function FinanceiroTab() {
           </div>
         </TabsContent>
 
-        <TabsContent value="subscriptions" className="mt-4">
+        <TabsContent value="subscriptions" className="mt-4 space-y-4">
+          {upcomingMensalidades.length > 0 && (
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+            >
+              <div className="px-4 py-3 border-b" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                <h4 className="text-sm font-semibold" style={{ color: "#E2EBF8" }}>
+                  Previsão de Início de Mensalidade ({upcomingMensalidades.length})
+                </h4>
+                <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
+                  Prazo de entrega + 30 dias de período de teste, para projetos que ainda não têm mensalidade ativa
+                </p>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                    <TableHead style={{ color: "#7BA3C6" }}>Projeto</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Empresa</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Previsão 1ª Mensalidade</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {upcomingMensalidades.map(({ project: p, predicted }) => (
+                    <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                      <TableCell className="text-sm">
+                        <Link href={`/projects/${p.id}?tab=financeiro`} className="hover:underline text-[#0B87C3]">
+                          {p.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{p.company?.name ?? "—"}</TableCell>
+                      <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>{formatDate(predicted.toISOString())}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
           <div
             className="rounded-xl overflow-hidden"
             style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
@@ -697,6 +804,7 @@ export function FinanceiroTab() {
                     <TableHead style={{ color: "#7BA3C6" }}>Valor</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Vencimento</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Status</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>NF</TableHead>
                     <TableHead className="w-[120px]" />
                   </TableRow>
                 </TableHeader>
@@ -734,6 +842,19 @@ export function FinanceiroTab() {
                           >
                             {meta.label}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          <button
+                            onClick={() => openInstallmentNF(inst)}
+                            className="text-xs px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
+                            style={
+                              inst.nf_number
+                                ? { background: "rgba(16,185,129,0.15)", color: "#10B981" }
+                                : { background: "rgba(148,163,184,0.15)", color: "#7BA3C6" }
+                            }
+                          >
+                            {inst.nf_number ? `NF ${inst.nf_number}` : "Sem NF"}
+                          </button>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-end gap-1">
@@ -776,6 +897,7 @@ export function FinanceiroTab() {
                     <TableHead style={{ color: "#7BA3C6" }}>Valor</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Vencimento</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Status</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>NF</TableHead>
                     <TableHead className="w-[80px]" />
                   </TableRow>
                 </TableHeader>
@@ -790,6 +912,19 @@ export function FinanceiroTab() {
                         <span className={"px-2 py-0.5 rounded-full text-xs font-medium " + (revenueStatusStyles[rev.status] ?? "bg-white/5 text-gray-400")}>
                           {rev.status}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => openRevenueNF(rev)}
+                          className="text-xs px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
+                          style={
+                            rev.nf_number
+                              ? { background: "rgba(16,185,129,0.15)", color: "#10B981" }
+                              : { background: "rgba(148,163,184,0.15)", color: "#7BA3C6" }
+                          }
+                        >
+                          {rev.nf_number ? `NF ${rev.nf_number}` : "Sem NF"}
+                        </button>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
@@ -1308,6 +1443,124 @@ export function FinanceiroTab() {
               </Table>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: Parcelas de Implementação por Cliente ─── */}
+      <Dialog open={parcelasBreakdownOpen} onOpenChange={setParcelasBreakdownOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Parcelas de Implementação por Cliente</DialogTitle>
+            <DialogDescription>
+              Quantas parcelas restam, o que já foi pago, e o total a receber até a finalização do contrato
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[65vh] overflow-y-auto">
+            {clientInstallmentsSummary.length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-6">Nenhuma parcela cadastrada ainda.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="text-center">Parcelas</TableHead>
+                    <TableHead className="text-right">Pago</TableHead>
+                    <TableHead className="text-right">A Receber</TableHead>
+                    <TableHead className="text-right">Finalização</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientInstallmentsSummary.map((c) => (
+                    <TableRow key={c.companyId}>
+                      <TableCell className="text-sm font-medium text-text-primary">{c.companyName}</TableCell>
+                      <TableCell className="text-center text-sm">
+                        <span className="text-text-primary font-medium">{c.paidCount}</span>
+                        <span className="text-text-muted">/{c.totalCount} pagas</span>
+                        {c.remainingCount > 0 && (
+                          <span className="block text-[11px] text-amber-500">{c.remainingCount} restantes</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-green-500">
+                        {formatCurrency(c.paidValue)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-amber-500">
+                        {formatCurrency(c.remainingValue)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm text-text-muted">
+                        {c.finalDueDate ? formatDate(c.finalDueDate) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: Nota Fiscal da Parcela ─── */}
+      <Dialog open={!!editingInstallmentNF} onOpenChange={(v) => !v && setEditingInstallmentNF(undefined)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Receipt size={16} />Nota Fiscal</DialogTitle>
+            <DialogDescription>
+              {editingInstallmentNF?.description} — {editingInstallmentNF?.project?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Número da NF</Label>
+              <Input value={nfNumber} onChange={(e) => setNfNumber(e.target.value)} placeholder="Ex: 1234" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Data de emissão</Label>
+              <Input type="date" value={nfIssuedAt} onChange={(e) => setNfIssuedAt(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Link da NF (opcional)</Label>
+              <Input value={nfInvoiceUrl} onChange={(e) => setNfInvoiceUrl(e.target.value)} placeholder="https://..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingInstallmentNF(undefined)}>Cancelar</Button>
+            <Button
+              onClick={handleSaveInstallmentNF}
+              disabled={updateInstallment.isPending}
+              style={{ background: "var(--primary)" }}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: Nota Fiscal da Receita ─── */}
+      <Dialog open={!!editingRevenueNF} onOpenChange={(v) => !v && setEditingRevenueNF(undefined)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Receipt size={16} />Nota Fiscal</DialogTitle>
+            <DialogDescription>{editingRevenueNF?.description}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Número da NF</Label>
+              <Input value={revNfNumber} onChange={(e) => setRevNfNumber(e.target.value)} placeholder="Ex: 1234" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Data de emissão</Label>
+              <Input type="date" value={revNfIssuedAt} onChange={(e) => setRevNfIssuedAt(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Link da NF (opcional)</Label>
+              <Input value={revNfLink} onChange={(e) => setRevNfLink(e.target.value)} placeholder="https://..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingRevenueNF(undefined)}>Cancelar</Button>
+            <Button onClick={handleSaveRevenueNF} disabled={updateRevenue.isPending} style={{ background: "var(--primary)" }}>
+              Salvar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

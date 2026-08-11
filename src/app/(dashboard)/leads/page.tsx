@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { KanbanBoard } from "@/components/leads/kanban-board";
+import { LeadWonNotice } from "@/components/leads/lead-won-notice";
 import { LeadsTable } from "@/components/leads/leads-table";
 import { LeadForm } from "@/components/forms/lead-form";
 import { ContactForm } from "@/components/forms/contact-form";
@@ -138,6 +139,7 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-6">
+      <LeadWonNotice />
       <Tabs defaultValue="leads">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>

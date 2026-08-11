@@ -151,6 +151,73 @@ export const buildInstallmentsPayload = ({
   }));
 };
 
+export interface ClientInstallmentsSummary {
+  companyId: string;
+  companyName: string;
+  totalCount: number;
+  paidCount: number;
+  remainingCount: number;
+  paidValue: number;
+  remainingValue: number;
+  finalDueDate: string | null;
+  installments: InstallmentWithRelations[];
+}
+
+// Acumulado de parcelas de implementação por cliente: quantas parcelas
+// restam, o que já foi pago, e o total a receber até a data da última
+// parcela do contrato (data de finalização das parcelas).
+export const useClientInstallmentsSummary = () => {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["installments", "clients-summary"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("project_installments")
+        .select("*, project:projects(id, name, company_id, company:companies(id, name))")
+        .order("due_date", { ascending: true, nullsFirst: false });
+      if (error) throw error;
+
+      type Row = InstallmentWithRelations & {
+        project?: { id: string; name: string; company_id: string | null; company?: { id: string; name: string } | null } | null;
+      };
+
+      const map = new Map<string, ClientInstallmentsSummary>();
+      for (const inst of (data ?? []) as unknown as Row[]) {
+        const companyId = inst.project?.company_id ?? "__sem_empresa__";
+        const companyName = inst.project?.company?.name ?? "Sem empresa";
+        if (!map.has(companyId)) {
+          map.set(companyId, {
+            companyId,
+            companyName,
+            totalCount: 0,
+            paidCount: 0,
+            remainingCount: 0,
+            paidValue: 0,
+            remainingValue: 0,
+            finalDueDate: null,
+            installments: [],
+          });
+        }
+        const entry = map.get(companyId)!;
+        entry.totalCount += 1;
+        entry.installments.push(inst);
+        if (inst.status === "pago") {
+          entry.paidCount += 1;
+          entry.paidValue += Number(inst.amount);
+        } else if (inst.status !== "cancelado") {
+          entry.remainingCount += 1;
+          entry.remainingValue += Number(inst.amount);
+        }
+        if (inst.due_date && (!entry.finalDueDate || inst.due_date > entry.finalDueDate)) {
+          entry.finalDueDate = inst.due_date;
+        }
+      }
+
+      return Array.from(map.values()).sort((a, b) => b.remainingValue - a.remainingValue);
+    },
+  });
+};
+
 export const INSTALLMENT_STATUS_META: Record<Installment["status"], { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "#94A3B8" },
   faturado: { label: "Faturado", color: "#0B87C3" },

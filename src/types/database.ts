@@ -134,6 +134,8 @@ export interface Database {
           closed_at: string | null;
           loss_reason: string | null;
           notes: string | null;
+          diagnostico: string | null;
+          arquitetura_solucao: string | null;
           tags: string[];
           archived: boolean;
           created_at: string;
@@ -284,11 +286,13 @@ export interface Database {
           roadmap_html: string | null;
           roadmap_filename: string | null;
           roadmap_updated_at: string | null;
+          auto_created_from_lead: boolean;
+          lead_win_notice_dismissed: boolean;
           created_at: string;
           updated_at: string;
           created_by: string | null;
         };
-        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["projects"]["Row"], "id" | "created_at" | "updated_at">>;
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["projects"]["Row"], "id" | "created_at" | "updated_at" | "auto_created_from_lead" | "lead_win_notice_dismissed">> & { auto_created_from_lead?: boolean; lead_win_notice_dismissed?: boolean };
         Update: Partial<Database["public"]["Tables"]["projects"]["Insert"]>;
         Relationships: [];
       };
@@ -453,6 +457,8 @@ export interface Database {
           status: "pendente" | "faturado" | "pago" | "atrasado" | "cancelado";
           paid_at: string | null;
           invoice_url: string | null;
+          nf_number: string | null;
+          nf_issued_at: string | null;
           notes: string | null;
           created_at: string;
           updated_at: string;
@@ -504,6 +510,9 @@ export interface Database {
           installment: string | null;
           auto_generated: boolean;
           auto_source: "project_receivable" | "project_received" | "project_monthly_billing" | null;
+          nf_number: string | null;
+          nf_issued_at: string | null;
+          nf_link: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -649,6 +658,21 @@ export interface Database {
         };
         Insert: NullableToOptional<Omit<Database["public"]["Tables"]["partner_payments"]["Row"], "id" | "created_at" | "updated_at" | "status">> & { status?: "pendente" | "pago" | "atrasado" | "cancelado" };
         Update: Partial<Database["public"]["Tables"]["partner_payments"]["Insert"]>;
+        Relationships: [];
+      };
+      revenue_goals: {
+        Row: {
+          id: string;
+          org_id: string;
+          reference_month: string;
+          revenue_target: number;
+          commercial_target: number;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["revenue_goals"]["Row"], "id" | "created_at" | "updated_at">>;
+        Update: Partial<Database["public"]["Tables"]["revenue_goals"]["Insert"]>;
         Relationships: [];
       };
       audit_logs: {

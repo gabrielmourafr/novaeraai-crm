@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Settings, CalendarClock, AlertTriangle } from "lucide-react";
-import { differenceInDays, parseISO } from "date-fns";
+import { differenceInDays, parseISO, addDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -87,6 +87,11 @@ export function ProjectBilling({ project }: Props) {
 
   const hasMensalidade = status !== "sem_mensalidade";
 
+  // Previsão da 1ª cobrança de mensalidade: prazo de entrega (prometido, ou
+  // previsto se não houver data prometida) + 30 dias de período de teste.
+  const deliveryDate = project.promised_delivery_date ?? project.expected_end_date;
+  const predictedFirstBilling = deliveryDate ? addDays(parseISO(deliveryDate), 30) : null;
+
   return (
     <div className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
@@ -103,9 +108,20 @@ export function ProjectBilling({ project }: Props) {
       </div>
 
       {!hasMensalidade ? (
-        <p className="text-sm text-text-muted text-center py-6">
-          Este projeto não possui contrato de mensalidade. Clique em <b>Configurar</b> para adicionar.
-        </p>
+        <div className="space-y-3">
+          <p className="text-sm text-text-muted text-center py-4">
+            Este projeto não possui contrato de mensalidade. Clique em <b>Configurar</b> para adicionar.
+          </p>
+          {predictedFirstBilling && (
+            <div className="rounded-lg p-3 bg-white/5 border border-border flex items-center gap-2">
+              <CalendarClock size={14} className="text-primary flex-shrink-0" />
+              <p className="text-xs text-text-muted">
+                Previsão da 1ª mensalidade: <b className="text-text-primary">{formatDate(predictedFirstBilling.toISOString())}</b>
+                {" "}(prazo de entrega + 30 dias de teste)
+              </p>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="space-y-4">
           {/* Top status row */}
@@ -136,7 +152,13 @@ export function ProjectBilling({ project }: Props) {
             />
             <Tile
               label="Início"
-              value={project.contract_start ? formatDate(project.contract_start) : "—"}
+              value={
+                project.contract_start
+                  ? formatDate(project.contract_start)
+                  : predictedFirstBilling
+                  ? `Previsto: ${formatDate(predictedFirstBilling.toISOString())}`
+                  : "—"
+              }
             />
             <Tile
               label="Término"

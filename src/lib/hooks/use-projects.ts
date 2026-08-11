@@ -135,6 +135,28 @@ export const useDeleteProject = () => {
   });
 };
 
+// Projetos criados automaticamente quando um lead foi movido pra um estágio
+// "Ganho" (trigger no banco), ainda não revisados — usado pro card de aviso.
+export const useLeadWonNotices = () => {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["projects", "lead-won-notices"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, name, company_id, created_at, lead_id, company:companies(id, name), lead:leads(id, title)")
+        .eq("auto_created_from_lead", true)
+        .eq("lead_win_notice_dismissed", false)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as (Pick<Project, "id" | "name" | "company_id" | "created_at" | "lead_id"> & {
+        company?: { id: string; name: string } | null;
+        lead?: { id: string; title: string } | null;
+      })[];
+    },
+  });
+};
+
 export const useToggleMilestone = () => {
   const supabase = createClient();
   const qc = useQueryClient();
