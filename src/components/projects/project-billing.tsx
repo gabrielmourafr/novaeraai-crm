@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, CalendarClock, AlertTriangle } from "lucide-react";
+import { Settings, CalendarClock, AlertTriangle, Pencil } from "lucide-react";
 import { differenceInDays, parseISO, addDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,8 @@ const RENEWAL_LABEL: Record<NonNullable<ProjectWithRelations["renewal_type"]>, s
 export function ProjectBilling({ project }: Props) {
   const update = useUpdateProject();
   const [open, setOpen] = useState(false);
+  const [predictionOpen, setPredictionOpen] = useState(false);
+  const [predictionOverride, setPredictionOverride] = useState(project.predicted_first_billing_override ?? "");
   const [form, setForm] = useState({
     billing_status: (project.billing_status ?? "sem_mensalidade") as NonNullable<ProjectWithRelations["billing_status"]>,
     billing_day: project.billing_day?.toString() ?? "",
@@ -87,10 +89,24 @@ export function ProjectBilling({ project }: Props) {
 
   const hasMensalidade = status !== "sem_mensalidade";
 
-  // Previsão da 1ª cobrança de mensalidade: prazo de entrega (prometido, ou
-  // previsto se não houver data prometida) + 30 dias de período de teste.
+  // Previsão da 1ª cobrança de mensalidade: por padrão, prazo de entrega
+  // (prometido, ou previsto se não houver data prometida) + 30 dias de
+  // período de teste — mas pode ser sobrescrita manualmente quando o
+  // contrato combinar um prazo diferente com o cliente.
   const deliveryDate = project.promised_delivery_date ?? project.expected_end_date;
-  const predictedFirstBilling = deliveryDate ? addDays(parseISO(deliveryDate), 30) : null;
+  const computedPrediction = deliveryDate ? addDays(parseISO(deliveryDate), 30) : null;
+  const predictedFirstBilling = project.predicted_first_billing_override
+    ? parseISO(project.predicted_first_billing_override)
+    : computedPrediction;
+  const isOverridden = !!project.predicted_first_billing_override;
+
+  const handleSavePrediction = async () => {
+    await update.mutateAsync({
+      id: project.id,
+      predicted_first_billing_override: predictionOverride || null,
+    });
+    setPredictionOpen(false);
+  };
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
@@ -115,10 +131,20 @@ export function ProjectBilling({ project }: Props) {
           {predictedFirstBilling && (
             <div className="rounded-lg p-3 bg-white/5 border border-border flex items-center gap-2">
               <CalendarClock size={14} className="text-primary flex-shrink-0" />
-              <p className="text-xs text-text-muted">
+              <p className="text-xs text-text-muted flex-1">
                 Previsão da 1ª mensalidade: <b className="text-text-primary">{formatDate(predictedFirstBilling.toISOString())}</b>
-                {" "}(prazo de entrega + 30 dias de teste)
+                {" "}
+                {isOverridden ? "(ajustada manualmente)" : "(prazo de entrega + 30 dias de teste)"}
               </p>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 flex-shrink-0"
+                onClick={() => { setPredictionOverride(project.predicted_first_billing_override ?? ""); setPredictionOpen(true); }}
+                title="Ajustar previsão"
+              >
+                <Pencil size={12} />
+              </Button>
             </div>
           )}
         </div>
@@ -260,6 +286,41 @@ export function ProjectBilling({ project }: Props) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave} style={{ background: "var(--primary)" }} disabled={update.isPending}>
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={predictionOpen} onOpenChange={setPredictionOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Ajustar previsão da 1ª mensalidade</DialogTitle>
+            <DialogDescription>
+              Por padrão é calculada como prazo de entrega + 30 dias de teste. Defina uma data aqui se o contrato combinar um prazo diferente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Data prevista</Label>
+            <Input type="date" value={predictionOverride} onChange={(e) => setPredictionOverride(e.target.value)} />
+            {computedPrediction && (
+              <p className="text-[11px] text-text-muted">
+                Cálculo automático: {formatDate(computedPrediction.toISOString())}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            {isOverridden && (
+              <Button
+                variant="outline"
+                className="mr-auto text-text-muted"
+                onClick={() => { setPredictionOverride(""); }}
+              >
+                Voltar ao automático
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setPredictionOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSavePrediction} style={{ background: "var(--primary)" }} disabled={update.isPending}>
               Salvar
             </Button>
           </DialogFooter>

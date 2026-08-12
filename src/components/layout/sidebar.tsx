@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Target, Building2, FileText, Package,
   Rocket, FolderOpen, CheckSquare, Calendar, Settings,
-  ChevronLeft, ChevronRight, LogOut, TrendingUp, ShieldCheck,
+  ChevronLeft, ChevronRight, LogOut, TrendingUp, ShieldCheck, HeartHandshake,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useSidebarStore } from "@/store/sidebar-store";
@@ -37,6 +37,12 @@ const NAV_GROUPS = [
     items: [
       { icon: Rocket, label: "Projetos", href: "/projects" },
       { icon: FolderOpen, label: "Documentos", href: "/documents" },
+    ],
+  },
+  {
+    label: "SUCESSO DO CLIENTE",
+    items: [
+      { icon: HeartHandshake, label: "Customer Success", href: "/customer-success" },
     ],
   },
   {

@@ -21,7 +21,7 @@ import { formatCurrency, formatDate, parseCurrencyInput } from "@/lib/utils/form
 import { exportToCsv } from "@/lib/utils/csv";
 import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues, type Revenue, type Expense } from "@/lib/hooks/use-finance";
 import { useAllInstallments, useMarkInstallmentPaid, useUpdateInstallment, useClientInstallmentsSummary, INSTALLMENT_STATUS_META, type InstallmentWithRelations } from "@/lib/hooks/use-installments";
-import { useActiveSubscriptions, useEnsureMonthlyBilling, nextBillingDate, RENEWAL_LABEL, type ActiveSubscription } from "@/lib/hooks/use-subscriptions";
+import { useActiveSubscriptions, useEnsureMonthlyBilling, useClientMensalidadeSummary, nextBillingDate, RENEWAL_LABEL, type ActiveSubscription } from "@/lib/hooks/use-subscriptions";
 import { useClientsFinancialSummary } from "@/lib/hooks/use-client-summary";
 import { useLeads } from "@/lib/hooks/use-leads";
 import { useCompanies } from "@/lib/hooks/use-companies";
@@ -125,6 +125,7 @@ export function FinanceiroTab() {
   useEnsureMonthlyBilling();
   const { data: totalRevenuesAllTime = 0 } = useTotalRevenues();
   const { data: activeSubscriptions = [], isLoading: subscriptionsLoading } = useActiveSubscriptions();
+  const { data: mensalidadeSummary = [] } = useClientMensalidadeSummary();
   const { data: clientsSummary = [] } = useClientsFinancialSummary();
   const { data: clientInstallmentsSummary = [] } = useClientInstallmentsSummary();
   const updateInstallment = useUpdateInstallment();
@@ -163,11 +164,14 @@ export function FinanceiroTab() {
     return projects
       .filter((p) => (p.billing_status ?? "sem_mensalidade") === "sem_mensalidade")
       .map((p) => {
+        if (p.predicted_first_billing_override) {
+          return { project: p, predicted: parseISO(p.predicted_first_billing_override), overridden: true };
+        }
         const deliveryDate = p.promised_delivery_date ?? p.expected_end_date;
         if (!deliveryDate) return null;
-        return { project: p, predicted: addDays(parseISO(deliveryDate), 30) };
+        return { project: p, predicted: addDays(parseISO(deliveryDate), 30), overridden: false };
       })
-      .filter((x): x is { project: (typeof projects)[number]; predicted: Date } => x !== null)
+      .filter((x): x is { project: (typeof projects)[number]; predicted: Date; overridden: boolean } => x !== null)
       .sort((a, b) => a.predicted.getTime() - b.predicted.getTime());
   }, [projects]);
   const { data: partnerPayments = [], isLoading: paymentsLoading } = usePartnerPayments();
@@ -721,7 +725,7 @@ export function FinanceiroTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {upcomingMensalidades.map(({ project: p, predicted }) => (
+                  {upcomingMensalidades.map(({ project: p, predicted, overridden }) => (
                     <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
                       <TableCell className="text-sm">
                         <Link href={`/projects/${p.id}?tab=financeiro`} className="hover:underline text-[#0B87C3]">
@@ -729,7 +733,10 @@ export function FinanceiroTab() {
                         </Link>
                       </TableCell>
                       <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{p.company?.name ?? "—"}</TableCell>
-                      <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>{formatDate(predicted.toISOString())}</TableCell>
+                      <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>
+                        {formatDate(predicted.toISOString())}
+                        {overridden && <span className="ml-1.5 text-[10px]" style={{ color: "#7BA3C6" }}>(ajustada)</span>}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1379,11 +1386,11 @@ export function FinanceiroTab() {
           <DialogHeader>
             <DialogTitle>Mensalidade por Cliente</DialogTitle>
             <DialogDescription>
-              Total acumulado: <strong>{formatCurrency(totalMonthlyRecurring)}</strong> — valor unitário de cada cliente abaixo
+              Total acumulado: <strong>{formatCurrency(totalMonthlyRecurring)}</strong> — pagas/restantes contam só contratos com data de término definida
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
-            {clientsSummary.filter((c) => c.mensalidade > 0).length === 0 ? (
+            {mensalidadeSummary.length === 0 ? (
               <p className="text-sm text-text-muted text-center py-6">Nenhuma mensalidade ativa ainda.</p>
             ) : (
               <Table>
@@ -1391,14 +1398,31 @@ export function FinanceiroTab() {
                   <TableRow>
                     <TableHead>Cliente</TableHead>
                     <TableHead className="text-right">Mensalidade</TableHead>
+                    <TableHead className="text-center">Pagas</TableHead>
+                    <TableHead className="text-center">Restantes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clientsSummary.filter((c) => c.mensalidade > 0).map((c) => (
-                    <TableRow key={c.companyId}>
-                      <TableCell className="text-sm font-medium text-text-primary">{c.companyName}</TableCell>
+                  {mensalidadeSummary.map((s) => (
+                    <TableRow key={s.projectId}>
+                      <TableCell className="text-sm font-medium text-text-primary">
+                        {s.companyName}
+                        <span className="block text-xs text-text-muted font-normal">{s.projectName}</span>
+                      </TableCell>
                       <TableCell className="text-right text-sm font-semibold text-green-500">
-                        {formatCurrency(c.mensalidade)}
+                        {formatCurrency(s.billingAmount)}
+                      </TableCell>
+                      <TableCell className="text-center text-sm text-text-primary">
+                        {s.totalExpectedCycles !== null ? `${s.paidCount}/${s.totalExpectedCycles}` : s.paidCount}
+                      </TableCell>
+                      <TableCell className="text-center text-sm">
+                        {s.remainingCount !== null ? (
+                          <span className={s.remainingCount <= 2 ? "text-amber-500 font-semibold" : "text-text-muted"}>
+                            {s.remainingCount}
+                          </span>
+                        ) : (
+                          <span className="text-text-muted">sem prazo</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

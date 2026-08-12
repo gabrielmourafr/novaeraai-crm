@@ -71,6 +71,83 @@ export const nextBillingDate = (billingDay: number | null): Date | null => {
   return next;
 };
 
+export interface ClientMensalidadeSummary {
+  projectId: string;
+  companyId: string;
+  companyName: string;
+  projectName: string;
+  billingAmount: number;
+  contractStart: string | null;
+  contractEnd: string | null;
+  totalExpectedCycles: number | null; // null = contrato sem prazo definido
+  paidCount: number;
+  remainingCount: number | null; // null = sem prazo definido
+}
+
+const monthsBetweenInclusive = (start: string, end: string): number => {
+  const s = new Date(start);
+  const e = new Date(end);
+  return (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1;
+};
+
+// Pra cada mensalidade ativa: quantos meses já foram pagos e quantos restam
+// até o fim do contrato — hoje só dava pra saber calculando de cabeça pela
+// data de término.
+export const useClientMensalidadeSummary = () => {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["subscriptions", "client-summary"],
+    queryFn: async () => {
+      const { data: subs, error: subsError } = await supabase
+        .from("projects")
+        .select("id, name, company_id, billing_amount, contract_start, contract_end, company:companies(id, name)")
+        .eq("billing_status", "ativo");
+      if (subsError) throw subsError;
+
+      const subscriptions = (subs ?? []) as unknown as {
+        id: string; name: string; company_id: string | null; billing_amount: number | null;
+        contract_start: string | null; contract_end: string | null;
+        company: { id: string; name: string } | null;
+      }[];
+      if (subscriptions.length === 0) return [] as ClientMensalidadeSummary[];
+
+      const { data: paidRevenues, error: revError } = await supabase
+        .from("revenues")
+        .select("project_id")
+        .in("project_id", subscriptions.map((s) => s.id))
+        .eq("auto_source", "project_monthly_billing")
+        .eq("status", "pago");
+      if (revError) throw revError;
+
+      const paidCountByProject = new Map<string, number>();
+      for (const r of (paidRevenues ?? []) as { project_id: string | null }[]) {
+        if (!r.project_id) continue;
+        paidCountByProject.set(r.project_id, (paidCountByProject.get(r.project_id) ?? 0) + 1);
+      }
+
+      return subscriptions.map((s): ClientMensalidadeSummary => {
+        const paidCount = paidCountByProject.get(s.id) ?? 0;
+        const rawCycles =
+          s.contract_start && s.contract_end ? monthsBetweenInclusive(s.contract_start, s.contract_end) : null;
+        // contract_end anterior ao contract_start (dado inconsistente) vira "sem prazo definido"
+        const totalExpectedCycles = rawCycles !== null && rawCycles > 0 ? rawCycles : null;
+        return {
+          projectId: s.id,
+          companyId: s.company_id ?? "",
+          companyName: s.company?.name ?? "Sem empresa",
+          projectName: s.name,
+          billingAmount: Number(s.billing_amount ?? 0),
+          contractStart: s.contract_start,
+          contractEnd: s.contract_end,
+          totalExpectedCycles,
+          paidCount,
+          remainingCount: totalExpectedCycles !== null ? Math.max(0, totalExpectedCycles - paidCount) : null,
+        };
+      });
+    },
+  });
+};
+
 export const RENEWAL_LABEL: Record<string, string> = {
   auto: "Automática",
   manual: "Manual",

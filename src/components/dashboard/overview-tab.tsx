@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Target, Briefcase, FileText, DollarSign, CheckSquare, TrendingDown, TrendingUp,
-  CalendarClock, ArrowRight, Clock, AlertCircle, Pencil, Trophy,
+  CalendarClock, ArrowRight, Clock, AlertCircle, Pencil, Trophy, BellRing, ReceiptText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import { useProposals } from "@/lib/hooks/use-proposals";
 import { useAllTasks } from "@/lib/hooks/use-tasks";
 import { useRevenues, useExpenses } from "@/lib/hooks/use-finance";
 import { useGoal, useUpsertGoal } from "@/lib/hooks/use-goals";
+import { useBillingAlerts } from "@/lib/hooks/use-billing-alerts";
 import { useUser } from "@/lib/hooks/use-user";
 import { formatCurrency, formatDate, isPastDate, parseCurrencyInput } from "@/lib/utils/format";
 
@@ -36,6 +37,9 @@ export function OverviewTab() {
   const { data: expenses = [] } = useExpenses(year, month);
   const { data: goal } = useGoal(year, month);
   const upsertGoal = useUpsertGoal();
+  const { data: billingAlerts = [] } = useBillingAlerts();
+  const finalInstallmentAlerts = billingAlerts.filter((a) => a.kind === "parcela_final");
+  const dueSoonAlerts = billingAlerts.filter((a) => a.kind === "vencimento_proximo");
 
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
   const [revenueTargetInput, setRevenueTargetInput] = useState("");
@@ -121,6 +125,74 @@ export function OverviewTab() {
         <StatCard label="Receitas do Mês" value={formatCurrency(totalRevenues)} icon={TrendingUp} />
         <StatCard label="Contratos a vencer" value={contractsExpiringSoon.length} icon={CalendarClock} />
       </div>
+
+      {/* Alertas de Vencimento */}
+      {billingAlerts.length > 0 && (
+        <div
+          className="rounded-xl p-5"
+          style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(239,68,68,0.25)" }}
+        >
+          <div className="flex items-center gap-1.5 mb-4">
+            <BellRing size={14} className="text-red-400" />
+            <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>
+              Alertas de Vencimento ({billingAlerts.length})
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {finalInstallmentAlerts.length > 0 && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#F59E0B" }}>
+                  Última parcela vencendo — hora de negociar renovação
+                </p>
+                <div className="space-y-1.5">
+                  {finalInstallmentAlerts.map((a) => (
+                    <Link
+                      key={a.id}
+                      href={a.href}
+                      className="flex items-center justify-between gap-3 p-2.5 rounded-lg hover:opacity-80 transition-opacity"
+                      style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate" style={{ color: "#E2EBF8" }}>{a.companyName}</p>
+                        <p className="text-[10px] mt-0.5" style={{ color: "#7BA3C6" }}>
+                          {a.daysUntil === 0 ? "Vence hoje" : `Vence em ${a.daysUntil}d`} · {formatCurrency(a.amount)}
+                        </p>
+                      </div>
+                      <ArrowRight size={12} className="text-amber-400 flex-shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+            {dueSoonAlerts.length > 0 && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#EF4444" }}>
+                  Vencendo nos próximos 7 dias — emitir boleto
+                </p>
+                <div className="space-y-1.5">
+                  {dueSoonAlerts.map((a) => (
+                    <Link
+                      key={a.id}
+                      href={a.href}
+                      className="flex items-center justify-between gap-3 p-2.5 rounded-lg hover:opacity-80 transition-opacity"
+                      style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.18)" }}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate" style={{ color: "#E2EBF8" }}>{a.companyName}</p>
+                        <p className="text-[10px] mt-0.5 truncate" style={{ color: "#7BA3C6" }}>
+                          {a.description} · {a.daysUntil === 0 ? "Vence hoje" : `Vence em ${a.daysUntil}d`} · {formatCurrency(a.amount)}
+                        </p>
+                      </div>
+                      <ReceiptText size={12} className="text-red-400 flex-shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Metas do Mês */}
       <div

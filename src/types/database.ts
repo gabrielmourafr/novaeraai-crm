@@ -288,6 +288,7 @@ export interface Database {
           roadmap_updated_at: string | null;
           auto_created_from_lead: boolean;
           lead_win_notice_dismissed: boolean;
+          predicted_first_billing_override: string | null;
           created_at: string;
           updated_at: string;
           created_by: string | null;
