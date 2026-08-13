@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import {
-  CheckSquare, Plus, Search, Trash2, Edit2, AlertCircle, Clock, CheckCircle2,
+  CheckSquare, Plus, Search, Trash2, Edit2, AlertCircle, Clock, CheckCircle2, List, LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { TaskForm, type TaskInitialData } from "@/components/forms/task-form";
-import { useAllTasks, useToggleTask, useDeleteTask, type TaskWithRelations } from "@/lib/hooks/use-tasks";
+import { TasksKanbanBoard } from "@/components/tasks/tasks-kanban-board";
+import { useAllTasks, useToggleTask, useUpdateTask, useDeleteTask, type TaskWithRelations } from "@/lib/hooks/use-tasks";
 import { useOrgUsers } from "@/lib/hooks/use-user";
 import { formatDate, formatInitials, isPastDate } from "@/lib/utils/format";
 
@@ -156,6 +157,7 @@ export default function TasksPage() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [view, setView] = useState<"list" | "kanban">("list");
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskInitialData | undefined>();
   const [deletingTask, setDeletingTask] = useState<TaskWithRelations | undefined>();
@@ -163,6 +165,7 @@ export default function TasksPage() {
   const { data: allTasks = [], isLoading } = useAllTasks({ search: search || undefined });
   const { data: orgUsers = [] } = useOrgUsers();
   const toggleTask = useToggleTask();
+  const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
   const assigneeFilteredTasks = allTasks.filter((t) => {
@@ -272,9 +275,39 @@ export default function TasksPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <div className="flex gap-1 rounded-lg p-1" style={{ background: "rgba(11,135,195,0.05)", border: "1px solid rgba(11,135,195,0.15)" }}>
+          <button
+            onClick={() => setView("list")}
+            className="p-1.5 rounded transition-colors"
+            style={view === "list" ? { background: "var(--primary)", color: "#fff" } : { color: "#7BA3C6" }}
+            title="Lista"
+          >
+            <List size={16} />
+          </button>
+          <button
+            onClick={() => setView("kanban")}
+            className="p-1.5 rounded transition-colors"
+            style={view === "kanban" ? { background: "var(--primary)", color: "#fff" } : { color: "#7BA3C6" }}
+            title="Kanban"
+          >
+            <LayoutGrid size={16} />
+          </button>
+        </div>
       </div>
 
+      {/* Kanban view */}
+      {view === "kanban" && (
+        <TasksKanbanBoard
+          tasks={assigneeFilteredTasks}
+          onMoveTask={(id, status) => updateTask.mutate({ id, status: status as "pendente" | "em_andamento" | "concluida" | "cancelada" })}
+          onEdit={handleEdit}
+          onDelete={setDeletingTask}
+        />
+      )}
+
       {/* Tasks list with tabs */}
+      {view === "list" && (
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList
           className="h-9"
@@ -340,6 +373,7 @@ export default function TasksPage() {
           </TabsContent>
         ))}
       </Tabs>
+      )}
 
       {/* Task Form */}
       <TaskForm
