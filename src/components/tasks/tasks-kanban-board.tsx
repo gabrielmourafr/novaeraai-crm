@@ -44,7 +44,7 @@ export const TasksKanbanBoard = ({ tasks, onMoveTask, onEdit, onDelete }: TasksK
         {COLUMNS.map((col) => {
           const colTasks = tasks.filter((t) => t.status === col.status);
           return (
-            <div key={col.status} className="flex flex-col shrink-0 w-80">
+            <div key={col.status} className="flex flex-col flex-1 min-w-[280px]">
               <div className="flex items-center gap-2 mb-2 px-1">
                 <div className="w-2 h-2 rounded-full" style={{ background: col.color }} />
                 <span className="text-sm font-medium text-text-primary">{col.label}</span>
