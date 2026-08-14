@@ -31,6 +31,8 @@ import { useClientsFinancialSummary } from "@/lib/hooks/use-client-summary";
 import { useCompanies } from "@/lib/hooks/use-companies";
 import { useUpdateProject, useProjects } from "@/lib/hooks/use-projects";
 import { useUser } from "@/lib/hooks/use-user";
+import { useGoal } from "@/lib/hooks/use-goals";
+import { useCashFlowForecast } from "@/lib/hooks/use-cash-flow-forecast";
 import {
   usePartnerPayments,
   useCreatePartnerPayment,
@@ -415,10 +417,38 @@ export function FinanceiroTab() {
   // Saldo é caixa real: só conta receita já recebida, não o que ainda está pendente
   const balance = paidRevenues - totalExpenses;
 
+  // Implementação do mês selecionado (sem ser acumulado all-time) — previsibilidade
+  const aReceberNoMes = revenues
+    .filter((r) => r.category === "projeto" && (r.status === "pendente" || r.status === "atrasado"))
+    .reduce((s, r) => s + r.value, 0);
+  const implementacaoPorMes = useMemo(() => {
+    return monthsBack.map((m) => {
+      const key = `${m.year}-${String(m.month).padStart(2, "0")}`;
+      const monthRevenues = (revenuesLastMonths[key] ?? []).filter((r) => r.category === "projeto");
+      return {
+        name: m.label,
+        recebido: monthRevenues.filter((r) => r.status === "pago").reduce((s, r) => s + r.value, 0),
+        aReceber: monthRevenues.filter((r) => r.status === "pendente" || r.status === "atrasado").reduce((s, r) => s + r.value, 0),
+      };
+    });
+  }, [monthsBack, revenuesLastMonths]);
+
   const paidExpenses = expenses.filter((e) => e.status === "pago").reduce((s, e) => s + e.value, 0);
   const expensesToPayValue = expenses.filter((e) => e.status !== "pago").reduce((s, e) => s + e.value, 0);
   const expensesToPayCount = expenses.filter((e) => e.status !== "pago").length;
   const filteredExpenses = expenses.filter((e) => expenseTypeFilter === "all" || e.expense_type === expenseTypeFilter);
+
+  // Previsto (tudo que venceu/vence no mês, qualquer status) x Realizado (só o pago)
+  const revenuePrevistoPct = totalRevenues > 0 ? Math.min(100, (paidRevenues / totalRevenues) * 100) : 0;
+
+  // Previsão x meta comercial: ritmo atual extrapolado pro resto do mês
+  const { data: currentGoal } = useGoal(year, month);
+  const daysInSelectedMonth = new Date(year, month, 0).getDate();
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+  const daysElapsed = isCurrentMonth ? now.getDate() : daysInSelectedMonth;
+  const projectedMonthEnd = daysElapsed > 0 ? (paidRevenues / daysElapsed) * daysInSelectedMonth : 0;
+
+  const { data: cashFlowForecast = [] } = useCashFlowForecast(3);
 
 
   // Expense by category for pie
@@ -509,6 +539,97 @@ export function FinanceiroTab() {
               <StatCard size="sm" label="Entrada Total (Implementação + Mensalidade)" value={formatCurrency(entradaTotal)} icon={DollarSign} />
             </div>
           </div>
+
+          {/* Previsto x Realizado do mês + projeção vs meta comercial */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div
+              className="rounded-xl p-5"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+            >
+              <h3 className="font-semibold text-sm mb-1" style={{ color: "#E2EBF8" }}>Previsto x Realizado</h3>
+              <p className="text-xs mb-3" style={{ color: "#7BA3C6" }}>Receitas do mês: o que venceu vs o que já caiu</p>
+              <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#7BA3C6" }}>
+                <span>Realizado: <b style={{ color: "#22c55e" }}>{formatCurrency(paidRevenues)}</b></span>
+                <span>Previsto: <b style={{ color: "#E2EBF8" }}>{formatCurrency(totalRevenues)}</b></span>
+              </div>
+              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                <div className="h-full rounded-full" style={{ width: `${revenuePrevistoPct}%`, background: revenuePrevistoPct >= 100 ? "#22c55e" : "#0B87C3" }} />
+              </div>
+              <p className="text-[11px] mt-1.5" style={{ color: "#3D5A78" }}>{revenuePrevistoPct.toFixed(0)}% do previsto já realizado</p>
+            </div>
+
+            <div
+              className="rounded-xl p-5"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+            >
+              <h3 className="font-semibold text-sm mb-1" style={{ color: "#E2EBF8" }}>Previsão vs Meta Comercial</h3>
+              {!currentGoal ? (
+                <p className="text-xs mt-3" style={{ color: "#3D5A78" }}>
+                  Nenhuma meta definida pra {months[month - 1]}. Defina em Dashboard → Visão Geral.
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs mb-3" style={{ color: "#7BA3C6" }}>
+                    No ritmo atual de recebimento, a projeção pro fim do mês é:
+                  </p>
+                  <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#7BA3C6" }}>
+                    <span>Projeção: <b style={{ color: projectedMonthEnd >= currentGoal.revenue_target ? "#22c55e" : "#F59E0B" }}>{formatCurrency(projectedMonthEnd)}</b></span>
+                    <span>Meta: <b style={{ color: "#E2EBF8" }}>{formatCurrency(currentGoal.revenue_target)}</b></span>
+                  </div>
+                  <div className="h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${currentGoal.revenue_target > 0 ? Math.min(100, (projectedMonthEnd / currentGoal.revenue_target) * 100) : 0}%`,
+                        background: projectedMonthEnd >= currentGoal.revenue_target ? "#22c55e" : "#F59E0B",
+                      }}
+                    />
+                  </div>
+                  <p className="text-[11px] mt-1.5" style={{ color: "#3D5A78" }}>
+                    Baseado em {formatCurrency(paidRevenues)} recebidos em {daysElapsed} de {daysInSelectedMonth} dias do mês
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Fluxo de caixa futuro */}
+          {cashFlowForecast.length > 0 && (
+            <div
+              className="rounded-xl p-5"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+            >
+              <div className="mb-4">
+                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Fluxo de Caixa — O Que Vem Pela Frente</h3>
+                <p className="text-xs" style={{ color: "#7BA3C6" }}>
+                  Mês atual + próximos 2 · barras sólidas são lançamentos reais, as mais claras são projeção (mensalidades e despesas fixas sem lançamento ainda)
+                </p>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={cashFlowForecast} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" />
+                  <XAxis dataKey="label" tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
+                  <Bar dataKey="receitasReais" name="Receita Real" stackId="rec" fill="#22c55e" radius={[0,0,0,0]} maxBarSize={40} />
+                  <Bar dataKey="receitasProjetadas" name="Receita Projetada" stackId="rec" fill="#22c55e" fillOpacity={0.35} radius={[4,4,0,0]} maxBarSize={40} />
+                  <Bar dataKey="despesasReais" name="Despesa Real" stackId="desp" fill="#ef4444" radius={[0,0,0,0]} maxBarSize={40} />
+                  <Bar dataKey="despesasProjetadas" name="Despesa Projetada" stackId="desp" fill="#ef4444" fillOpacity={0.35} radius={[4,4,0,0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="grid grid-cols-3 gap-3 mt-4">
+                {cashFlowForecast.map((m) => (
+                  <div key={m.month} className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.03)" }}>
+                    <p className="text-xs font-semibold mb-1" style={{ color: "#E2EBF8" }}>{m.label}</p>
+                    <p className="text-[11px]" style={{ color: "#7BA3C6" }}>Saldo previsto</p>
+                    <p className="text-sm font-bold" style={{ color: m.saldoPrevisto >= 0 ? "#22c55e" : "#ef4444" }}>
+                      {formatCurrency(m.saldoPrevisto)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -654,6 +775,41 @@ export function FinanceiroTab() {
                 icon={Building2}
                 onClick={() => setImplRecebidaBreakdownOpen(true)}
               />
+            </div>
+          </div>
+
+          {/* Implementação do mês selecionado (previsibilidade, sem ser acumulado) */}
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+              Previsibilidade — {months[month - 1]} / {year}
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <StatCard size="sm" label="A Receber no Mês" value={formatCurrency(aReceberNoMes)} icon={Building2} />
+              <StatCard
+                size="sm"
+                label="Recebido no Mês (implementação)"
+                value={formatCurrency(revenues.filter((r) => r.category === "projeto" && r.status === "pago").reduce((s, r) => s + r.value, 0))}
+                icon={Building2}
+              />
+            </div>
+            <div
+              className="rounded-xl p-5"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+            >
+              <div className="mb-4">
+                <h4 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Implementação por Mês</h4>
+                <p className="text-xs" style={{ color: "#7BA3C6" }}>Últimos 6 meses — recebido vs a receber</p>
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={implementacaoPorMes} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" />
+                  <XAxis dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
+                  <Bar dataKey="recebido" name="Recebido" fill="#22c55e" radius={[4,4,0,0]} maxBarSize={40} />
+                  <Bar dataKey="aReceber" name="A Receber" fill="#f59e0b" radius={[4,4,0,0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
