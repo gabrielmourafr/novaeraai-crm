@@ -19,7 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatDate, parseCurrencyInput } from "@/lib/utils/format";
 import { exportToCsv } from "@/lib/utils/csv";
-import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues, type Revenue, type Expense } from "@/lib/hooks/use-finance";
+import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useUpcomingFixedExpenses, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues, type Revenue, type Expense } from "@/lib/hooks/use-finance";
 import { useAllInstallments, useMarkInstallmentPaid, useUpdateInstallment, useClientInstallmentsSummary, INSTALLMENT_STATUS_META, type InstallmentWithRelations } from "@/lib/hooks/use-installments";
 import { useActiveSubscriptions, useEnsureMonthlyBilling, useClientMensalidadeSummary, nextBillingDate, RENEWAL_LABEL, type ActiveSubscription } from "@/lib/hooks/use-subscriptions";
 import { useClientsFinancialSummary } from "@/lib/hooks/use-client-summary";
@@ -119,6 +119,9 @@ export function FinanceiroTab() {
   const [expDueDate, setExpDueDate] = useState("");
   const [expStatus, setExpStatus] = useState<"pendente" | "pago" | "atrasado">("pendente");
   const [expRecurrence, setExpRecurrence] = useState<"pontual" | "mensal" | "trimestral" | "anual">("pontual");
+  const [expType, setExpType] = useState<"" | "fixo" | "variavel">("");
+  const [editingExpense, setEditingExpense] = useState<Expense | undefined>();
+  const [expenseTypeFilter, setExpenseTypeFilter] = useState<"all" | "fixo" | "variavel">("all");
 
   const { user } = useUser();
   useEnsureMonthlyBilling();
@@ -211,6 +214,7 @@ export function FinanceiroTab() {
   };
   const { data: revenues = [], isLoading: revLoading } = useRevenues(year, month);
   const { data: expenses = [], isLoading: expLoading } = useExpenses(year, month);
+  const { data: upcomingFixedExpenses = [] } = useUpcomingFixedExpenses();
   const { data: revenuesLastMonths = {} } = useRevenuesLastMonths(year, month, 6);
   const { data: expensesLastMonths = {} } = useExpensesLastMonths(year, month, 6);
   const { data: installmentsPending = [], isLoading: installmentsLoading } = useAllInstallments([
@@ -267,26 +271,63 @@ export function FinanceiroTab() {
     setRevCategory("consultoria"); setRevStatus("pendente"); setRevRecurrence("pontual");
   };
 
-  const handleCreateExpense = async (e: React.FormEvent) => {
+  const resetExpenseForm = () => {
+    setExpDesc(""); setExpValue(""); setExpDueDate("");
+    setExpCategory("outro"); setExpStatus("pendente"); setExpRecurrence("pontual"); setExpType("");
+  };
+
+  const openCreateExpense = () => {
+    resetExpenseForm();
+    setEditingExpense(undefined);
+    setCreateExpenseOpen(true);
+  };
+
+  const openEditExpense = (exp: Expense) => {
+    setExpDesc(exp.description);
+    setExpCategory(exp.category);
+    setExpValue(exp.value.toString());
+    setExpDueDate(exp.due_date ?? "");
+    setExpStatus(exp.status);
+    setExpRecurrence(exp.recurrence);
+    setExpType(exp.expense_type ?? "");
+    setEditingExpense(exp);
+    setCreateExpenseOpen(true);
+  };
+
+  const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) { toast.error("Sessão não carregada ainda — recarregue a página e tente de novo."); return; }
     if (!expDesc || !expValue) { toast.error("Preencha descrição e valor."); return; }
     const parsedValue = parseCurrencyInput(expValue);
     if (isNaN(parsedValue)) { toast.error("Valor inválido — use um número, ex: 1500,00."); return; }
-    await createExpense.mutateAsync({
-      org_id: user.org_id,
-      description: expDesc,
-      category: expCategory,
-      value: parsedValue,
-      status: expStatus,
-      due_date: expDueDate || null,
-      recurrence: expRecurrence,
-      project_id: null,
-      paid_at: null,
-    });
+    if (editingExpense) {
+      await updateExpense.mutateAsync({
+        id: editingExpense.id,
+        description: expDesc,
+        category: expCategory,
+        value: parsedValue,
+        status: expStatus,
+        due_date: expDueDate || null,
+        recurrence: expRecurrence,
+        expense_type: expType || null,
+      });
+    } else {
+      await createExpense.mutateAsync({
+        org_id: user.org_id,
+        description: expDesc,
+        category: expCategory,
+        value: parsedValue,
+        status: expStatus,
+        due_date: expDueDate || null,
+        recurrence: expRecurrence,
+        expense_type: expType || null,
+        project_id: null,
+        paid_at: null,
+      });
+    }
     setCreateExpenseOpen(false);
-    setExpDesc(""); setExpValue(""); setExpDueDate("");
-    setExpCategory("outro"); setExpStatus("pendente"); setExpRecurrence("pontual");
+    setEditingExpense(undefined);
+    resetExpenseForm();
   };
 
   const handleCreatePayment = async (e: React.FormEvent) => {
@@ -364,6 +405,11 @@ export function FinanceiroTab() {
   const paidRevenues = revenues.filter((r) => r.status === "pago").reduce((s, r) => s + r.value, 0);
   // Saldo é caixa real: só conta receita já recebida, não o que ainda está pendente
   const balance = paidRevenues - totalExpenses;
+
+  const paidExpenses = expenses.filter((e) => e.status === "pago").reduce((s, e) => s + e.value, 0);
+  const expensesToPayValue = expenses.filter((e) => e.status !== "pago").reduce((s, e) => s + e.value, 0);
+  const expensesToPayCount = expenses.filter((e) => e.status !== "pago").length;
+  const filteredExpenses = expenses.filter((e) => expenseTypeFilter === "all" || e.expense_type === expenseTypeFilter);
 
 
   // Expense by category for pie
@@ -891,34 +937,119 @@ export function FinanceiroTab() {
           </div>
         </TabsContent>
 
-        <TabsContent value="despesas" className="mt-4">
-          <div className="flex justify-end gap-2 mb-3">
-            <Button size="sm" variant="outline" onClick={handleExportExpenses} disabled={expenses.length === 0}>
-              <Download size={14} className="mr-1" />Exportar planilha
-            </Button>
-            <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => setCreateExpenseOpen(true)}><Plus size={14} className="mr-1" />Nova Despesa</Button>
+        <TabsContent value="despesas" className="mt-4 space-y-4">
+          {/* Despesas do mês: A Pagar / Pago */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <StatCard
+              size="sm"
+              label={`Despesas do Mês — A Pagar (${expensesToPayCount})`}
+              value={formatCurrency(expensesToPayValue)}
+              icon={TrendingDown}
+            />
+            <StatCard size="sm" label="Despesas do Mês — Pago" value={formatCurrency(paidExpenses)} icon={TrendingDown} />
+          </div>
+
+          {/* Previsão de pagamento das despesas fixas */}
+          {upcomingFixedExpenses.length > 0 && (
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+            >
+              <div className="px-4 py-3 border-b" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                <h4 className="text-sm font-semibold" style={{ color: "#E2EBF8" }}>
+                  Previsão de Pagamento — Despesas Fixas ({upcomingFixedExpenses.length})
+                </h4>
+                <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
+                  Todas as despesas marcadas como fixas, pendentes ou atrasadas, independente do mês selecionado acima
+                </p>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                    <TableHead style={{ color: "#7BA3C6" }}>Descrição</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Valor</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Vencimento</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {upcomingFixedExpenses.map((exp) => {
+                    const overdue = exp.due_date && exp.status !== "pago" && new Date(exp.due_date) < new Date();
+                    return (
+                      <TableRow key={exp.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                        <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>{exp.description}</TableCell>
+                        <TableCell><span className="text-sm font-semibold text-red-400">{formatCurrency(exp.value)}</span></TableCell>
+                        <TableCell>
+                          <span className={`text-sm ${overdue ? "text-red-400 font-medium" : ""}`} style={{ color: overdue ? undefined : "#7BA3C6" }}>
+                            {exp.due_date ? formatDate(exp.due_date) : "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={"px-2 py-0.5 rounded-full text-xs font-medium " + (expenseStatusStyles[exp.status] ?? "bg-white/5 text-gray-400")}>
+                            {exp.status}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex gap-1 rounded-lg p-1" style={{ background: "rgba(11,135,195,0.05)", border: "1px solid rgba(11,135,195,0.15)" }}>
+              {([
+                { value: "all", label: "Todas" },
+                { value: "fixo", label: "Fixas" },
+                { value: "variavel", label: "Variáveis" },
+              ] as const).map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => setExpenseTypeFilter(f.value)}
+                  className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                  style={expenseTypeFilter === f.value ? { background: "var(--primary)", color: "#fff" } : { color: "#7BA3C6" }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={handleExportExpenses} disabled={expenses.length === 0}>
+                <Download size={14} className="mr-1" />Exportar planilha
+              </Button>
+              <Button size="sm" style={{ background: "var(--primary)" }} onClick={openCreateExpense}><Plus size={14} className="mr-1" />Nova Despesa</Button>
+            </div>
           </div>
           <div
             className="rounded-xl overflow-hidden"
             style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
           >
-            {expLoading ? <div className="p-8 text-center text-sm" style={{ color: "#7BA3C6" }}>Carregando...</div> : expenses.length === 0 ? <div className="p-8 text-center text-sm" style={{ color: "#3D5A78" }}>Nenhuma despesa neste mês.</div> : (
+            {expLoading ? <div className="p-8 text-center text-sm" style={{ color: "#7BA3C6" }}>Carregando...</div> : filteredExpenses.length === 0 ? <div className="p-8 text-center text-sm" style={{ color: "#3D5A78" }}>Nenhuma despesa encontrada.</div> : (
               <Table>
                 <TableHeader>
                   <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
                     <TableHead style={{ color: "#7BA3C6" }}>Descrição</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Categoria</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Tipo</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Valor</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Vencimento</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Status</TableHead>
-                    <TableHead className="w-[80px]" />
+                    <TableHead className="w-[100px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {expenses.map((exp) => (
+                  {filteredExpenses.map((exp) => (
                     <TableRow key={exp.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
                       <TableCell className="font-medium text-sm" style={{ color: "#E2EBF8" }}>{exp.description}</TableCell>
                       <TableCell><span className="text-xs capitalize" style={{ color: "#7BA3C6" }}>{exp.category}</span></TableCell>
+                      <TableCell>
+                        {exp.expense_type ? (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "rgba(11,135,195,0.12)", color: "#0CA8F5" }}>
+                            {exp.expense_type === "fixo" ? "Fixa" : "Variável"}
+                          </span>
+                        ) : <span className="text-xs" style={{ color: "#3D5A78" }}>—</span>}
+                      </TableCell>
                       <TableCell><span className="text-sm font-semibold text-red-400">{formatCurrency(exp.value)}</span></TableCell>
                       <TableCell><span className="text-sm" style={{ color: "#7BA3C6" }}>{exp.due_date ? formatDate(exp.due_date) : "—"}</span></TableCell>
                       <TableCell>
@@ -934,6 +1065,9 @@ export function FinanceiroTab() {
                               ✓ Pago
                             </Button>
                           )}
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-text-muted hover:text-primary" onClick={() => openEditExpense(exp)}>
+                            <Pencil size={13} />
+                          </Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => setDeletingExpense(exp)}>
                             <Trash2 size={13} />
                           </Button>
@@ -1125,14 +1259,16 @@ export function FinanceiroTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Create Expense Dialog */}
-      <Dialog open={createExpenseOpen} onOpenChange={(v) => !v && setCreateExpenseOpen(false)}>
+      {/* Create/Edit Expense Dialog */}
+      <Dialog open={createExpenseOpen} onOpenChange={(v) => { if (!v) { setCreateExpenseOpen(false); setEditingExpense(undefined); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Nova Despesa</DialogTitle>
-            <DialogDescription>Registre uma nova saída financeira</DialogDescription>
+            <DialogTitle>{editingExpense ? "Editar Despesa" : "Nova Despesa"}</DialogTitle>
+            <DialogDescription>
+              {editingExpense ? "Atualize os dados dessa saída financeira" : "Registre uma nova saída financeira"}
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreateExpense} className="space-y-4 mt-2">
+          <form onSubmit={handleSaveExpense} className="space-y-4 mt-2">
             <div className="space-y-1.5">
               <Label>Descrição *</Label>
               <Input value={expDesc} onChange={(e) => setExpDesc(e.target.value)} placeholder="Ex: Servidor AWS mensal" required />
@@ -1174,22 +1310,35 @@ export function FinanceiroTab() {
                 </Select>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Recorrência</Label>
-              <Select value={expRecurrence} onValueChange={(v) => setExpRecurrence(v as typeof expRecurrence)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pontual">Pontual</SelectItem>
-                  <SelectItem value="mensal">Mensal</SelectItem>
-                  <SelectItem value="trimestral">Trimestral</SelectItem>
-                  <SelectItem value="anual">Anual</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Recorrência</Label>
+                <Select value={expRecurrence} onValueChange={(v) => setExpRecurrence(v as typeof expRecurrence)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pontual">Pontual</SelectItem>
+                    <SelectItem value="mensal">Mensal</SelectItem>
+                    <SelectItem value="trimestral">Trimestral</SelectItem>
+                    <SelectItem value="anual">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Tipo</Label>
+                <Select value={expType || "__none__"} onValueChange={(v) => setExpType(v === "__none__" ? "" : (v as "fixo" | "variavel"))}>
+                  <SelectTrigger><SelectValue placeholder="Não classificada" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Não classificada</SelectItem>
+                    <SelectItem value="fixo">Fixa</SelectItem>
+                    <SelectItem value="variavel">Variável</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setCreateExpenseOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createExpense.isPending} style={{ background: "var(--primary)" }}>
-                Salvar Despesa
+              <Button type="button" variant="outline" onClick={() => { setCreateExpenseOpen(false); setEditingExpense(undefined); }}>Cancelar</Button>
+              <Button type="submit" disabled={createExpense.isPending || updateExpense.isPending} style={{ background: "var(--primary)" }}>
+                {editingExpense ? "Salvar Alterações" : "Salvar Despesa"}
               </Button>
             </div>
           </form>

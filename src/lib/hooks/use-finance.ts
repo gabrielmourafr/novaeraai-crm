@@ -96,6 +96,27 @@ export const useExpenses = (year?: number, month?: number) => {
   });
 };
 
+// Previsão de pagamento das despesas fixas — todas as pendentes/atrasadas
+// marcadas como "fixo", com vencimento futuro, independente do mês
+// selecionado no filtro. Usado no bloco de previsão da aba Despesas.
+export const useUpcomingFixedExpenses = () => {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["expenses", "upcoming-fixed"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("expense_type", "fixo")
+        .in("status", ["pendente", "atrasado"])
+        .not("due_date", "is", null)
+        .order("due_date", { ascending: true });
+      if (error) throw error;
+      return data as Expense[];
+    },
+  });
+};
+
 export const useRevenuesLastMonths = (year: number, month: number, months = 6) => {
   const supabase = createClient();
   return useQuery({

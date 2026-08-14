@@ -533,6 +533,7 @@ export interface Database {
           paid_at: string | null;
           status: "pendente" | "pago" | "atrasado";
           recurrence: "pontual" | "mensal" | "trimestral" | "anual";
+          expense_type: "fixo" | "variavel" | null;
           created_at: string;
           updated_at: string;
         };
