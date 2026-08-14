@@ -246,6 +246,37 @@ export function FinanceiroTab() {
   }, [clientsSummary, clientInstallmentsSummary, mensalidadeSummary, projects]);
 
   const { data: partnerPayments = [], isLoading: paymentsLoading } = usePartnerPayments();
+
+  // Resumo por recebedor + projeto: quantas parcelas já foram pagas, quantas
+  // restam, e a data do próximo pagamento pendente.
+  const partnerPaymentsSummary = useMemo(() => {
+    type Row = {
+      recipientName: string; recipientType: string; projectName: string | null;
+      paidCount: number; pendingCount: number; paidValue: number; pendingValue: number;
+      nextDueDate: string | null;
+    };
+    const map = new Map<string, Row>();
+    for (const p of partnerPayments) {
+      const key = `${p.recipient_name}__${p.project_id ?? "none"}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          recipientName: p.recipient_name, recipientType: p.recipient_type,
+          projectName: p.project?.name ?? null,
+          paidCount: 0, pendingCount: 0, paidValue: 0, pendingValue: 0, nextDueDate: null,
+        });
+      }
+      const row = map.get(key)!;
+      if (p.status === "pago") {
+        row.paidCount += 1;
+        row.paidValue += Number(p.amount);
+      } else if (p.status !== "cancelado") {
+        row.pendingCount += 1;
+        row.pendingValue += Number(p.amount);
+        if (p.due_date && (!row.nextDueDate || p.due_date < row.nextDueDate)) row.nextDueDate = p.due_date;
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.pendingValue - a.pendingValue);
+  }, [partnerPayments]);
   const createPayment = useCreatePartnerPayment();
   const markPaymentPaid = useMarkPartnerPaymentPaid();
   const deletePayment = useDeletePartnerPayment();
@@ -580,8 +611,7 @@ export function FinanceiroTab() {
           <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
           <TabsTrigger value="implementacao">Implementação</TabsTrigger>
           <TabsTrigger value="mensalidade">Mensalidade</TabsTrigger>
-          <TabsTrigger value="receitas">Receitas ({revenues.length})</TabsTrigger>
-          <TabsTrigger value="despesas">Despesas ({expenses.length})</TabsTrigger>
+          <TabsTrigger value="receitas-despesas">Receitas &amp; Despesas</TabsTrigger>
           <TabsTrigger value="parceiros">Parceiros & Devs ({pendingPayments.length})</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
         </TabsList>
@@ -625,59 +655,6 @@ export function FinanceiroTab() {
             </div>
           </div>
 
-          {/* Previsto x Realizado do mês + projeção vs meta comercial */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div
-              className="rounded-xl p-5"
-              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
-            >
-              <h3 className="font-semibold text-sm mb-1" style={{ color: "#E2EBF8" }}>Previsto x Realizado</h3>
-              <p className="text-xs mb-3" style={{ color: "#7BA3C6" }}>Receitas do mês: o que venceu vs o que já caiu</p>
-              <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#7BA3C6" }}>
-                <span>Realizado: <b style={{ color: "#22c55e" }}>{formatCurrency(paidRevenues)}</b></span>
-                <span>Previsto: <b style={{ color: "#E2EBF8" }}>{formatCurrency(totalRevenues)}</b></span>
-              </div>
-              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                <div className="h-full rounded-full" style={{ width: `${revenuePrevistoPct}%`, background: revenuePrevistoPct >= 100 ? "#22c55e" : "#0B87C3" }} />
-              </div>
-              <p className="text-[11px] mt-1.5" style={{ color: "#3D5A78" }}>{revenuePrevistoPct.toFixed(0)}% do previsto já realizado</p>
-            </div>
-
-            <div
-              className="rounded-xl p-5"
-              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
-            >
-              <h3 className="font-semibold text-sm mb-1" style={{ color: "#E2EBF8" }}>Previsão vs Meta Comercial</h3>
-              {!currentGoal ? (
-                <p className="text-xs mt-3" style={{ color: "#3D5A78" }}>
-                  Nenhuma meta definida pra {months[month - 1]}. Defina em Dashboard → Visão Geral.
-                </p>
-              ) : (
-                <>
-                  <p className="text-xs mb-3" style={{ color: "#7BA3C6" }}>
-                    No ritmo atual de recebimento, a projeção pro fim do mês é:
-                  </p>
-                  <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#7BA3C6" }}>
-                    <span>Projeção: <b style={{ color: projectedMonthEnd >= currentGoal.revenue_target ? "#22c55e" : "#F59E0B" }}>{formatCurrency(projectedMonthEnd)}</b></span>
-                    <span>Meta: <b style={{ color: "#E2EBF8" }}>{formatCurrency(currentGoal.revenue_target)}</b></span>
-                  </div>
-                  <div className="h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${currentGoal.revenue_target > 0 ? Math.min(100, (projectedMonthEnd / currentGoal.revenue_target) * 100) : 0}%`,
-                        background: projectedMonthEnd >= currentGoal.revenue_target ? "#22c55e" : "#F59E0B",
-                      }}
-                    />
-                  </div>
-                  <p className="text-[11px] mt-1.5" style={{ color: "#3D5A78" }}>
-                    Baseado em {formatCurrency(paidRevenues)} recebidos em {daysElapsed} de {daysInSelectedMonth} dias do mês
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-
           {/* Fluxo de caixa futuro */}
           {cashFlowForecast.length > 0 && (
             <div
@@ -716,119 +693,6 @@ export function FinanceiroTab() {
             </div>
           )}
 
-          {/* Charts Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Cash Flow Area Chart */}
-            <div
-              className="lg:col-span-2 rounded-xl p-5"
-              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
-            >
-              <div className="mb-4">
-                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Fluxo de Caixa</h3>
-                <p className="text-xs" style={{ color: "#7BA3C6" }}>Receitas vs Despesas</p>
-              </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={cashFlowData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gradRec" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0.3}/>
-                    </linearGradient>
-                    <linearGradient id="gradExp" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0.3}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" />
-                  <XAxis dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
-                  <Bar dataKey="receitas" name="Receitas" fill="#22c55e" radius={[4,4,0,0]} maxBarSize={40} />
-                  <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Revenue Status Pie */}
-            <div
-              className="rounded-xl p-5"
-              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
-            >
-              <div className="mb-4">
-                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Status das Receitas</h3>
-                <p className="text-xs" style={{ color: "#7BA3C6" }}>Mês atual</p>
-              </div>
-              {revStatusData.length === 0 ? (
-                <div className="flex items-center justify-center h-40 text-xs" style={{ color: "#3D5A78" }}>
-                  Sem dados neste mês
-                </div>
-              ) : (
-                <>
-                  <ResponsiveContainer width="100%" height={140}>
-                    <PieChart>
-                      <Pie data={revStatusData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" paddingAngle={3}>
-                        {revStatusData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                      </Pie>
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="mt-3 space-y-1.5">
-                    {revStatusData.map((item) => (
-                      <div key={item.name} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
-                          <span style={{ color: "#7BA3C6" }}>{item.name}</span>
-                        </div>
-                        <span className="font-semibold" style={{ color: "#E2EBF8" }}>{formatCurrency(item.value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Expense breakdown */}
-          {expCategoryData.length > 0 && (
-            <div
-              className="rounded-xl p-5"
-              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
-            >
-              <div className="mb-4">
-                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Despesas por Categoria</h3>
-                <p className="text-xs" style={{ color: "#7BA3C6" }}>Distribuição do mês</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={expCategoryData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" horizontal={false} />
-                    <XAxis type="number" tick={{ fill: "#7BA3C6", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
-                    <YAxis type="category" dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 10 }} axisLine={false} tickLine={false} width={80} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
-                    <Bar dataKey="value" name="Valor" radius={[0,4,4,0]} maxBarSize={20}>
-                      {expCategoryData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-                <div className="space-y-2">
-                  {expCategoryData.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
-                        <span className="capitalize" style={{ color: "#7BA3C6" }}>{item.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>{formatCurrency(item.value)}</span>
-                        <span className="ml-2 text-xs" style={{ color: "#3D5A78" }}>
-                          {totalExpenses > 0 ? `${((item.value / totalExpenses) * 100).toFixed(0)}%` : "—"}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </TabsContent>
 
         {/* ══════════════════ IMPLEMENTAÇÃO ══════════════════ */}
@@ -1176,77 +1040,196 @@ export function FinanceiroTab() {
           </div>
         </TabsContent>
 
-        <TabsContent value="receitas" className="mt-4">
-          <div className="flex justify-end gap-2 mb-3">
-            <Button size="sm" variant="outline" onClick={handleExportRevenues} disabled={revenues.length === 0}>
-              <Download size={14} className="mr-1" />Exportar planilha
-            </Button>
-            <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => setCreateRevenueOpen(true)}><Plus size={14} className="mr-1" />Nova Receita</Button>
-          </div>
+        <TabsContent value="receitas-despesas" className="mt-4 space-y-4">
+          {/* Fluxo de Caixa (compartilhado entre receitas e despesas) */}
           <div
-            className="rounded-xl overflow-hidden"
-            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+            className="rounded-xl p-5"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
           >
-            {revLoading ? <div className="p-8 text-center text-sm" style={{ color: "#7BA3C6" }}>Carregando...</div> : revenues.length === 0 ? <div className="p-8 text-center text-sm" style={{ color: "#3D5A78" }}>Nenhuma receita neste mês.</div> : (
-              <Table>
-                <TableHeader>
-                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
-                    <TableHead style={{ color: "#7BA3C6" }}>Descrição</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>Categoria</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>Valor</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>Vencimento</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>Status</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>NF</TableHead>
-                    <TableHead className="w-[80px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {revenues.map((rev) => (
-                    <TableRow key={rev.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
-                      <TableCell className="font-medium text-sm" style={{ color: "#E2EBF8" }}>{rev.description}</TableCell>
-                      <TableCell><span className="text-xs capitalize" style={{ color: "#7BA3C6" }}>{rev.category}</span></TableCell>
-                      <TableCell><span className="text-sm font-semibold text-green-400">{formatCurrency(rev.value)}</span></TableCell>
-                      <TableCell><span className="text-sm" style={{ color: "#7BA3C6" }}>{rev.due_date ? formatDate(rev.due_date) : "—"}</span></TableCell>
-                      <TableCell>
-                        <span className={"px-2 py-0.5 rounded-full text-xs font-medium " + (revenueStatusStyles[rev.status] ?? "bg-white/5 text-gray-400")}>
-                          {rev.status}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <button
-                          onClick={() => openRevenueNF(rev)}
-                          className="text-xs px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
-                          style={
-                            rev.nf_number
-                              ? { background: "rgba(16,185,129,0.15)", color: "#10B981" }
-                              : { background: "rgba(148,163,184,0.15)", color: "#7BA3C6" }
-                          }
-                        >
-                          {rev.nf_number ? `NF ${rev.nf_number}` : "Sem NF"}
-                        </button>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-1">
-                          {rev.status !== "pago" && (
-                            <Button variant="ghost" size="sm" className="h-7 text-xs text-green-400 hover:text-green-300"
-                              onClick={() => updateRevenue.mutate({ id: rev.id, status: "pago", paid_at: new Date().toISOString() })}>
-                              ✓ Pago
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => setDeletingRevenue(rev)}>
-                            <Trash2 size={13} />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+            <div className="mb-4">
+              <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Fluxo de Caixa</h3>
+              <p className="text-xs" style={{ color: "#7BA3C6" }}>Receitas vs Despesas — últimos 6 meses</p>
+            </div>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={cashFlowData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" />
+                <XAxis dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
+                <Bar dataKey="receitas" name="Receitas" fill="#22c55e" radius={[4,4,0,0]} maxBarSize={40} />
+                <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        </TabsContent>
 
-        <TabsContent value="despesas" className="mt-4 space-y-4">
+          <Tabs defaultValue="receitas">
+            <TabsList>
+              <TabsTrigger value="receitas">Receitas ({revenues.length})</TabsTrigger>
+              <TabsTrigger value="despesas">Despesas ({expenses.length})</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="receitas" className="mt-4 space-y-4">
+              {/* Previsto x Realizado + projeção vs meta comercial */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div
+                  className="rounded-xl p-5"
+                  style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+                >
+                  <h3 className="font-semibold text-sm mb-1" style={{ color: "#E2EBF8" }}>Previsto x Realizado</h3>
+                  <p className="text-xs mb-3" style={{ color: "#7BA3C6" }}>Receitas do mês: o que venceu vs o que já caiu</p>
+                  <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#7BA3C6" }}>
+                    <span>Realizado: <b style={{ color: "#22c55e" }}>{formatCurrency(paidRevenues)}</b></span>
+                    <span>Previsto: <b style={{ color: "#E2EBF8" }}>{formatCurrency(totalRevenues)}</b></span>
+                  </div>
+                  <div className="h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${revenuePrevistoPct}%`, background: revenuePrevistoPct >= 100 ? "#22c55e" : "#0B87C3" }} />
+                  </div>
+                  <p className="text-[11px] mt-1.5" style={{ color: "#3D5A78" }}>{revenuePrevistoPct.toFixed(0)}% do previsto já realizado</p>
+                </div>
+
+                <div
+                  className="rounded-xl p-5"
+                  style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+                >
+                  <h3 className="font-semibold text-sm mb-1" style={{ color: "#E2EBF8" }}>Previsão vs Meta Comercial</h3>
+                  {!currentGoal ? (
+                    <p className="text-xs mt-3" style={{ color: "#3D5A78" }}>
+                      Nenhuma meta definida pra {months[month - 1]}. Defina em Dashboard → Visão Geral.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-xs mb-3" style={{ color: "#7BA3C6" }}>
+                        No ritmo atual de recebimento, a projeção pro fim do mês é:
+                      </p>
+                      <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#7BA3C6" }}>
+                        <span>Projeção: <b style={{ color: projectedMonthEnd >= currentGoal.revenue_target ? "#22c55e" : "#F59E0B" }}>{formatCurrency(projectedMonthEnd)}</b></span>
+                        <span>Meta: <b style={{ color: "#E2EBF8" }}>{formatCurrency(currentGoal.revenue_target)}</b></span>
+                      </div>
+                      <div className="h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${currentGoal.revenue_target > 0 ? Math.min(100, (projectedMonthEnd / currentGoal.revenue_target) * 100) : 0}%`,
+                            background: projectedMonthEnd >= currentGoal.revenue_target ? "#22c55e" : "#F59E0B",
+                          }}
+                        />
+                      </div>
+                      <p className="text-[11px] mt-1.5" style={{ color: "#3D5A78" }}>
+                        Baseado em {formatCurrency(paidRevenues)} recebidos em {daysElapsed} de {daysInSelectedMonth} dias do mês
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Status das Receitas */}
+              <div
+                className="rounded-xl p-5"
+                style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+              >
+                <div className="mb-4">
+                  <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Status das Receitas</h3>
+                  <p className="text-xs" style={{ color: "#7BA3C6" }}>Mês atual</p>
+                </div>
+                {revStatusData.length === 0 ? (
+                  <div className="flex items-center justify-center h-40 text-xs" style={{ color: "#3D5A78" }}>
+                    Sem dados neste mês
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                    <ResponsiveContainer width="100%" height={160}>
+                      <PieChart>
+                        <Pie data={revStatusData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" paddingAngle={3}>
+                          {revStatusData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-1.5">
+                      {revStatusData.map((item) => (
+                        <div key={item.name} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
+                            <span style={{ color: "#7BA3C6" }}>{item.name}</span>
+                          </div>
+                          <span className="font-semibold" style={{ color: "#E2EBF8" }}>{formatCurrency(item.value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="outline" onClick={handleExportRevenues} disabled={revenues.length === 0}>
+                  <Download size={14} className="mr-1" />Exportar planilha
+                </Button>
+                <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => setCreateRevenueOpen(true)}><Plus size={14} className="mr-1" />Nova Receita</Button>
+              </div>
+              <div
+                className="rounded-xl overflow-hidden"
+                style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+              >
+                {revLoading ? <div className="p-8 text-center text-sm" style={{ color: "#7BA3C6" }}>Carregando...</div> : revenues.length === 0 ? <div className="p-8 text-center text-sm" style={{ color: "#3D5A78" }}>Nenhuma receita neste mês.</div> : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                        <TableHead style={{ color: "#7BA3C6" }}>Descrição</TableHead>
+                        <TableHead style={{ color: "#7BA3C6" }}>Categoria</TableHead>
+                        <TableHead style={{ color: "#7BA3C6" }}>Valor</TableHead>
+                        <TableHead style={{ color: "#7BA3C6" }}>Vencimento</TableHead>
+                        <TableHead style={{ color: "#7BA3C6" }}>Status</TableHead>
+                        <TableHead style={{ color: "#7BA3C6" }}>NF</TableHead>
+                        <TableHead className="w-[80px]" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {revenues.map((rev) => (
+                        <TableRow key={rev.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                          <TableCell className="font-medium text-sm" style={{ color: "#E2EBF8" }}>{rev.description}</TableCell>
+                          <TableCell><span className="text-xs capitalize" style={{ color: "#7BA3C6" }}>{rev.category}</span></TableCell>
+                          <TableCell><span className="text-sm font-semibold text-green-400">{formatCurrency(rev.value)}</span></TableCell>
+                          <TableCell><span className="text-sm" style={{ color: "#7BA3C6" }}>{rev.due_date ? formatDate(rev.due_date) : "—"}</span></TableCell>
+                          <TableCell>
+                            <span className={"px-2 py-0.5 rounded-full text-xs font-medium " + (revenueStatusStyles[rev.status] ?? "bg-white/5 text-gray-400")}>
+                              {rev.status}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <button
+                              onClick={() => openRevenueNF(rev)}
+                              className="text-xs px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
+                              style={
+                                rev.nf_number
+                                  ? { background: "rgba(16,185,129,0.15)", color: "#10B981" }
+                                  : { background: "rgba(148,163,184,0.15)", color: "#7BA3C6" }
+                              }
+                            >
+                              {rev.nf_number ? `NF ${rev.nf_number}` : "Sem NF"}
+                            </button>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              {rev.status !== "pago" && (
+                                <Button variant="ghost" size="sm" className="h-7 text-xs text-green-400 hover:text-green-300"
+                                  onClick={() => updateRevenue.mutate({ id: rev.id, status: "pago", paid_at: new Date().toISOString() })}>
+                                  ✓ Pago
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => setDeletingRevenue(rev)}>
+                                <Trash2 size={13} />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="despesas" className="mt-4 space-y-4">
           {/* Despesas do mês: A Pagar / Pago */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <StatCard
@@ -1257,6 +1240,48 @@ export function FinanceiroTab() {
             />
             <StatCard size="sm" label="Despesas do Mês — Pago" value={formatCurrency(paidExpenses)} icon={TrendingDown} />
           </div>
+
+          {/* Despesas por Categoria */}
+          {expCategoryData.length > 0 && (
+            <div
+              className="rounded-xl p-5"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+            >
+              <div className="mb-4">
+                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Despesas por Categoria</h3>
+                <p className="text-xs" style={{ color: "#7BA3C6" }}>Distribuição do mês</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={expCategoryData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" horizontal={false} />
+                    <XAxis type="number" tick={{ fill: "#7BA3C6", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                    <YAxis type="category" dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 10 }} axisLine={false} tickLine={false} width={80} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
+                    <Bar dataKey="value" name="Valor" radius={[0,4,4,0]} maxBarSize={20}>
+                      {expCategoryData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="space-y-2">
+                  {expCategoryData.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
+                        <span className="capitalize" style={{ color: "#7BA3C6" }}>{item.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>{formatCurrency(item.value)}</span>
+                        <span className="ml-2 text-xs" style={{ color: "#3D5A78" }}>
+                          {totalExpenses > 0 ? `${((item.value / totalExpenses) * 100).toFixed(0)}%` : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Previsão de pagamento das despesas fixas */}
           {upcomingFixedExpenses.length > 0 && (
@@ -1445,6 +1470,8 @@ export function FinanceiroTab() {
               </Table>
             )}
           </div>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         {/* ══════════════════ PARCEIROS & DEVS ══════════════════ */}
@@ -1457,6 +1484,49 @@ export function FinanceiroTab() {
               icon={Users}
             />
           </div>
+
+          {/* Resumo por desenvolvedor/parceiro + projeto */}
+          {partnerPaymentsSummary.length > 0 && (
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+            >
+              <div className="px-4 py-3 border-b" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                <h4 className="text-sm font-semibold" style={{ color: "#E2EBF8" }}>Resumo por Recebedor e Projeto</h4>
+                <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>Quantas parcelas já foram pagas, quantas faltam, e a data do próximo pagamento</p>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                    <TableHead style={{ color: "#7BA3C6" }}>Recebedor</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Projeto</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-center">Pagas</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-center">Restantes</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Próximo Vencimento</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Valor Restante</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {partnerPaymentsSummary.map((row) => (
+                    <TableRow key={`${row.recipientName}__${row.projectName ?? "none"}`} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                      <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>
+                        {row.recipientName}
+                        <span className="block text-[10px] font-normal" style={{ color: "#7BA3C6" }}>
+                          {RECIPIENT_TYPE_LABEL[row.recipientType as "parceiro" | "desenvolvedor"]}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{row.projectName ?? "—"}</TableCell>
+                      <TableCell className="text-center text-sm text-green-400">{row.paidCount}</TableCell>
+                      <TableCell className="text-center text-sm" style={{ color: row.pendingCount > 0 ? "#F59E0B" : "#7BA3C6" }}>{row.pendingCount}</TableCell>
+                      <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{row.nextDueDate ? formatDate(row.nextDueDate) : "—"}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold" style={{ color: "#E2EBF8" }}>{formatCurrency(row.pendingValue)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
           <div className="flex justify-end mb-3">
             <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => setCreatePaymentOpen(true)}>
               <Plus size={14} className="mr-1" />Novo Pagamento
