@@ -181,6 +181,59 @@ export function FinanceiroTab() {
       .filter((x): x is { project: (typeof projects)[number]; predicted: Date; overridden: boolean } => x !== null)
       .sort((a, b) => a.predicted.getTime() - b.predicted.getTime());
   }, [projects]);
+
+  // Previsão por cliente: junta implementação, mensalidade, parcelas e custo
+  // de infra dos projetos — tudo que já existe em hooks separados, num lugar só.
+  const clientForecast = useMemo(() => {
+    type Row = {
+      companyId: string; companyName: string;
+      implementacaoReceber: number; implementacaoRecebida: number;
+      mensalidadeAtiva: number; parcelasRestantes: number; parcelasRestantesValue: number;
+      custoSetup: number; custoMensal: number;
+    };
+    const map = new Map<string, Row>();
+    const getRow = (companyId: string, companyName: string) => {
+      if (!map.has(companyId)) {
+        map.set(companyId, {
+          companyId, companyName,
+          implementacaoReceber: 0, implementacaoRecebida: 0,
+          mensalidadeAtiva: 0, parcelasRestantes: 0, parcelasRestantesValue: 0,
+          custoSetup: 0, custoMensal: 0,
+        });
+      }
+      return map.get(companyId)!;
+    };
+
+    for (const c of clientsSummary) {
+      const row = getRow(c.companyId, c.companyName);
+      row.implementacaoReceber += c.implementacaoReceber;
+      row.implementacaoRecebida += c.implementacaoRecebida;
+    }
+    for (const c of clientInstallmentsSummary) {
+      const row = getRow(c.companyId, c.companyName);
+      row.parcelasRestantes += c.remainingCount;
+      row.parcelasRestantesValue += c.remainingValue;
+    }
+    for (const s of mensalidadeSummary) {
+      const row = getRow(s.companyId, s.companyName);
+      row.mensalidadeAtiva += s.billingAmount;
+    }
+    for (const p of projects) {
+      if (!p.company_id) continue;
+      const row = map.get(p.company_id);
+      if (!row) continue; // custo de projeto sem receita/mensalidade ainda não entra na visão
+      row.custoSetup += Number(p.infra_setup_cost ?? 0);
+      if (p.billing_status === "ativo") row.custoMensal += Number(p.infra_monthly_cost ?? 0);
+    }
+
+    return Array.from(map.values())
+      .map((r) => ({
+        ...r,
+        totalPrevisto: r.implementacaoReceber + r.mensalidadeAtiva,
+      }))
+      .sort((a, b) => b.totalPrevisto - a.totalPrevisto);
+  }, [clientsSummary, clientInstallmentsSummary, mensalidadeSummary, projects]);
+
   const { data: partnerPayments = [], isLoading: paymentsLoading } = usePartnerPayments();
   const createPayment = useCreatePartnerPayment();
   const markPaymentPaid = useMarkPartnerPaymentPaid();
@@ -499,6 +552,7 @@ export function FinanceiroTab() {
           <TabsTrigger value="receitas">Receitas ({revenues.length})</TabsTrigger>
           <TabsTrigger value="despesas">Despesas ({expenses.length})</TabsTrigger>
           <TabsTrigger value="parceiros">Parceiros & Devs ({pendingPayments.length})</TabsTrigger>
+          <TabsTrigger value="clientes">Clientes</TabsTrigger>
         </TabsList>
 
         {/* ══════════════════ VISÃO GERAL ══════════════════ */}
@@ -1390,6 +1444,55 @@ export function FinanceiroTab() {
                       </TableRow>
                     );
                   })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ══════════════════ CLIENTES ══════════════════ */}
+        <TabsContent value="clientes" className="mt-4">
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+          >
+            <div className="px-4 py-3 border-b" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+              <h4 className="text-sm font-semibold" style={{ color: "#E2EBF8" }}>Previsão por Cliente</h4>
+              <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
+                Custos, recebimento e previsão de cada cliente, tudo num lugar
+              </p>
+            </div>
+            {clientForecast.length === 0 ? (
+              <div className="p-8 text-center text-sm" style={{ color: "#3D5A78" }}>Nenhum cliente com dado financeiro ainda.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                    <TableHead style={{ color: "#7BA3C6" }}>Cliente</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Implementação a Receber</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Implementação Recebida</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Mensalidade Ativa</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-center">Parcelas Restantes</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Custo (setup + mensal)</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Previsão Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientForecast.map((c) => (
+                    <TableRow key={c.companyId} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                      <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>{c.companyName}</TableCell>
+                      <TableCell className="text-right text-sm" style={{ color: "#F59E0B" }}>{formatCurrency(c.implementacaoReceber)}</TableCell>
+                      <TableCell className="text-right text-sm text-green-400">{formatCurrency(c.implementacaoRecebida)}</TableCell>
+                      <TableCell className="text-right text-sm" style={{ color: "#E2EBF8" }}>{formatCurrency(c.mensalidadeAtiva)}</TableCell>
+                      <TableCell className="text-center text-sm" style={{ color: "#7BA3C6" }}>
+                        {c.parcelasRestantes > 0 ? `${c.parcelasRestantes} (${formatCurrency(c.parcelasRestantesValue)})` : "—"}
+                      </TableCell>
+                      <TableCell className="text-right text-sm text-red-400">
+                        {c.custoSetup + c.custoMensal > 0 ? formatCurrency(c.custoSetup + c.custoMensal) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold" style={{ color: "#E2EBF8" }}>{formatCurrency(c.totalPrevisto)}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             )}
