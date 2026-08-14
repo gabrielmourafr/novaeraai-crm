@@ -20,7 +20,7 @@ import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatDate, parseCurrencyInput } from "@/lib/utils/format";
 import { exportToCsv } from "@/lib/utils/csv";
 import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useUpcomingFixedExpenses, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues, type Revenue, type Expense } from "@/lib/hooks/use-finance";
-import { useAllInstallments, useMarkInstallmentPaid, useUpdateInstallment, useClientInstallmentsSummary, INSTALLMENT_STATUS_META, type InstallmentWithRelations } from "@/lib/hooks/use-installments";
+import { useAllInstallments, useMarkInstallmentPaid, useUpdateInstallment, useClientInstallmentsSummary, INSTALLMENT_STATUS_META, PAYMENT_METHOD_LABEL, type InstallmentWithRelations } from "@/lib/hooks/use-installments";
 import {
   useActiveSubscriptions, useEnsureMonthlyBilling, useClientMensalidadeSummary,
   useMensalidadeReceivedHistory, useMensalidadeReceivedTotal,
@@ -163,6 +163,7 @@ export function FinanceiroTab() {
   const totalMonthlyRecurring = activeSubscriptions.reduce((s, p) => s + Number(p.billing_amount ?? 0), 0);
   const totalImplementacaoReceber = clientsSummary.reduce((s, c) => s + c.implementacaoReceber, 0);
   const totalImplementacaoRecebida = clientsSummary.reduce((s, c) => s + c.implementacaoRecebida, 0);
+  const entradaTotal = totalImplementacaoRecebida + mensalidadeReceivedTotal;
   const { data: projects = [] } = useProjects();
   const upcomingMensalidades = useMemo(() => {
     return projects
@@ -497,6 +498,18 @@ export function FinanceiroTab() {
             </div>
           </div>
 
+          {/* Entrada total: implementação + mensalidade, todos os períodos */}
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+              Entrada Total (todos os períodos)
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <StatCard size="sm" label="Implementação Recebida" value={formatCurrency(totalImplementacaoRecebida)} icon={Wallet} />
+              <StatCard size="sm" label="Mensalidade Recebida" value={formatCurrency(mensalidadeReceivedTotal)} icon={Wallet} />
+              <StatCard size="sm" label="Entrada Total (Implementação + Mensalidade)" value={formatCurrency(entradaTotal)} icon={DollarSign} />
+            </div>
+          </div>
+
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Cash Flow Area Chart */}
@@ -684,6 +697,11 @@ export function FinanceiroTab() {
                         <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>
                           {inst.description}
                           <span className="ml-1 text-xs" style={{ color: "#7BA3C6" }}>({inst.percentage}%)</span>
+                          {inst.payment_method && (
+                            <span className="block text-[10px]" style={{ color: "#7BA3C6" }}>
+                              {PAYMENT_METHOD_LABEL[inst.payment_method]}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <span className="text-sm font-semibold text-green-400">{formatCurrency(Number(inst.amount))}</span>

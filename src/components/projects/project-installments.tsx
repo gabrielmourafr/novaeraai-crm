@@ -22,7 +22,9 @@ import {
   useDeleteInstallment,
   useMarkInstallmentPaid,
   INSTALLMENT_STATUS_META,
+  PAYMENT_METHOD_LABEL,
   type Installment,
+  type PaymentMethod,
 } from "@/lib/hooks/use-installments";
 
 interface SplitRow {
@@ -31,6 +33,7 @@ interface SplitRow {
   percentage: number;
   phase_id: string | null;
   due_date: string | null;
+  payment_method: PaymentMethod | null;
 }
 
 interface Props {
@@ -75,12 +78,13 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
           percentage: Number(i.percentage),
           phase_id: i.phase_id,
           due_date: i.due_date,
+          payment_method: i.payment_method,
         }))
       );
     } else {
       setSplits([
-        { description: "Sinal 50%", percentage: 50, phase_id: null, due_date: null },
-        { description: "Entrega 50%", percentage: 50, phase_id: null, due_date: null },
+        { description: "Sinal 50%", percentage: 50, phase_id: null, due_date: null, payment_method: null },
+        { description: "Entrega 50%", percentage: 50, phase_id: null, due_date: null, payment_method: null },
       ]);
     }
     setConfigOpen(true);
@@ -93,6 +97,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
         percentage: p,
         phase_id: null,
         due_date: null,
+        payment_method: null,
       }))
     );
   };
@@ -100,7 +105,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
   const addSplit = () => {
     setSplits((prev) => [
       ...prev,
-      { description: `Parcela ${prev.length + 1}`, percentage: 0, phase_id: null, due_date: null },
+      { description: `Parcela ${prev.length + 1}`, percentage: 0, phase_id: null, due_date: null, payment_method: null },
     ]);
   };
 
@@ -122,25 +127,44 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
       return;
     }
 
-    // Strategy: delete all existing for this project, then insert new ones.
-    // (Simpler than diff; small data volume.)
+    // Atualiza as parcelas existentes (mantém status/pago/NF), cria as novas
+    // e só apaga as que o usuário de fato removeu da lista — evita perder
+    // parcelas já pagas ao só ajustar uma data ou percentual.
     try {
+      const keptIds = new Set(splits.filter((s) => s.id).map((s) => s.id!));
       for (const existing of installments) {
-        await deleteIns.mutateAsync(existing.id);
+        if (!keptIds.has(existing.id)) {
+          await deleteIns.mutateAsync(existing.id);
+        }
       }
       for (let i = 0; i < splits.length; i++) {
         const s = splits[i];
-        await createIns.mutateAsync({
-          org_id: orgId,
-          project_id: projectId,
-          position: i + 1,
-          description: s.description,
-          percentage: s.percentage,
-          amount: Math.round((contractValue * s.percentage) / 100 * 100) / 100,
-          phase_id: s.phase_id,
-          due_date: s.due_date,
-          status: "pendente",
-        });
+        const amount = Math.round((contractValue * s.percentage) / 100 * 100) / 100;
+        if (s.id) {
+          await updateIns.mutateAsync({
+            id: s.id,
+            position: i + 1,
+            description: s.description,
+            percentage: s.percentage,
+            amount,
+            phase_id: s.phase_id,
+            due_date: s.due_date,
+            payment_method: s.payment_method,
+          });
+        } else {
+          await createIns.mutateAsync({
+            org_id: orgId,
+            project_id: projectId,
+            position: i + 1,
+            description: s.description,
+            percentage: s.percentage,
+            amount,
+            phase_id: s.phase_id,
+            due_date: s.due_date,
+            payment_method: s.payment_method,
+            status: "pendente",
+          });
+        }
       }
       setConfigOpen(false);
       toast.success("Parcelas configuradas!");
@@ -232,55 +256,73 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
           </div>
 
           {/* Splits */}
-          <div className="space-y-2 mt-3 max-h-[50vh] overflow-y-auto">
+          <div className="space-y-3 mt-3 max-h-[50vh] overflow-y-auto">
             {splits.map((row, idx) => (
-              <div key={idx} className="grid grid-cols-[1fr_80px_140px_140px_30px] gap-2 items-center">
-                <Input
-                  placeholder="Descrição (ex: Sinal 50%)"
-                  value={row.description}
-                  onChange={(e) => updateSplit(idx, { description: e.target.value })}
-                  className="h-9 text-xs"
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.01}
-                  placeholder="%"
-                  value={row.percentage || ""}
-                  onChange={(e) => updateSplit(idx, { percentage: parseFloat(e.target.value) || 0 })}
-                  className="h-9 text-xs"
-                />
-                <Select
-                  value={row.phase_id ?? "__none__"}
-                  onValueChange={(v) => updateSplit(idx, { phase_id: v === "__none__" ? null : v })}
-                >
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue placeholder="Etapa..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Sem etapa</SelectItem>
-                    {phases.map((ph) => (
-                      <SelectItem key={ph.id} value={ph.id}>
-                        {ph.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="date"
-                  value={row.due_date ?? ""}
-                  onChange={(e) => updateSplit(idx, { due_date: e.target.value || null })}
-                  className="h-9 text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeSplit(idx)}
-                  className="p-1 rounded hover:bg-red-50 text-text-muted hover:text-red-600 transition-colors"
-                  title="Remover"
-                >
-                  <Trash2 size={14} />
-                </button>
+              <div key={idx} className="rounded-lg border border-border p-2.5 space-y-2">
+                <div className="grid grid-cols-[1fr_80px_30px] gap-2 items-center">
+                  <Input
+                    placeholder="Descrição (ex: Sinal 50%)"
+                    value={row.description}
+                    onChange={(e) => updateSplit(idx, { description: e.target.value })}
+                    className="h-9 text-xs"
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.01}
+                    placeholder="%"
+                    value={row.percentage || ""}
+                    onChange={(e) => updateSplit(idx, { percentage: parseFloat(e.target.value) || 0 })}
+                    className="h-9 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSplit(idx)}
+                    className="p-1 rounded hover:bg-red-50 text-text-muted hover:text-red-600 transition-colors justify-self-center"
+                    title="Remover"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Select
+                    value={row.phase_id ?? "__none__"}
+                    onValueChange={(v) => updateSplit(idx, { phase_id: v === "__none__" ? null : v })}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Etapa..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sem etapa</SelectItem>
+                      {phases.map((ph) => (
+                        <SelectItem key={ph.id} value={ph.id}>
+                          {ph.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="date"
+                    value={row.due_date ?? ""}
+                    onChange={(e) => updateSplit(idx, { due_date: e.target.value || null })}
+                    className="h-9 text-xs"
+                  />
+                  <Select
+                    value={row.payment_method ?? "__none__"}
+                    onValueChange={(v) => updateSplit(idx, { payment_method: v === "__none__" ? null : (v as PaymentMethod) })}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Forma de pagto..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Não definida</SelectItem>
+                      {(Object.entries(PAYMENT_METHOD_LABEL) as [PaymentMethod, string][]).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             ))}
             <Button type="button" variant="outline" size="sm" onClick={addSplit} className="w-full">
@@ -372,6 +414,7 @@ function InstallmentRow({
         </div>
         <p className="text-xs text-text-muted mt-0.5">
           {installment.percentage}% • {installment.due_date ? `Vence ${formatDate(installment.due_date)}` : "Sem data"}
+          {installment.payment_method && ` • ${PAYMENT_METHOD_LABEL[installment.payment_method]}`}
           {installment.paid_at && ` • Pago em ${formatDate(installment.paid_at)}`}
         </p>
       </div>

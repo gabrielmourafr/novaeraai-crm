@@ -225,3 +225,12 @@ export const INSTALLMENT_STATUS_META: Record<Installment["status"], { label: str
   atrasado: { label: "Atrasado", color: "#EF4444" },
   cancelado: { label: "Cancelado", color: "#64748B" },
 };
+
+export type PaymentMethod = NonNullable<Installment["payment_method"]>;
+
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  pix: "Pix",
+  boleto: "Boleto",
+  cartao: "Cartão",
+  transferencia: "Transferência",
+};
