@@ -58,6 +58,12 @@ export const useEnsureMonthlyBilling = () => {
   }, []);
 };
 
+export const formatMonthLabel = (monthKey: string) => {
+  const [y, m] = monthKey.split("-");
+  const names = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  return `${names[Number(m) - 1]} / ${y}`;
+};
+
 export const nextBillingDate = (billingDay: number | null): Date | null => {
   if (!billingDay) return null;
   const today = new Date();
@@ -144,6 +150,80 @@ export const useClientMensalidadeSummary = () => {
           remainingCount: totalExpectedCycles !== null ? Math.max(0, totalExpectedCycles - paidCount) : null,
         };
       });
+    },
+  });
+};
+
+export interface MensalidadeReceivedItem {
+  id: string;
+  description: string;
+  value: number;
+  paidAt: string;
+  companyName: string;
+  projectName: string | null;
+}
+
+export interface MensalidadeReceivedMonth {
+  month: string; // yyyy-mm-01
+  total: number;
+  items: MensalidadeReceivedItem[];
+}
+
+// Histórico de mensalidades já recebidas, agrupado por mês — pra ver
+// exatamente qual mês cada mensalidade caiu, além do total geral.
+export const useMensalidadeReceivedHistory = () => {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["subscriptions", "received-history"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("revenues")
+        .select("id, description, value, paid_at, due_date, company:companies(name), project:projects(name)")
+        .eq("auto_source", "project_monthly_billing")
+        .eq("status", "pago")
+        .order("paid_at", { ascending: false, nullsFirst: false });
+      if (error) throw error;
+
+      type Row = {
+        id: string; description: string; value: number; paid_at: string | null; due_date: string | null;
+        company: { name: string } | null; project: { name: string } | null;
+      };
+
+      const byMonth = new Map<string, MensalidadeReceivedMonth>();
+      for (const r of (data ?? []) as unknown as Row[]) {
+        const ref = r.paid_at ?? r.due_date;
+        if (!ref) continue;
+        const monthKey = `${ref.slice(0, 7)}-01`;
+        if (!byMonth.has(monthKey)) byMonth.set(monthKey, { month: monthKey, total: 0, items: [] });
+        const entry = byMonth.get(monthKey)!;
+        entry.total += Number(r.value);
+        entry.items.push({
+          id: r.id,
+          description: r.description,
+          value: Number(r.value),
+          paidAt: r.paid_at ?? r.due_date!,
+          companyName: r.company?.name ?? "Sem empresa",
+          projectName: r.project?.name ?? null,
+        });
+      }
+
+      return Array.from(byMonth.values()).sort((a, b) => b.month.localeCompare(a.month));
+    },
+  });
+};
+
+export const useMensalidadeReceivedTotal = () => {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["subscriptions", "received-total"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("revenues")
+        .select("value")
+        .eq("auto_source", "project_monthly_billing")
+        .eq("status", "pago");
+      if (error) throw error;
+      return (data ?? []).reduce((s, r) => s + Number(r.value), 0);
     },
   });
 };

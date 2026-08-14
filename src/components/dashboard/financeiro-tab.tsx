@@ -21,7 +21,12 @@ import { formatCurrency, formatDate, parseCurrencyInput } from "@/lib/utils/form
 import { exportToCsv } from "@/lib/utils/csv";
 import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useUpcomingFixedExpenses, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues, type Revenue, type Expense } from "@/lib/hooks/use-finance";
 import { useAllInstallments, useMarkInstallmentPaid, useUpdateInstallment, useClientInstallmentsSummary, INSTALLMENT_STATUS_META, type InstallmentWithRelations } from "@/lib/hooks/use-installments";
-import { useActiveSubscriptions, useEnsureMonthlyBilling, useClientMensalidadeSummary, nextBillingDate, RENEWAL_LABEL, type ActiveSubscription } from "@/lib/hooks/use-subscriptions";
+import {
+  useActiveSubscriptions, useEnsureMonthlyBilling, useClientMensalidadeSummary,
+  useMensalidadeReceivedHistory, useMensalidadeReceivedTotal,
+  nextBillingDate, formatMonthLabel, RENEWAL_LABEL,
+  type ActiveSubscription, type MensalidadeReceivedMonth,
+} from "@/lib/hooks/use-subscriptions";
 import { useClientsFinancialSummary } from "@/lib/hooks/use-client-summary";
 import { useCompanies } from "@/lib/hooks/use-companies";
 import { useUpdateProject, useProjects } from "@/lib/hooks/use-projects";
@@ -127,6 +132,9 @@ export function FinanceiroTab() {
   useEnsureMonthlyBilling();
   const { data: totalRevenuesAllTime = 0 } = useTotalRevenues();
   const { data: activeSubscriptions = [], isLoading: subscriptionsLoading } = useActiveSubscriptions();
+  const { data: mensalidadeHistory = [] } = useMensalidadeReceivedHistory();
+  const { data: mensalidadeReceivedTotal = 0 } = useMensalidadeReceivedTotal();
+  const [mensalidadeMonthDetail, setMensalidadeMonthDetail] = useState<MensalidadeReceivedMonth | undefined>();
   const { data: mensalidadeSummary = [] } = useClientMensalidadeSummary();
   const { data: clientsSummary = [] } = useClientsFinancialSummary();
   const { data: clientInstallmentsSummary = [] } = useClientInstallmentsSummary();
@@ -742,8 +750,50 @@ export function FinanceiroTab() {
                 icon={TrendingUp}
                 onClick={() => setMensalidadesBreakdownOpen(true)}
               />
+              <StatCard
+                size="sm"
+                label="Total Recebido em Mensalidades (todos os períodos)"
+                value={formatCurrency(mensalidadeReceivedTotal)}
+                icon={Wallet}
+              />
             </div>
           </div>
+
+          {/* Mensalidades recebidas por mês */}
+          {mensalidadeHistory.length > 0 && (
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+            >
+              <div className="px-4 py-3 border-b" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                <h4 className="text-sm font-semibold" style={{ color: "#E2EBF8" }}>Mensalidades Recebidas por Mês</h4>
+                <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>Clique num mês pra ver quais clientes pagaram</p>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                    <TableHead style={{ color: "#7BA3C6" }}>Mês</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Clientes</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Total Recebido</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {mensalidadeHistory.map((m) => (
+                    <TableRow
+                      key={m.month}
+                      style={{ borderColor: "rgba(11,135,195,0.06)", cursor: "pointer" }}
+                      onClick={() => setMensalidadeMonthDetail(m)}
+                    >
+                      <TableCell className="text-sm capitalize" style={{ color: "#E2EBF8" }}>{formatMonthLabel(m.month)}</TableCell>
+                      <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{m.items.length}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-green-400">{formatCurrency(m.total)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
           {upcomingMensalidades.length > 0 && (
             <div
               className="rounded-xl overflow-hidden"
@@ -1521,6 +1571,43 @@ export function FinanceiroTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ─── DIALOG: Detalhe de Mensalidades Recebidas no Mês ─── */}
+      <Dialog open={!!mensalidadeMonthDetail} onOpenChange={(v) => !v && setMensalidadeMonthDetail(undefined)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="capitalize">
+              {mensalidadeMonthDetail ? formatMonthLabel(mensalidadeMonthDetail.month) : ""}
+            </DialogTitle>
+            <DialogDescription>
+              Total recebido: <strong>{formatCurrency(mensalidadeMonthDetail?.total ?? 0)}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Recebido em</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mensalidadeMonthDetail?.items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="text-sm font-medium text-text-primary">
+                      {item.companyName}
+                      {item.projectName && <span className="block text-xs text-text-muted font-normal">{item.projectName}</span>}
+                    </TableCell>
+                    <TableCell className="text-sm text-text-muted">{formatDate(item.paidAt)}</TableCell>
+                    <TableCell className="text-right text-sm font-semibold text-green-500">{formatCurrency(item.value)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ─── DIALOG: Breakdown de Mensalidades por Cliente ─── */}
       <Dialog open={mensalidadesBreakdownOpen} onOpenChange={setMensalidadesBreakdownOpen}>
