@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { Target, FileText, ArrowRight } from "lucide-react";
+import { Target, FileText, ArrowRight, Flame } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -33,6 +33,7 @@ export function ComercialTab() {
   const hotLeads = activeLeads.filter((l) => l.temperature === "quente");
   const sentProposals = proposals.filter((p) => p.status === "enviada");
   const pipelineValue = activeLeads.reduce((s, l) => s + (l.value ?? 0), 0);
+  const hotLeadsPipeline = hotLeads.reduce((s, l) => s + (l.value ?? 0), 0);
 
   const pipelineData = useMemo(() => {
     return MONTHS_SHORT.slice(Math.max(0, month - 6), month).map((m, i, arr) => {
@@ -66,6 +67,14 @@ export function ComercialTab() {
         <StatCard label="Leads Quentes" value={hotLeads.length} icon={Target} />
         <StatCard label="Propostas Enviadas" value={sentProposals.length} icon={FileText} />
         <StatCard label="Valor em Pipeline" value={formatCurrency(pipelineValue)} icon={Target} />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <StatCard
+          label={`Pipeline Quente — Projeção (${hotLeads.length})`}
+          value={formatCurrency(hotLeadsPipeline)}
+          icon={Flame}
+        />
       </div>
 
       {/* Charts Row */}

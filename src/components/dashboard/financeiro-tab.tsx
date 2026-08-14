@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { addDays, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Flame, Building2, Users, Download, Receipt, Layers } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Building2, Users, Download, Receipt, Layers } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,6 @@ import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths,
 import { useAllInstallments, useMarkInstallmentPaid, useUpdateInstallment, useClientInstallmentsSummary, INSTALLMENT_STATUS_META, type InstallmentWithRelations } from "@/lib/hooks/use-installments";
 import { useActiveSubscriptions, useEnsureMonthlyBilling, useClientMensalidadeSummary, nextBillingDate, RENEWAL_LABEL, type ActiveSubscription } from "@/lib/hooks/use-subscriptions";
 import { useClientsFinancialSummary } from "@/lib/hooks/use-client-summary";
-import { useLeads } from "@/lib/hooks/use-leads";
 import { useCompanies } from "@/lib/hooks/use-companies";
 import { useUpdateProject, useProjects } from "@/lib/hooks/use-projects";
 import { useUser } from "@/lib/hooks/use-user";
@@ -149,16 +148,10 @@ export function FinanceiroTab() {
     setEditingInstallmentNF(undefined);
   };
 
-  const { data: leads = [] } = useLeads();
   const { data: companiesList = [] } = useCompanies();
   const totalMonthlyRecurring = activeSubscriptions.reduce((s, p) => s + Number(p.billing_amount ?? 0), 0);
   const totalImplementacaoReceber = clientsSummary.reduce((s, c) => s + c.implementacaoReceber, 0);
   const totalImplementacaoRecebida = clientsSummary.reduce((s, c) => s + c.implementacaoRecebida, 0);
-  const hotLeadsPipeline = useMemo(
-    () => leads.filter((l) => l.temperature === "quente").reduce((s, l) => s + (l.value ?? 0), 0),
-    [leads]
-  );
-  const hotLeadsCount = leads.filter((l) => l.temperature === "quente").length;
   const { data: projects = [] } = useProjects();
   const upcomingMensalidades = useMemo(() => {
     return projects
@@ -412,284 +405,271 @@ export function FinanceiroTab() {
 
   return (
     <div className="space-y-6">
-      {/* Month/Year Filter */}
-      <div className="flex gap-3 items-center">
-        <Select value={month.toString()} onValueChange={(v) => setMonth(parseInt(v))}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>{months.map((m, i) => (<SelectItem key={i+1} value={(i+1).toString()}>{m}</SelectItem>))}</SelectContent>
-        </Select>
-        <Select value={year.toString()} onValueChange={(v) => setYear(parseInt(v))}>
-          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-          <SelectContent>{[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map((y) => (<SelectItem key={y} value={y.toString()}>{y}</SelectItem>))}</SelectContent>
-        </Select>
-      </div>
-
-      {/* Resumo do mês selecionado */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
-          Resumo de {months[month - 1]} / {year}
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label="Receitas (mês)" value={formatCurrency(totalRevenues)} icon={TrendingUp} />
-          <StatCard label="Despesas (mês)" value={formatCurrency(totalExpenses)} icon={TrendingDown} />
-          <StatCard label="Saldo" value={formatCurrency(balance)} icon={DollarSign} />
-          <StatCard label="Recebido" value={formatCurrency(paidRevenues)} icon={TrendingUp} />
-        </div>
-      </div>
-
-      {/* Implementação (acumulado, todos os períodos) */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
-          Implementação — Acumulado
-        </h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard size="sm" label="Faturamento Total" value={formatCurrency(totalRevenuesAllTime)} icon={Wallet} />
-          <StatCard
-            size="sm"
-            label={`Parcelas Restantes (${totalParcelasRestantes})`}
-            value={formatCurrency(totalParcelasRestantesValue)}
-            icon={Layers}
-            onClick={() => setParcelasBreakdownOpen(true)}
-          />
-          <StatCard
-            size="sm"
-            label="A Receber (clientes)"
-            value={formatCurrency(totalImplementacaoReceber)}
-            icon={Building2}
-            onClick={() => setImplReceberBreakdownOpen(true)}
-          />
-          <StatCard
-            size="sm"
-            label="Recebida (clientes)"
-            value={formatCurrency(totalImplementacaoRecebida)}
-            icon={Building2}
-            onClick={() => setImplRecebidaBreakdownOpen(true)}
-          />
-        </div>
-      </div>
-
-      {/* Recorrência, pipeline e pagamentos */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
-          Recorrência &amp; Pipeline
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard
-            size="sm"
-            label={`Mensalidades Acumuladas (${activeSubscriptions.length})`}
-            value={formatCurrency(totalMonthlyRecurring)}
-            icon={TrendingUp}
-            onClick={() => setMensalidadesBreakdownOpen(true)}
-          />
-          <StatCard
-            size="sm"
-            label={`Pipeline Quente — Projeção (${hotLeadsCount})`}
-            value={formatCurrency(hotLeadsPipeline)}
-            icon={Flame}
-          />
-          <StatCard
-            size="sm"
-            label={`A Pagar — Parceiros/Devs (${pendingPayments.length})`}
-            value={formatCurrency(totalPendingPayments)}
-            icon={Users}
-          />
-        </div>
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Cash Flow Area Chart */}
-        <div
-          className="lg:col-span-2 rounded-xl p-5"
-          style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
-        >
-          <div className="mb-4">
-            <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Fluxo de Caixa</h3>
-            <p className="text-xs" style={{ color: "#7BA3C6" }}>Receitas vs Despesas</p>
-          </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={cashFlowData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gradRec" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0.3}/>
-                </linearGradient>
-                <linearGradient id="gradExp" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0.3}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" />
-              <XAxis dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
-              <Bar dataKey="receitas" name="Receitas" fill="#22c55e" radius={[4,4,0,0]} maxBarSize={40} />
-              <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Revenue Status Pie */}
-        <div
-          className="rounded-xl p-5"
-          style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
-        >
-          <div className="mb-4">
-            <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Status das Receitas</h3>
-            <p className="text-xs" style={{ color: "#7BA3C6" }}>Mês atual</p>
-          </div>
-          {revStatusData.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-xs" style={{ color: "#3D5A78" }}>
-              Sem dados neste mês
-            </div>
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={140}>
-                <PieChart>
-                  <Pie data={revStatusData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" paddingAngle={3}>
-                    {revStatusData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="mt-3 space-y-1.5">
-                {revStatusData.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
-                      <span style={{ color: "#7BA3C6" }}>{item.name}</span>
-                    </div>
-                    <span className="font-semibold" style={{ color: "#E2EBF8" }}>{formatCurrency(item.value)}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Expense breakdown */}
-      {expCategoryData.length > 0 && (
-        <div
-          className="rounded-xl p-5"
-          style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
-        >
-          <div className="mb-4">
-            <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Despesas por Categoria</h3>
-            <p className="text-xs" style={{ color: "#7BA3C6" }}>Distribuição do mês</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={expCategoryData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" horizontal={false} />
-                <XAxis type="number" tick={{ fill: "#7BA3C6", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
-                <YAxis type="category" dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 10 }} axisLine={false} tickLine={false} width={80} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
-                <Bar dataKey="value" name="Valor" radius={[0,4,4,0]} maxBarSize={20}>
-                  {expCategoryData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="space-y-2">
-              {expCategoryData.map((item) => (
-                <div key={item.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
-                    <span className="capitalize" style={{ color: "#7BA3C6" }}>{item.name}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>{formatCurrency(item.value)}</span>
-                    <span className="ml-2 text-xs" style={{ color: "#3D5A78" }}>
-                      {totalExpenses > 0 ? `${((item.value / totalExpenses) * 100).toFixed(0)}%` : "—"}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tables */}
-      <Tabs defaultValue="receivables">
-        <TabsList>
-          <TabsTrigger value="receivables">Recebíveis ({installmentsPending.length})</TabsTrigger>
-          <TabsTrigger value="subscriptions">Mensalidades Ativas ({activeSubscriptions.length})</TabsTrigger>
-          <TabsTrigger value="revenues">Receitas ({revenues.length})</TabsTrigger>
-          <TabsTrigger value="expenses">Despesas ({expenses.length})</TabsTrigger>
-          <TabsTrigger value="partner-payments">Parceiros & Devs ({pendingPayments.length})</TabsTrigger>
+      {/* Sub-navegação: telas separadas por área do Financeiro */}
+      <Tabs defaultValue="visao-geral">
+        <TabsList className="flex-wrap h-auto gap-1">
+          <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
+          <TabsTrigger value="implementacao">Implementação</TabsTrigger>
+          <TabsTrigger value="mensalidade">Mensalidade</TabsTrigger>
+          <TabsTrigger value="receitas">Receitas ({revenues.length})</TabsTrigger>
+          <TabsTrigger value="despesas">Despesas ({expenses.length})</TabsTrigger>
+          <TabsTrigger value="parceiros">Parceiros & Devs ({pendingPayments.length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="partner-payments" className="mt-4">
-          <div className="flex justify-end mb-3">
-            <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => setCreatePaymentOpen(true)}>
-              <Plus size={14} className="mr-1" />Novo Pagamento
-            </Button>
+        {/* ══════════════════ VISÃO GERAL ══════════════════ */}
+        <TabsContent value="visao-geral" className="mt-4 space-y-6">
+          {/* Month/Year Filter */}
+          <div className="flex gap-3 items-center">
+            <Select value={month.toString()} onValueChange={(v) => setMonth(parseInt(v))}>
+              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectContent>{months.map((m, i) => (<SelectItem key={i+1} value={(i+1).toString()}>{m}</SelectItem>))}</SelectContent>
+            </Select>
+            <Select value={year.toString()} onValueChange={(v) => setYear(parseInt(v))}>
+              <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+              <SelectContent>{[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map((y) => (<SelectItem key={y} value={y.toString()}>{y}</SelectItem>))}</SelectContent>
+            </Select>
           </div>
+
+          {/* Resumo do mês selecionado */}
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+              Resumo de {months[month - 1]} / {year}
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard label="Receitas (mês)" value={formatCurrency(totalRevenues)} icon={TrendingUp} />
+              <StatCard label="Despesas (mês)" value={formatCurrency(totalExpenses)} icon={TrendingDown} />
+              <StatCard label="Saldo" value={formatCurrency(balance)} icon={DollarSign} />
+              <StatCard label="Recebido" value={formatCurrency(paidRevenues)} icon={TrendingUp} />
+            </div>
+          </div>
+
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Cash Flow Area Chart */}
+            <div
+              className="lg:col-span-2 rounded-xl p-5"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+            >
+              <div className="mb-4">
+                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Fluxo de Caixa</h3>
+                <p className="text-xs" style={{ color: "#7BA3C6" }}>Receitas vs Despesas</p>
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={cashFlowData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradRec" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0.3}/>
+                    </linearGradient>
+                    <linearGradient id="gradExp" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0.3}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" />
+                  <XAxis dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
+                  <Bar dataKey="receitas" name="Receitas" fill="#22c55e" radius={[4,4,0,0]} maxBarSize={40} />
+                  <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Revenue Status Pie */}
+            <div
+              className="rounded-xl p-5"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+            >
+              <div className="mb-4">
+                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Status das Receitas</h3>
+                <p className="text-xs" style={{ color: "#7BA3C6" }}>Mês atual</p>
+              </div>
+              {revStatusData.length === 0 ? (
+                <div className="flex items-center justify-center h-40 text-xs" style={{ color: "#3D5A78" }}>
+                  Sem dados neste mês
+                </div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={140}>
+                    <PieChart>
+                      <Pie data={revStatusData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" paddingAngle={3}>
+                        {revStatusData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="mt-3 space-y-1.5">
+                    {revStatusData.map((item) => (
+                      <div key={item.name} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
+                          <span style={{ color: "#7BA3C6" }}>{item.name}</span>
+                        </div>
+                        <span className="font-semibold" style={{ color: "#E2EBF8" }}>{formatCurrency(item.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Expense breakdown */}
+          {expCategoryData.length > 0 && (
+            <div
+              className="rounded-xl p-5"
+              style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+            >
+              <div className="mb-4">
+                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Despesas por Categoria</h3>
+                <p className="text-xs" style={{ color: "#7BA3C6" }}>Distribuição do mês</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={expCategoryData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" horizontal={false} />
+                    <XAxis type="number" tick={{ fill: "#7BA3C6", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                    <YAxis type="category" dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 10 }} axisLine={false} tickLine={false} width={80} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
+                    <Bar dataKey="value" name="Valor" radius={[0,4,4,0]} maxBarSize={20}>
+                      {expCategoryData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="space-y-2">
+                  {expCategoryData.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
+                        <span className="capitalize" style={{ color: "#7BA3C6" }}>{item.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>{formatCurrency(item.value)}</span>
+                        <span className="ml-2 text-xs" style={{ color: "#3D5A78" }}>
+                          {totalExpenses > 0 ? `${((item.value / totalExpenses) * 100).toFixed(0)}%` : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ══════════════════ IMPLEMENTAÇÃO ══════════════════ */}
+        <TabsContent value="implementacao" className="mt-4 space-y-6">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+              Implementação
+            </h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard size="sm" label="Faturamento Total" value={formatCurrency(totalRevenuesAllTime)} icon={Wallet} />
+              <StatCard
+                size="sm"
+                label={`Parcelas Restantes (${totalParcelasRestantes})`}
+                value={formatCurrency(totalParcelasRestantesValue)}
+                icon={Layers}
+                onClick={() => setParcelasBreakdownOpen(true)}
+              />
+              <StatCard
+                size="sm"
+                label="A Receber (clientes)"
+                value={formatCurrency(totalImplementacaoReceber)}
+                icon={Building2}
+                onClick={() => setImplReceberBreakdownOpen(true)}
+              />
+              <StatCard
+                size="sm"
+                label="Recebida (clientes)"
+                value={formatCurrency(totalImplementacaoRecebida)}
+                icon={Building2}
+                onClick={() => setImplRecebidaBreakdownOpen(true)}
+              />
+            </div>
+          </div>
+
           <div
             className="rounded-xl overflow-hidden"
             style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
           >
-            {paymentsLoading ? (
+            {installmentsLoading ? (
               <div className="p-8 text-center text-sm" style={{ color: "#7BA3C6" }}>Carregando...</div>
-            ) : partnerPayments.length === 0 ? (
+            ) : installmentsPending.length === 0 ? (
               <div className="p-8 text-center text-sm" style={{ color: "#3D5A78" }}>
-                Nenhum pagamento registrado. Use <b>Novo Pagamento</b> pra lançar comissões de parceiros ou desenvolvedores.
+                Nenhuma parcela pendente. Configure parcelas em cada projeto na aba <b>Financeiro</b>.
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
-                    <TableHead style={{ color: "#7BA3C6" }}>Recebedor</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>Tipo</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>Descrição</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Projeto</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Parcela</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Valor</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Vencimento</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Status</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>NF</TableHead>
                     <TableHead className="w-[120px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {partnerPayments.map((p) => {
-                    const meta = PAYMENT_STATUS_META[p.status];
-                    const overdue = p.due_date && p.status === "pendente" && new Date(p.due_date) < new Date();
+                  {installmentsPending.map((inst) => {
+                    const meta = INSTALLMENT_STATUS_META[inst.status];
+                    const overdue =
+                      inst.due_date && inst.status !== "pago" && new Date(inst.due_date) < new Date();
                     return (
-                      <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
-                        <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>{p.recipient_name}</TableCell>
-                        <TableCell>
-                          <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "rgba(11,135,195,0.12)", color: "#0CA8F5" }}>
-                            {RECIPIENT_TYPE_LABEL[p.recipient_type]}
-                          </span>
+                      <TableRow key={inst.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                        <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>
+                          {inst.project ? (
+                            <Link href={`/projects/${inst.project.id}?tab=financeiro`} className="hover:underline text-[#0B87C3]">
+                              {inst.project.name}
+                            </Link>
+                          ) : "—"}
                         </TableCell>
-                        <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{p.description}</TableCell>
-                        <TableCell className="text-sm">
-                          {p.project ? (
-                            <Link href={`/projects/${p.project.id}`} className="hover:underline text-[#0B87C3]">{p.project.name}</Link>
-                          ) : <span style={{ color: "#3D5A78" }}>—</span>}
+                        <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>
+                          {inst.description}
+                          <span className="ml-1 text-xs" style={{ color: "#7BA3C6" }}>({inst.percentage}%)</span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm font-semibold text-green-400">{formatCurrency(Number(p.amount))}</span>
+                          <span className="text-sm font-semibold text-green-400">{formatCurrency(Number(inst.amount))}</span>
                         </TableCell>
                         <TableCell>
                           <span className={`text-sm ${overdue ? "text-red-400 font-medium" : ""}`} style={{ color: overdue ? undefined : "#7BA3C6" }}>
-                            {p.due_date ? formatDate(p.due_date) : "—"}
+                            {inst.due_date ? formatDate(inst.due_date) : "—"}
+                            {overdue && <span className="block text-[10px]">Atrasada</span>}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: `${meta.color}20`, color: meta.color }}>
+                          <span
+                            className="px-2 py-0.5 rounded-full text-xs font-medium"
+                            style={{ background: `${meta.color}20`, color: meta.color }}
+                          >
                             {meta.label}
                           </span>
                         </TableCell>
                         <TableCell>
+                          <button
+                            onClick={() => openInstallmentNF(inst)}
+                            className="text-xs px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
+                            style={
+                              inst.nf_number
+                                ? { background: "rgba(16,185,129,0.15)", color: "#10B981" }
+                                : { background: "rgba(148,163,184,0.15)", color: "#7BA3C6" }
+                            }
+                          >
+                            {inst.nf_number ? `NF ${inst.nf_number}` : "Sem NF"}
+                          </button>
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center justify-end gap-1">
-                            {p.status !== "pago" && (
-                              <Button variant="ghost" size="sm" className="h-7 text-xs text-green-400 hover:text-green-300" onClick={() => markPaymentPaid.mutate(p.id)}>
-                                ✓ Pago
-                              </Button>
-                            )}
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => setDeletingPayment(p)}>
-                              <Trash2 size={13} />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs text-green-400 hover:text-green-300"
+                              onClick={() => markPaid.mutate(inst.id)}
+                            >
+                              ✓ Pago
                             </Button>
                           </div>
                         </TableCell>
@@ -702,7 +682,22 @@ export function FinanceiroTab() {
           </div>
         </TabsContent>
 
-        <TabsContent value="subscriptions" className="mt-4 space-y-4">
+        {/* ══════════════════ MENSALIDADE ══════════════════ */}
+        <TabsContent value="mensalidade" className="mt-4 space-y-4">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+              Mensalidade
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <StatCard
+                size="sm"
+                label={`Mensalidades Acumuladas (${activeSubscriptions.length})`}
+                value={formatCurrency(totalMonthlyRecurring)}
+                icon={TrendingUp}
+                onClick={() => setMensalidadesBreakdownOpen(true)}
+              />
+            </div>
+          </div>
           {upcomingMensalidades.length > 0 && (
             <div
               className="rounded-xl overflow-hidden"
@@ -826,100 +821,7 @@ export function FinanceiroTab() {
           </div>
         </TabsContent>
 
-        <TabsContent value="receivables" className="mt-4">
-          <div
-            className="rounded-xl overflow-hidden"
-            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
-          >
-            {installmentsLoading ? (
-              <div className="p-8 text-center text-sm" style={{ color: "#7BA3C6" }}>Carregando...</div>
-            ) : installmentsPending.length === 0 ? (
-              <div className="p-8 text-center text-sm" style={{ color: "#3D5A78" }}>
-                Nenhuma parcela pendente. Configure parcelas em cada projeto na aba <b>Financeiro</b>.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
-                    <TableHead style={{ color: "#7BA3C6" }}>Projeto</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>Parcela</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>Valor</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>Vencimento</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>Status</TableHead>
-                    <TableHead style={{ color: "#7BA3C6" }}>NF</TableHead>
-                    <TableHead className="w-[120px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {installmentsPending.map((inst) => {
-                    const meta = INSTALLMENT_STATUS_META[inst.status];
-                    const overdue =
-                      inst.due_date && inst.status !== "pago" && new Date(inst.due_date) < new Date();
-                    return (
-                      <TableRow key={inst.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
-                        <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>
-                          {inst.project ? (
-                            <Link href={`/projects/${inst.project.id}?tab=financeiro`} className="hover:underline text-[#0B87C3]">
-                              {inst.project.name}
-                            </Link>
-                          ) : "—"}
-                        </TableCell>
-                        <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>
-                          {inst.description}
-                          <span className="ml-1 text-xs" style={{ color: "#7BA3C6" }}>({inst.percentage}%)</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm font-semibold text-green-400">{formatCurrency(Number(inst.amount))}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className={`text-sm ${overdue ? "text-red-400 font-medium" : ""}`} style={{ color: overdue ? undefined : "#7BA3C6" }}>
-                            {inst.due_date ? formatDate(inst.due_date) : "—"}
-                            {overdue && <span className="block text-[10px]">Atrasada</span>}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className="px-2 py-0.5 rounded-full text-xs font-medium"
-                            style={{ background: `${meta.color}20`, color: meta.color }}
-                          >
-                            {meta.label}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <button
-                            onClick={() => openInstallmentNF(inst)}
-                            className="text-xs px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
-                            style={
-                              inst.nf_number
-                                ? { background: "rgba(16,185,129,0.15)", color: "#10B981" }
-                                : { background: "rgba(148,163,184,0.15)", color: "#7BA3C6" }
-                            }
-                          >
-                            {inst.nf_number ? `NF ${inst.nf_number}` : "Sem NF"}
-                          </button>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs text-green-400 hover:text-green-300"
-                              onClick={() => markPaid.mutate(inst.id)}
-                            >
-                              ✓ Pago
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="revenues" className="mt-4">
+        <TabsContent value="receitas" className="mt-4">
           <div className="flex justify-end gap-2 mb-3">
             <Button size="sm" variant="outline" onClick={handleExportRevenues} disabled={revenues.length === 0}>
               <Download size={14} className="mr-1" />Exportar planilha
@@ -989,7 +891,7 @@ export function FinanceiroTab() {
           </div>
         </TabsContent>
 
-        <TabsContent value="expenses" className="mt-4">
+        <TabsContent value="despesas" className="mt-4">
           <div className="flex justify-end gap-2 mb-3">
             <Button size="sm" variant="outline" onClick={handleExportExpenses} disabled={expenses.length === 0}>
               <Download size={14} className="mr-1" />Exportar planilha
@@ -1039,6 +941,97 @@ export function FinanceiroTab() {
                       </TableCell>
                     </TableRow>
                   ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ══════════════════ PARCEIROS & DEVS ══════════════════ */}
+        <TabsContent value="parceiros" className="mt-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <StatCard
+              size="sm"
+              label={`A Pagar — Parceiros/Devs (${pendingPayments.length})`}
+              value={formatCurrency(totalPendingPayments)}
+              icon={Users}
+            />
+          </div>
+          <div className="flex justify-end mb-3">
+            <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => setCreatePaymentOpen(true)}>
+              <Plus size={14} className="mr-1" />Novo Pagamento
+            </Button>
+          </div>
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+          >
+            {paymentsLoading ? (
+              <div className="p-8 text-center text-sm" style={{ color: "#7BA3C6" }}>Carregando...</div>
+            ) : partnerPayments.length === 0 ? (
+              <div className="p-8 text-center text-sm" style={{ color: "#3D5A78" }}>
+                Nenhum pagamento registrado. Use <b>Novo Pagamento</b> pra lançar comissões de parceiros ou desenvolvedores.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                    <TableHead style={{ color: "#7BA3C6" }}>Recebedor</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Tipo</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Descrição</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Projeto</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Valor</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Vencimento</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Status</TableHead>
+                    <TableHead className="w-[120px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {partnerPayments.map((p) => {
+                    const meta = PAYMENT_STATUS_META[p.status];
+                    const overdue = p.due_date && p.status === "pendente" && new Date(p.due_date) < new Date();
+                    return (
+                      <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                        <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>{p.recipient_name}</TableCell>
+                        <TableCell>
+                          <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "rgba(11,135,195,0.12)", color: "#0CA8F5" }}>
+                            {RECIPIENT_TYPE_LABEL[p.recipient_type]}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{p.description}</TableCell>
+                        <TableCell className="text-sm">
+                          {p.project ? (
+                            <Link href={`/projects/${p.project.id}`} className="hover:underline text-[#0B87C3]">{p.project.name}</Link>
+                          ) : <span style={{ color: "#3D5A78" }}>—</span>}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm font-semibold text-green-400">{formatCurrency(Number(p.amount))}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`text-sm ${overdue ? "text-red-400 font-medium" : ""}`} style={{ color: overdue ? undefined : "#7BA3C6" }}>
+                            {p.due_date ? formatDate(p.due_date) : "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: `${meta.color}20`, color: meta.color }}>
+                            {meta.label}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            {p.status !== "pago" && (
+                              <Button variant="ghost" size="sm" className="h-7 text-xs text-green-400 hover:text-green-300" onClick={() => markPaymentPaid.mutate(p.id)}>
+                                ✓ Pago
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => setDeletingPayment(p)}>
+                              <Trash2 size={13} />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
