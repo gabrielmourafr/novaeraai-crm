@@ -19,7 +19,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatDate, parseCurrencyInput } from "@/lib/utils/format";
 import { exportToCsv } from "@/lib/utils/csv";
-import { useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useUpcomingFixedExpenses, useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues, type Revenue, type Expense } from "@/lib/hooks/use-finance";
+import {
+  useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useUpcomingFixedExpenses,
+  useRecurringExpenseTemplates, useEnsureMonthlyFixedExpenses,
+  useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues,
+  type Revenue, type Expense, type ExpenseWithCompany,
+} from "@/lib/hooks/use-finance";
 import { useAllInstallments, useMarkInstallmentPaid, useUpdateInstallment, useClientInstallmentsSummary, INSTALLMENT_STATUS_META, PAYMENT_METHOD_LABEL, type InstallmentWithRelations } from "@/lib/hooks/use-installments";
 import {
   useActiveSubscriptions, useEnsureMonthlyBilling, useClientMensalidadeSummary,
@@ -127,11 +132,17 @@ export function FinanceiroTab() {
   const [expStatus, setExpStatus] = useState<"pendente" | "pago" | "atrasado">("pendente");
   const [expRecurrence, setExpRecurrence] = useState<"pontual" | "mensal" | "trimestral" | "anual">("pontual");
   const [expType, setExpType] = useState<"" | "fixo" | "variavel">("");
-  const [editingExpense, setEditingExpense] = useState<Expense | undefined>();
+  const [editingExpense, setEditingExpense] = useState<ExpenseWithCompany | undefined>();
   const [expenseTypeFilter, setExpenseTypeFilter] = useState<"all" | "fixo" | "variavel">("all");
+  const [expIsRecurringTemplate, setExpIsRecurringTemplate] = useState(false);
+  const [expCompanyId, setExpCompanyId] = useState("__none__");
+  const [expBillingDay, setExpBillingDay] = useState("");
+  const [expContractStart, setExpContractStart] = useState("");
+  const [expContractEnd, setExpContractEnd] = useState("");
 
   const { user } = useUser();
   useEnsureMonthlyBilling();
+  useEnsureMonthlyFixedExpenses();
   const { data: totalRevenuesAllTime = 0 } = useTotalRevenues();
   const { data: activeSubscriptions = [], isLoading: subscriptionsLoading } = useActiveSubscriptions();
   const { data: mensalidadeHistory = [] } = useMensalidadeReceivedHistory();
@@ -279,6 +290,7 @@ export function FinanceiroTab() {
   const { data: revenues = [], isLoading: revLoading } = useRevenues(year, month);
   const { data: expenses = [], isLoading: expLoading } = useExpenses(year, month);
   const { data: upcomingFixedExpenses = [] } = useUpcomingFixedExpenses();
+  const { data: recurringTemplates = [] } = useRecurringExpenseTemplates();
   const { data: revenuesLastMonths = {} } = useRevenuesLastMonths(year, month, 6);
   const { data: expensesLastMonths = {} } = useExpensesLastMonths(year, month, 6);
   const { data: installmentsPending = [], isLoading: installmentsLoading } = useAllInstallments([
@@ -338,6 +350,8 @@ export function FinanceiroTab() {
   const resetExpenseForm = () => {
     setExpDesc(""); setExpValue(""); setExpDueDate("");
     setExpCategory("outro"); setExpStatus("pendente"); setExpRecurrence("pontual"); setExpType("");
+    setExpIsRecurringTemplate(false); setExpCompanyId("__none__");
+    setExpBillingDay(""); setExpContractStart(""); setExpContractEnd("");
   };
 
   const openCreateExpense = () => {
@@ -346,7 +360,15 @@ export function FinanceiroTab() {
     setCreateExpenseOpen(true);
   };
 
-  const openEditExpense = (exp: Expense) => {
+  const openCreateRecurringExpense = () => {
+    resetExpenseForm();
+    setExpIsRecurringTemplate(true);
+    setExpRecurrence("mensal");
+    setEditingExpense(undefined);
+    setCreateExpenseOpen(true);
+  };
+
+  const openEditExpense = (exp: ExpenseWithCompany) => {
     setExpDesc(exp.description);
     setExpCategory(exp.category);
     setExpValue(exp.value.toString());
@@ -354,6 +376,11 @@ export function FinanceiroTab() {
     setExpStatus(exp.status);
     setExpRecurrence(exp.recurrence);
     setExpType(exp.expense_type ?? "");
+    setExpIsRecurringTemplate(exp.is_recurring_template);
+    setExpCompanyId(exp.company_id ?? "__none__");
+    setExpBillingDay(exp.billing_day?.toString() ?? "");
+    setExpContractStart(exp.contract_start ?? "");
+    setExpContractEnd(exp.contract_end ?? "");
     setEditingExpense(exp);
     setCreateExpenseOpen(true);
   };
@@ -364,29 +391,33 @@ export function FinanceiroTab() {
     if (!expDesc || !expValue) { toast.error("Preencha descrição e valor."); return; }
     const parsedValue = parseCurrencyInput(expValue);
     if (isNaN(parsedValue)) { toast.error("Valor inválido — use um número, ex: 1500,00."); return; }
+    if (expIsRecurringTemplate && expCompanyId === "__none__") {
+      toast.error("Selecione o cliente pra uma despesa recorrente vinculada a cliente.");
+      return;
+    }
+    const sharedFields = {
+      description: expDesc,
+      category: expCategory,
+      value: parsedValue,
+      status: expStatus,
+      recurrence: expIsRecurringTemplate ? "mensal" as const : expRecurrence,
+      expense_type: expType || null,
+      company_id: expCompanyId !== "__none__" ? expCompanyId : null,
+      billing_day: expIsRecurringTemplate && expBillingDay ? parseInt(expBillingDay) : null,
+      contract_start: expIsRecurringTemplate ? (expContractStart || null) : null,
+      contract_end: expIsRecurringTemplate ? (expContractEnd || null) : null,
+      is_recurring_template: expIsRecurringTemplate,
+      due_date: expIsRecurringTemplate ? null : (expDueDate || null),
+    };
     if (editingExpense) {
-      await updateExpense.mutateAsync({
-        id: editingExpense.id,
-        description: expDesc,
-        category: expCategory,
-        value: parsedValue,
-        status: expStatus,
-        due_date: expDueDate || null,
-        recurrence: expRecurrence,
-        expense_type: expType || null,
-      });
+      await updateExpense.mutateAsync({ id: editingExpense.id, ...sharedFields });
     } else {
       await createExpense.mutateAsync({
         org_id: user.org_id,
-        description: expDesc,
-        category: expCategory,
-        value: parsedValue,
-        status: expStatus,
-        due_date: expDueDate || null,
-        recurrence: expRecurrence,
-        expense_type: expType || null,
+        ...sharedFields,
         project_id: null,
         paid_at: null,
+        template_id: null,
       });
     }
     setCreateExpenseOpen(false);
@@ -1275,6 +1306,63 @@ export function FinanceiroTab() {
             </div>
           )}
 
+          {/* Despesas recorrentes vinculadas a cliente */}
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+          >
+            <div className="px-4 py-3 border-b flex items-center justify-between gap-2" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+              <div>
+                <h4 className="text-sm font-semibold" style={{ color: "#E2EBF8" }}>Despesas Recorrentes de Clientes</h4>
+                <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
+                  Ex: VPS de um cliente — o lançamento do mês é gerado sozinho, no dia de cobrança configurado
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={openCreateRecurringExpense}>
+                <Plus size={14} className="mr-1" />Nova Recorrente
+              </Button>
+            </div>
+            {recurringTemplates.length === 0 ? (
+              <div className="p-6 text-center text-sm" style={{ color: "#3D5A78" }}>Nenhuma despesa recorrente de cliente cadastrada.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                    <TableHead style={{ color: "#7BA3C6" }}>Descrição</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Cliente</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Valor</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Dia de Cobrança</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Contrato</TableHead>
+                    <TableHead className="w-[60px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recurringTemplates.map((tpl) => {
+                    const contractEnded = tpl.contract_end && new Date(tpl.contract_end) < new Date();
+                    return (
+                      <TableRow key={tpl.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                        <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>{tpl.description}</TableCell>
+                        <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{tpl.company?.name ?? "—"}</TableCell>
+                        <TableCell><span className="text-sm font-semibold text-red-400">{formatCurrency(tpl.value)}</span></TableCell>
+                        <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{tpl.billing_day ? `Dia ${tpl.billing_day}` : "—"}</TableCell>
+                        <TableCell className="text-sm" style={{ color: contractEnded ? "#ef4444" : "#7BA3C6" }}>
+                          {tpl.contract_start ? formatDate(tpl.contract_start) : "—"}
+                          {tpl.contract_end ? ` até ${formatDate(tpl.contract_end)}` : " (sem prazo)"}
+                          {contractEnded && <span className="block text-[10px]">Contrato encerrado</span>}
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-text-muted hover:text-primary" onClick={() => openEditExpense(tpl)}>
+                            <Pencil size={13} />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex gap-1 rounded-lg p-1" style={{ background: "rgba(11,135,195,0.05)", border: "1px solid rgba(11,135,195,0.15)" }}>
               {([
@@ -1600,68 +1688,152 @@ export function FinanceiroTab() {
               <Label>Descrição *</Label>
               <Input value={expDesc} onChange={(e) => setExpDesc(e.target.value)} placeholder="Ex: Servidor AWS mensal" required />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Valor (R$) *</Label>
-                <Input value={expValue} onChange={(e) => setExpValue(e.target.value)} placeholder="0,00" required />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Vencimento</Label>
-                <Input type="date" value={expDueDate} onChange={(e) => setExpDueDate(e.target.value)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Categoria</Label>
-                <Select value={expCategory} onValueChange={(v) => setExpCategory(v as typeof expCategory)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="infraestrutura">Infraestrutura</SelectItem>
-                    <SelectItem value="saas">SaaS</SelectItem>
-                    <SelectItem value="marketing">Marketing</SelectItem>
-                    <SelectItem value="pessoal">Pessoal</SelectItem>
-                    <SelectItem value="imposto">Imposto</SelectItem>
-                    <SelectItem value="outro">Outro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Status</Label>
-                <Select value={expStatus} onValueChange={(v) => setExpStatus(v as typeof expStatus)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pendente">Pendente</SelectItem>
-                    <SelectItem value="pago">Pago</SelectItem>
-                    <SelectItem value="atrasado">Atrasado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Recorrência</Label>
-                <Select value={expRecurrence} onValueChange={(v) => setExpRecurrence(v as typeof expRecurrence)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pontual">Pontual</SelectItem>
-                    <SelectItem value="mensal">Mensal</SelectItem>
-                    <SelectItem value="trimestral">Trimestral</SelectItem>
-                    <SelectItem value="anual">Anual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tipo</Label>
-                <Select value={expType || "__none__"} onValueChange={(v) => setExpType(v === "__none__" ? "" : (v as "fixo" | "variavel"))}>
-                  <SelectTrigger><SelectValue placeholder="Não classificada" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Não classificada</SelectItem>
-                    <SelectItem value="fixo">Fixa</SelectItem>
-                    <SelectItem value="variavel">Variável</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+
+            <label className="flex items-start gap-2.5 rounded-lg border border-border p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={expIsRecurringTemplate}
+                onChange={(e) => {
+                  setExpIsRecurringTemplate(e.target.checked);
+                  if (e.target.checked) setExpRecurrence("mensal");
+                }}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="block text-sm font-medium text-text-primary">Despesa recorrente vinculada a cliente</span>
+                <span className="block text-xs text-text-muted mt-0.5">
+                  Ex: VPS de um cliente, cobrada todo mês num dia fixo, com prazo de contrato — o sistema gera o lançamento do mês sozinho.
+                </span>
+              </span>
+            </label>
+
+            {expIsRecurringTemplate ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Cliente *</Label>
+                  <Select value={expCompanyId} onValueChange={setExpCompanyId}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Selecionar cliente</SelectItem>
+                      {companiesList.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Valor (R$) *</Label>
+                    <Input value={expValue} onChange={(e) => setExpValue(e.target.value)} placeholder="0,00" required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Dia de cobrança</Label>
+                    <Input type="number" min={1} max={31} value={expBillingDay} onChange={(e) => setExpBillingDay(e.target.value)} placeholder="10" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Categoria</Label>
+                    <Select value={expCategory} onValueChange={(v) => setExpCategory(v as typeof expCategory)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="infraestrutura">Infraestrutura</SelectItem>
+                        <SelectItem value="saas">SaaS</SelectItem>
+                        <SelectItem value="marketing">Marketing</SelectItem>
+                        <SelectItem value="pessoal">Pessoal</SelectItem>
+                        <SelectItem value="imposto">Imposto</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Início do contrato</Label>
+                    <Input type="date" value={expContractStart} onChange={(e) => setExpContractStart(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Fim do contrato (opcional)</Label>
+                    <Input type="date" value={expContractEnd} onChange={(e) => setExpContractEnd(e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Tipo</Label>
+                  <Select value={expType || "__none__"} onValueChange={(v) => setExpType(v === "__none__" ? "" : (v as "fixo" | "variavel"))}>
+                    <SelectTrigger><SelectValue placeholder="Não classificada" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Não classificada</SelectItem>
+                      <SelectItem value="fixo">Fixa</SelectItem>
+                      <SelectItem value="variavel">Variável</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Valor (R$) *</Label>
+                    <Input value={expValue} onChange={(e) => setExpValue(e.target.value)} placeholder="0,00" required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Vencimento</Label>
+                    <Input type="date" value={expDueDate} onChange={(e) => setExpDueDate(e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Categoria</Label>
+                    <Select value={expCategory} onValueChange={(v) => setExpCategory(v as typeof expCategory)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="infraestrutura">Infraestrutura</SelectItem>
+                        <SelectItem value="saas">SaaS</SelectItem>
+                        <SelectItem value="marketing">Marketing</SelectItem>
+                        <SelectItem value="pessoal">Pessoal</SelectItem>
+                        <SelectItem value="imposto">Imposto</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Status</Label>
+                    <Select value={expStatus} onValueChange={(v) => setExpStatus(v as typeof expStatus)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="pago">Pago</SelectItem>
+                        <SelectItem value="atrasado">Atrasado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Recorrência</Label>
+                    <Select value={expRecurrence} onValueChange={(v) => setExpRecurrence(v as typeof expRecurrence)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pontual">Pontual</SelectItem>
+                        <SelectItem value="mensal">Mensal</SelectItem>
+                        <SelectItem value="trimestral">Trimestral</SelectItem>
+                        <SelectItem value="anual">Anual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Tipo</Label>
+                    <Select value={expType || "__none__"} onValueChange={(v) => setExpType(v === "__none__" ? "" : (v as "fixo" | "variavel"))}>
+                      <SelectTrigger><SelectValue placeholder="Não classificada" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Não classificada</SelectItem>
+                        <SelectItem value="fixo">Fixa</SelectItem>
+                        <SelectItem value="variavel">Variável</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => { setCreateExpenseOpen(false); setEditingExpense(undefined); }}>Cancelar</Button>
               <Button type="submit" disabled={createExpense.isPending || updateExpense.isPending} style={{ background: "var(--primary)" }}>

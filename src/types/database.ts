@@ -535,10 +535,16 @@ export interface Database {
           status: "pendente" | "pago" | "atrasado";
           recurrence: "pontual" | "mensal" | "trimestral" | "anual";
           expense_type: "fixo" | "variavel" | null;
+          company_id: string | null;
+          billing_day: number | null;
+          contract_start: string | null;
+          contract_end: string | null;
+          is_recurring_template: boolean;
+          template_id: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["expenses"]["Row"], "id" | "created_at" | "updated_at">;
+        Insert: Omit<Database["public"]["Tables"]["expenses"]["Row"], "id" | "created_at" | "updated_at" | "is_recurring_template"> & { is_recurring_template?: boolean };
         Update: Partial<Database["public"]["Tables"]["expenses"]["Insert"]>;
         Relationships: [];
       };

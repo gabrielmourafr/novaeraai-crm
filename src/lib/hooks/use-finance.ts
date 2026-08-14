@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -267,4 +268,43 @@ export const useDeleteExpense = () => {
     },
     onError: () => toast.error("Erro ao remover despesa"),
   });
+};
+
+export type ExpenseWithCompany = Expense & { company?: { id: string; name: string } | null };
+
+// Modelos de despesa fixa recorrente vinculada a cliente (ex: VPS de um
+// cliente, cobrada todo dia X, com prazo de contrato) — a linha em si não
+// tem vencimento, ela só gera a despesa do mês via ensure_monthly_fixed_expenses.
+export const useRecurringExpenseTemplates = () => {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["expenses", "recurring-templates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("*, company:companies(id, name)")
+        .eq("is_recurring_template", true)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as ExpenseWithCompany[];
+    },
+  });
+};
+
+// Garante que toda despesa fixa recorrente de cliente tenha o lançamento do
+// mês corrente gerado, sem depender de cron externo — roda ao abrir a página,
+// igual já acontece com a mensalidade dos projetos.
+export const useEnsureMonthlyFixedExpenses = () => {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  useEffect(() => {
+    supabase.rpc("ensure_monthly_fixed_expenses").then(({ error }) => {
+      if (error) {
+        console.error("Erro ao gerar despesas fixas recorrentes:", error);
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 };
