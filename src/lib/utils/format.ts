@@ -73,6 +73,30 @@ export const formatRelative = (date: string | Date) => {
 export const formatPercent = (value: number) =>
   `${value.toFixed(0)}%`;
 
+// Formata a diferença entre duas datas em horas/minutos ou dias, pro
+// "tempo gasto" de uma tarefa (started_at -> completed_at).
+export const formatDurationBetween = (startISO: string, endISO: string) => {
+  const ms = Math.max(0, new Date(endISO).getTime() - new Date(startISO).getTime());
+  const totalMinutes = Math.round(ms / 60000);
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const totalHours = totalMinutes / 60;
+  if (totalHours < 24) {
+    const h = Math.floor(totalHours);
+    const m = totalMinutes % 60;
+    return m > 0 ? `${h}h ${m}min` : `${h}h`;
+  }
+  const days = Math.floor(totalHours / 24);
+  const remHours = Math.round(totalHours % 24);
+  return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`;
+};
+
+// Formata horas decimais (ex: 2.5) como "2h 30min" pro tempo estimado.
+export const formatHoursDecimal = (hours: number) => {
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
+};
+
 export const formatInitials = (name: string) =>
   name
     .split(" ")

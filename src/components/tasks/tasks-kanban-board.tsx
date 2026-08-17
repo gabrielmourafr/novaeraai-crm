@@ -4,6 +4,7 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-p
 import { AlertCircle, Clock, Edit2, Trash2 } from "lucide-react";
 import type { TaskWithRelations } from "@/lib/hooks/use-tasks";
 import { formatDate, formatInitials, isPastDate } from "@/lib/utils/format";
+import { TASK_TYPES, TASK_COMPLEXITIES } from "@/lib/utils/constants";
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   urgente: { label: "Urgente", color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
@@ -12,11 +13,10 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string
   baixa:   { label: "Baixa",   color: "#22c55e", bg: "rgba(34,197,94,0.12)" },
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  followup: "Follow-up", ligacao: "Ligação", email: "Email",
-  reuniao: "Reunião", proposta: "Proposta", entrega: "Entrega",
-  interno: "Interno", outro: "Outro",
-};
+const TYPE_LABELS: Record<string, string> = Object.fromEntries(TASK_TYPES.map((t) => [t.value, t.label]));
+const COMPLEXITY_CONFIG: Record<string, { label: string; color: string }> = Object.fromEntries(
+  TASK_COMPLEXITIES.map((c) => [c.value, { label: c.label, color: c.color }])
+);
 
 const COLUMNS = [
   { status: "pendente", label: "Pendentes", color: "#f59e0b" },
@@ -116,12 +116,22 @@ export const TasksKanbanBoard = ({ tasks, onMoveTask, onEdit, onDelete }: TasksK
                               </div>
 
                               <div className="flex items-center justify-between gap-2">
-                                <span
-                                  className="text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0"
-                                  style={{ color: prio.color, background: prio.bg }}
-                                >
-                                  {prio.label}
-                                </span>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span
+                                    className="text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0"
+                                    style={{ color: prio.color, background: prio.bg }}
+                                  >
+                                    {prio.label}
+                                  </span>
+                                  {task.complexity && (
+                                    <span
+                                      className="text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0"
+                                      style={{ color: COMPLEXITY_CONFIG[task.complexity].color, background: `${COMPLEXITY_CONFIG[task.complexity].color}20` }}
+                                    >
+                                      {COMPLEXITY_CONFIG[task.complexity].label}
+                                    </span>
+                                  )}
+                                </div>
 
                                 <div className="flex items-center gap-2 flex-shrink-0">
                                   {task.due_date && (

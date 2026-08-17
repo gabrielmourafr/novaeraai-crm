@@ -132,6 +132,35 @@ export const TASK_PRIORITIES = [
   { value: "urgente", label: "Urgente", color: "#EF4444" },
 ] as const;
 
+export const TASK_TYPES = [
+  { value: "financeiro", label: "Financeiro" },
+  { value: "contrato", label: "Contrato" },
+  { value: "arquitetura_solucao", label: "Arquitetura da Solução" },
+  { value: "manutencao_adaptativa", label: "Manutenção Adaptativa" },
+  { value: "manutencao_aditiva", label: "Manutenção Aditiva" },
+  { value: "manutencao_corretiva", label: "Manutenção Corretiva" },
+  // legado — mantidos pra continuar exibindo o tipo certo de tarefas antigas
+  { value: "followup", label: "Follow-up" },
+  { value: "ligacao", label: "Ligação" },
+  { value: "email", label: "Email" },
+  { value: "reuniao", label: "Reunião" },
+  { value: "proposta", label: "Proposta" },
+  { value: "entrega", label: "Entrega" },
+  { value: "interno", label: "Interno" },
+  { value: "outro", label: "Outro" },
+] as const;
+
+// Os 3 tipos de manutenção pedem cliente + projeto vinculados
+export const MAINTENANCE_TASK_TYPES = new Set([
+  "manutencao_adaptativa", "manutencao_aditiva", "manutencao_corretiva",
+]);
+
+export const TASK_COMPLEXITIES = [
+  { value: "baixa", label: "Baixa", color: "#10B981" },
+  { value: "media", label: "Média", color: "#F59E0B" },
+  { value: "alta", label: "Alta", color: "#EF4444" },
+] as const;
+
 export const PROGRAMS = [
   { value: "ai_decision_system", label: "AI Decision System" },
   { value: "ai_operations_architecture", label: "AI Operations Architecture" },

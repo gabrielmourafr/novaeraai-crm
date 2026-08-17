@@ -15,6 +15,7 @@ type TaskPriority = Database["public"]["Tables"]["tasks"]["Row"]["priority"];
 export type TaskWithRelations = Task & {
   lead?: { id: string; title: string } | null;
   project?: { id: string; name: string } | null;
+  company?: { id: string; name: string } | null;
   assignee?: { id: string; full_name: string; avatar_url: string | null } | null;
 };
 
@@ -39,6 +40,7 @@ export const useAllTasks = (filters?: UseAllTasksFilters) => {
           `*,
            lead:leads(id, title),
            project:projects(id, name),
+           company:companies(id, name),
            assignee:users!tasks_assignee_id_fkey(id, full_name, avatar_url)`
         )
         .order("due_date", { ascending: true });

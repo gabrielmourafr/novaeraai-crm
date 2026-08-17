@@ -553,7 +553,10 @@ export interface Database {
           id: string;
           org_id: string;
           title: string;
-          type: "followup" | "ligacao" | "email" | "reuniao" | "proposta" | "entrega" | "interno" | "outro";
+          type:
+            | "followup" | "ligacao" | "email" | "reuniao" | "proposta" | "entrega" | "interno" | "outro"
+            | "financeiro" | "contrato" | "arquitetura_solucao"
+            | "manutencao_adaptativa" | "manutencao_aditiva" | "manutencao_corretiva";
           lead_id: string | null;
           contact_id: string | null;
           company_id: string | null;
@@ -565,11 +568,15 @@ export interface Database {
           priority: "baixa" | "media" | "alta" | "urgente";
           status: "pendente" | "em_andamento" | "concluida" | "cancelada";
           notes: string | null;
+          complexity: "baixa" | "media" | "alta" | null;
+          estimated_hours: number | null;
+          started_at: string | null;
+          completed_at: string | null;
           created_at: string;
           updated_at: string;
           created_by: string | null;
         };
-        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["tasks"]["Row"], "id" | "created_at" | "updated_at">>;
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["tasks"]["Row"], "id" | "created_at" | "updated_at" | "started_at" | "completed_at">>;
         Update: Partial<Database["public"]["Tables"]["tasks"]["Insert"]>;
         Relationships: [];
       };
