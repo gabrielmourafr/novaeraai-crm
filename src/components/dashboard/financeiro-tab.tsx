@@ -35,12 +35,15 @@ import {
 import { useClientsFinancialSummary } from "@/lib/hooks/use-client-summary";
 import { useCompanies } from "@/lib/hooks/use-companies";
 import { useUpdateProject, useProjects } from "@/lib/hooks/use-projects";
-import { useUser } from "@/lib/hooks/use-user";
+import { useUser, useOrgUsers } from "@/lib/hooks/use-user";
 import { useGoal } from "@/lib/hooks/use-goals";
 import {
   useCompanyPartners, useCreateCompanyPartner, useUpdateCompanyPartner, useDeleteCompanyPartner,
   type CompanyPartner,
 } from "@/lib/hooks/use-company-partners";
+import {
+  usePartnerAdvances, useCreatePartnerAdvance, useDeletePartnerAdvance, type PartnerAdvance,
+} from "@/lib/hooks/use-partner-advances";
 import { useCashFlowForecast } from "@/lib/hooks/use-cash-flow-forecast";
 import {
   usePartnerPayments,
@@ -155,37 +158,88 @@ export function FinanceiroTab() {
 
   // Sócios — distribuição de lucros
   const { data: companyPartners = [] } = useCompanyPartners();
+  const { data: orgUsersList = [] } = useOrgUsers();
   const createPartner = useCreateCompanyPartner();
   const updatePartner = useUpdateCompanyPartner();
   const deletePartner = useDeleteCompanyPartner();
   const [managePartnersOpen, setManagePartnersOpen] = useState(false);
   const [editingPartner, setEditingPartner] = useState<CompanyPartner | undefined>();
   const [deletingPartner, setDeletingPartner] = useState<CompanyPartner | undefined>();
+  const [partnerMode, setPartnerMode] = useState<"manual" | "user">("manual");
+  const [partnerUserId, setPartnerUserId] = useState("__none__");
   const [partnerName, setPartnerName] = useState("");
   const [partnerPct, setPartnerPct] = useState("");
   const totalPartnerPct = companyPartners.reduce((s, p) => s + Number(p.percentage), 0);
 
+  // Adiantamentos por sócio
+  const { data: partnerAdvances = [] } = usePartnerAdvances();
+  const createAdvance = useCreatePartnerAdvance();
+  const deleteAdvance = useDeletePartnerAdvance();
+  const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
+  const [deletingAdvance, setDeletingAdvance] = useState<PartnerAdvance | undefined>();
+  const [advancePartnerId, setAdvancePartnerId] = useState("__none__");
+  const [advanceValue, setAdvanceValue] = useState("");
+  const [advanceDate, setAdvanceDate] = useState("");
+  const [advanceDesc, setAdvanceDesc] = useState("");
+  const advancesByPartner = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of partnerAdvances) map.set(a.partner_id, (map.get(a.partner_id) ?? 0) + Number(a.value));
+    return map;
+  }, [partnerAdvances]);
+
   const openAddPartner = () => {
     setEditingPartner(undefined);
+    setPartnerMode("manual");
+    setPartnerUserId("__none__");
     setPartnerName("");
     setPartnerPct("");
   };
   const openEditPartner = (p: CompanyPartner) => {
     setEditingPartner(p);
+    setPartnerMode(p.user_id ? "user" : "manual");
+    setPartnerUserId(p.user_id ?? "__none__");
     setPartnerName(p.name);
     setPartnerPct(p.percentage.toString());
   };
   const handleSavePartner = async () => {
     if (!user) return;
-    if (!partnerName.trim() || !partnerPct) { toast.error("Preencha nome e percentual."); return; }
+    const resolvedName = partnerMode === "user"
+      ? orgUsersList.find((u) => u.id === partnerUserId)?.full_name ?? ""
+      : partnerName.trim();
+    if (partnerMode === "user" && partnerUserId === "__none__") { toast.error("Selecione o sócio."); return; }
+    if (!resolvedName || !partnerPct) { toast.error("Preencha nome e percentual."); return; }
     const pct = parseFloat(partnerPct.replace(",", "."));
     if (isNaN(pct) || pct <= 0 || pct > 100) { toast.error("Percentual inválido — use um número entre 0 e 100."); return; }
+    const resolvedUserId = partnerMode === "user" && partnerUserId !== "__none__" ? partnerUserId : null;
     if (editingPartner) {
-      await updatePartner.mutateAsync({ id: editingPartner.id, name: partnerName.trim(), percentage: pct });
+      await updatePartner.mutateAsync({ id: editingPartner.id, name: resolvedName, percentage: pct, user_id: resolvedUserId });
     } else {
-      await createPartner.mutateAsync({ org_id: user.org_id, user_id: null, name: partnerName.trim(), percentage: pct });
+      await createPartner.mutateAsync({ org_id: user.org_id, user_id: resolvedUserId, name: resolvedName, percentage: pct });
     }
     openAddPartner();
+  };
+
+  const openCreateAdvance = () => {
+    setAdvancePartnerId("__none__");
+    setAdvanceValue("");
+    setAdvanceDate(new Date().toISOString().slice(0, 10));
+    setAdvanceDesc("");
+    setAdvanceDialogOpen(true);
+  };
+  const handleSaveAdvance = async () => {
+    if (!user) return;
+    if (advancePartnerId === "__none__" || !advanceValue) { toast.error("Selecione o sócio e o valor."); return; }
+    const parsedValue = parseCurrencyInput(advanceValue);
+    if (isNaN(parsedValue) || parsedValue <= 0) { toast.error("Valor inválido."); return; }
+    await createAdvance.mutateAsync({
+      org_id: user.org_id,
+      partner_id: advancePartnerId,
+      description: advanceDesc.trim() || null,
+      value: parsedValue,
+      date: advanceDate || new Date().toISOString().slice(0, 10),
+      notes: null,
+    });
+    setAdvanceDialogOpen(false);
   };
   const { data: mensalidadeSummary = [] } = useClientMensalidadeSummary();
   const { data: clientsSummary = [] } = useClientsFinancialSummary();
@@ -653,6 +707,7 @@ export function FinanceiroTab() {
           <TabsTrigger value="receitas-despesas">Receitas &amp; Despesas</TabsTrigger>
           <TabsTrigger value="parceiros">Parceiros & Devs ({pendingPayments.length})</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
+          <TabsTrigger value="lucro-distribuicao">Lucro e Distribuição</TabsTrigger>
         </TabsList>
 
         {/* ══════════════════ VISÃO GERAL ══════════════════ */}
@@ -692,57 +747,6 @@ export function FinanceiroTab() {
               <StatCard size="sm" label="Mensalidade Recebida" value={formatCurrency(mensalidadeReceivedTotal)} icon={Wallet} />
               <StatCard size="sm" label="Entrada Total (Implementação + Mensalidade)" value={formatCurrency(entradaTotal)} icon={DollarSign} />
             </div>
-          </div>
-
-          {/* Distribuição de Lucros por Sócio */}
-          <div
-            className="rounded-xl overflow-hidden"
-            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
-          >
-            <div className="px-5 py-4 border-b flex items-center justify-between gap-2 flex-wrap" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
-              <div>
-                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Distribuição de Lucros por Sócio</h3>
-                <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
-                  Sobre o Saldo de {months[month - 1]} / {year}: <b style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>{formatCurrency(balance)}</b>
-                </p>
-              </div>
-              <Button size="sm" variant="outline" onClick={() => { openAddPartner(); setManagePartnersOpen(true); }}>
-                <Pencil size={13} className="mr-1.5" />Gerenciar Sócios
-              </Button>
-            </div>
-            {companyPartners.length === 0 ? (
-              <div className="p-6 text-center text-sm" style={{ color: "#3D5A78" }}>
-                Nenhum sócio cadastrado ainda. Clique em <b>Gerenciar Sócios</b> pra definir o % de cada um.
-              </div>
-            ) : (
-              <>
-                <Table>
-                  <TableHeader>
-                    <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
-                      <TableHead style={{ color: "#7BA3C6" }}>Sócio</TableHead>
-                      <TableHead style={{ color: "#7BA3C6" }} className="text-center">%</TableHead>
-                      <TableHead style={{ color: "#7BA3C6" }} className="text-right">Valor no mês</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {companyPartners.map((p) => (
-                      <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
-                        <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>{p.name}</TableCell>
-                        <TableCell className="text-center text-sm" style={{ color: "#7BA3C6" }}>{Number(p.percentage).toFixed(1)}%</TableCell>
-                        <TableCell className="text-right text-sm font-semibold" style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>
-                          {formatCurrency(balance * (Number(p.percentage) / 100))}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {Math.abs(totalPartnerPct - 100) > 0.01 && (
-                  <div className="px-5 py-2.5 text-xs" style={{ color: "#F59E0B", borderTop: "1px solid rgba(11,135,195,0.1)" }}>
-                    ⚠ Os percentuais somam {totalPartnerPct.toFixed(1)}%, não 100%. Ajuste em &quot;Gerenciar Sócios&quot;.
-                  </div>
-                )}
-              </>
-            )}
           </div>
 
           {/* Fluxo de caixa futuro */}
@@ -1746,6 +1750,114 @@ export function FinanceiroTab() {
             )}
           </div>
         </TabsContent>
+
+        {/* ══════════════════ LUCRO E DISTRIBUIÇÃO ══════════════════ */}
+        <TabsContent value="lucro-distribuicao" className="mt-4 space-y-4">
+          {/* Distribuição de Lucros por Sócio */}
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+          >
+            <div className="px-5 py-4 border-b flex items-center justify-between gap-2 flex-wrap" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+              <div>
+                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Distribuição de Lucros por Sócio</h3>
+                <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
+                  Sobre o Saldo de {months[month - 1]} / {year}: <b style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>{formatCurrency(balance)}</b>
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => { openAddPartner(); setManagePartnersOpen(true); }}>
+                <Pencil size={13} className="mr-1.5" />Gerenciar Sócios
+              </Button>
+            </div>
+            {companyPartners.length === 0 ? (
+              <div className="p-6 text-center text-sm" style={{ color: "#3D5A78" }}>
+                Nenhum sócio cadastrado ainda. Clique em <b>Gerenciar Sócios</b> pra definir o % de cada um.
+              </div>
+            ) : (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                      <TableHead style={{ color: "#7BA3C6" }}>Sócio</TableHead>
+                      <TableHead style={{ color: "#7BA3C6" }} className="text-center">%</TableHead>
+                      <TableHead style={{ color: "#7BA3C6" }} className="text-right">Valor no Mês</TableHead>
+                      <TableHead style={{ color: "#7BA3C6" }} className="text-right">Adiantado (total)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {companyPartners.map((p) => (
+                      <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                        <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>{p.name}</TableCell>
+                        <TableCell className="text-center text-sm" style={{ color: "#7BA3C6" }}>{Number(p.percentage).toFixed(1)}%</TableCell>
+                        <TableCell className="text-right text-sm font-semibold" style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>
+                          {formatCurrency(balance * (Number(p.percentage) / 100))}
+                        </TableCell>
+                        <TableCell className="text-right text-sm" style={{ color: (advancesByPartner.get(p.id) ?? 0) > 0 ? "#F59E0B" : "#3D5A78" }}>
+                          {formatCurrency(advancesByPartner.get(p.id) ?? 0)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {Math.abs(totalPartnerPct - 100) > 0.01 && (
+                  <div className="px-5 py-2.5 text-xs" style={{ color: "#F59E0B", borderTop: "1px solid rgba(11,135,195,0.1)" }}>
+                    ⚠ Os percentuais somam {totalPartnerPct.toFixed(1)}%, não 100%. Ajuste em &quot;Gerenciar Sócios&quot;.
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Adiantamentos por Sócio */}
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+          >
+            <div className="px-5 py-4 border-b flex items-center justify-between gap-2 flex-wrap" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+              <div>
+                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Adiantamentos por Sócio</h3>
+                <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>Valores já retirados por cada sócio, pra abater da distribuição</p>
+              </div>
+              <Button size="sm" style={{ background: "var(--primary)" }} onClick={openCreateAdvance} disabled={companyPartners.length === 0}>
+                <Plus size={14} className="mr-1.5" />Novo Adiantamento
+              </Button>
+            </div>
+            {partnerAdvances.length === 0 ? (
+              <div className="p-6 text-center text-sm" style={{ color: "#3D5A78" }}>
+                Nenhum adiantamento registrado ainda.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                    <TableHead style={{ color: "#7BA3C6" }}>Sócio</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Descrição</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Data</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Valor</TableHead>
+                    <TableHead className="w-[60px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {partnerAdvances.map((a) => (
+                    <TableRow key={a.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                      <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>
+                        {companyPartners.find((p) => p.id === a.partner_id)?.name ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{a.description ?? "—"}</TableCell>
+                      <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{formatDate(a.date)}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold" style={{ color: "#F59E0B" }}>{formatCurrency(Number(a.value))}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => setDeletingAdvance(a)}>
+                          <Trash2 size={13} />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Create Revenue Dialog */}
@@ -2214,14 +2326,50 @@ export function FinanceiroTab() {
             )}
           </div>
 
-          <div className="grid grid-cols-[1fr_100px] gap-2 pt-3 border-t border-border">
-            <div className="space-y-1.5">
-              <Label>{editingPartner ? "Editar nome" : "Nome do sócio"}</Label>
-              <Input value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Ex: Gabriel" />
+          <div className="space-y-3 pt-3 border-t border-border">
+            <div className="flex gap-1 rounded-lg p-1 w-fit" style={{ background: "rgba(11,135,195,0.05)", border: "1px solid rgba(11,135,195,0.15)" }}>
+              <button
+                type="button"
+                onClick={() => setPartnerMode("manual")}
+                className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                style={partnerMode === "manual" ? { background: "var(--primary)", color: "#fff" } : { color: "#7BA3C6" }}
+              >
+                Cadastrar manual
+              </button>
+              <button
+                type="button"
+                onClick={() => setPartnerMode("user")}
+                className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                style={partnerMode === "user" ? { background: "var(--primary)", color: "#fff" } : { color: "#7BA3C6" }}
+              >
+                Selecionar sócio do sistema
+              </button>
             </div>
-            <div className="space-y-1.5">
-              <Label>%</Label>
-              <Input value={partnerPct} onChange={(e) => setPartnerPct(e.target.value)} placeholder="33,3" />
+
+            <div className="grid grid-cols-[1fr_100px] gap-2">
+              {partnerMode === "user" ? (
+                <div className="space-y-1.5">
+                  <Label>Sócio</Label>
+                  <Select value={partnerUserId} onValueChange={setPartnerUserId}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Selecionar...</SelectItem>
+                      {orgUsersList.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label>Nome do sócio</Label>
+                  <Input value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Ex: Gabriel" />
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label>%</Label>
+                <Input value={partnerPct} onChange={(e) => setPartnerPct(e.target.value)} placeholder="33,3" />
+              </div>
             </div>
           </div>
 
@@ -2239,6 +2387,71 @@ export function FinanceiroTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ─── DIALOG: Novo Adiantamento ─── */}
+      <Dialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Novo Adiantamento</DialogTitle>
+            <DialogDescription>Registre um valor já retirado por um sócio</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Sócio *</Label>
+              <Select value={advancePartnerId} onValueChange={setAdvancePartnerId}>
+                <SelectTrigger><SelectValue placeholder="Selecionar sócio" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Selecionar...</SelectItem>
+                  {companyPartners.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Valor (R$) *</Label>
+                <Input value={advanceValue} onChange={(e) => setAdvanceValue(e.target.value)} placeholder="0,00" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Data</Label>
+                <Input type="date" value={advanceDate} onChange={(e) => setAdvanceDate(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descrição</Label>
+              <Input value={advanceDesc} onChange={(e) => setAdvanceDesc(e.target.value)} placeholder="Ex: Retirada mensal" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdvanceDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveAdvance} disabled={createAdvance.isPending} style={{ background: "var(--primary)" }}>
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── ALERT: Remover Adiantamento ─── */}
+      <AlertDialog open={!!deletingAdvance} onOpenChange={(v) => !v && setDeletingAdvance(undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover adiantamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O adiantamento de <strong>{formatCurrency(Number(deletingAdvance?.value ?? 0))}</strong> será removido.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={async () => { if (deletingAdvance) { await deleteAdvance.mutateAsync(deletingAdvance.id); setDeletingAdvance(undefined); } }}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ─── ALERT: Remover Sócio ─── */}
       <AlertDialog open={!!deletingPartner} onOpenChange={(v) => !v && setDeletingPartner(undefined)}>
