@@ -37,6 +37,10 @@ import { useCompanies } from "@/lib/hooks/use-companies";
 import { useUpdateProject, useProjects } from "@/lib/hooks/use-projects";
 import { useUser } from "@/lib/hooks/use-user";
 import { useGoal } from "@/lib/hooks/use-goals";
+import {
+  useCompanyPartners, useCreateCompanyPartner, useUpdateCompanyPartner, useDeleteCompanyPartner,
+  type CompanyPartner,
+} from "@/lib/hooks/use-company-partners";
 import { useCashFlowForecast } from "@/lib/hooks/use-cash-flow-forecast";
 import {
   usePartnerPayments,
@@ -148,6 +152,41 @@ export function FinanceiroTab() {
   const { data: mensalidadeHistory = [] } = useMensalidadeReceivedHistory();
   const { data: mensalidadeReceivedTotal = 0 } = useMensalidadeReceivedTotal();
   const [mensalidadeMonthDetail, setMensalidadeMonthDetail] = useState<MensalidadeReceivedMonth | undefined>();
+
+  // Sócios — distribuição de lucros
+  const { data: companyPartners = [] } = useCompanyPartners();
+  const createPartner = useCreateCompanyPartner();
+  const updatePartner = useUpdateCompanyPartner();
+  const deletePartner = useDeleteCompanyPartner();
+  const [managePartnersOpen, setManagePartnersOpen] = useState(false);
+  const [editingPartner, setEditingPartner] = useState<CompanyPartner | undefined>();
+  const [deletingPartner, setDeletingPartner] = useState<CompanyPartner | undefined>();
+  const [partnerName, setPartnerName] = useState("");
+  const [partnerPct, setPartnerPct] = useState("");
+  const totalPartnerPct = companyPartners.reduce((s, p) => s + Number(p.percentage), 0);
+
+  const openAddPartner = () => {
+    setEditingPartner(undefined);
+    setPartnerName("");
+    setPartnerPct("");
+  };
+  const openEditPartner = (p: CompanyPartner) => {
+    setEditingPartner(p);
+    setPartnerName(p.name);
+    setPartnerPct(p.percentage.toString());
+  };
+  const handleSavePartner = async () => {
+    if (!user) return;
+    if (!partnerName.trim() || !partnerPct) { toast.error("Preencha nome e percentual."); return; }
+    const pct = parseFloat(partnerPct.replace(",", "."));
+    if (isNaN(pct) || pct <= 0 || pct > 100) { toast.error("Percentual inválido — use um número entre 0 e 100."); return; }
+    if (editingPartner) {
+      await updatePartner.mutateAsync({ id: editingPartner.id, name: partnerName.trim(), percentage: pct });
+    } else {
+      await createPartner.mutateAsync({ org_id: user.org_id, user_id: null, name: partnerName.trim(), percentage: pct });
+    }
+    openAddPartner();
+  };
   const { data: mensalidadeSummary = [] } = useClientMensalidadeSummary();
   const { data: clientsSummary = [] } = useClientsFinancialSummary();
   const { data: clientInstallmentsSummary = [] } = useClientInstallmentsSummary();
@@ -653,6 +692,57 @@ export function FinanceiroTab() {
               <StatCard size="sm" label="Mensalidade Recebida" value={formatCurrency(mensalidadeReceivedTotal)} icon={Wallet} />
               <StatCard size="sm" label="Entrada Total (Implementação + Mensalidade)" value={formatCurrency(entradaTotal)} icon={DollarSign} />
             </div>
+          </div>
+
+          {/* Distribuição de Lucros por Sócio */}
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+          >
+            <div className="px-5 py-4 border-b flex items-center justify-between gap-2 flex-wrap" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+              <div>
+                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Distribuição de Lucros por Sócio</h3>
+                <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
+                  Sobre o Saldo de {months[month - 1]} / {year}: <b style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>{formatCurrency(balance)}</b>
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => { openAddPartner(); setManagePartnersOpen(true); }}>
+                <Pencil size={13} className="mr-1.5" />Gerenciar Sócios
+              </Button>
+            </div>
+            {companyPartners.length === 0 ? (
+              <div className="p-6 text-center text-sm" style={{ color: "#3D5A78" }}>
+                Nenhum sócio cadastrado ainda. Clique em <b>Gerenciar Sócios</b> pra definir o % de cada um.
+              </div>
+            ) : (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                      <TableHead style={{ color: "#7BA3C6" }}>Sócio</TableHead>
+                      <TableHead style={{ color: "#7BA3C6" }} className="text-center">%</TableHead>
+                      <TableHead style={{ color: "#7BA3C6" }} className="text-right">Valor no mês</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {companyPartners.map((p) => (
+                      <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                        <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>{p.name}</TableCell>
+                        <TableCell className="text-center text-sm" style={{ color: "#7BA3C6" }}>{Number(p.percentage).toFixed(1)}%</TableCell>
+                        <TableCell className="text-right text-sm font-semibold" style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>
+                          {formatCurrency(balance * (Number(p.percentage) / 100))}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {Math.abs(totalPartnerPct - 100) > 0.01 && (
+                  <div className="px-5 py-2.5 text-xs" style={{ color: "#F59E0B", borderTop: "1px solid rgba(11,135,195,0.1)" }}>
+                    ⚠ Os percentuais somam {totalPartnerPct.toFixed(1)}%, não 100%. Ajuste em &quot;Gerenciar Sócios&quot;.
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Fluxo de caixa futuro */}
@@ -2085,6 +2175,86 @@ export function FinanceiroTab() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleRemoveSubscription}>
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ─── DIALOG: Gerenciar Sócios ─── */}
+      <Dialog open={managePartnersOpen} onOpenChange={setManagePartnersOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Gerenciar Sócios</DialogTitle>
+            <DialogDescription>
+              Defina o percentual de lucro de cada sócio. {totalPartnerPct > 0 && `Soma atual: ${totalPartnerPct.toFixed(1)}%.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[40vh] overflow-y-auto space-y-2">
+            {companyPartners.length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-4">Nenhum sócio cadastrado ainda.</p>
+            ) : (
+              companyPartners.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-border p-2.5">
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">{p.name}</p>
+                    <p className="text-xs text-text-muted">{Number(p.percentage).toFixed(1)}%</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditPartner(p)}>
+                      <Pencil size={13} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => setDeletingPartner(p)}>
+                      <Trash2 size={13} />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="grid grid-cols-[1fr_100px] gap-2 pt-3 border-t border-border">
+            <div className="space-y-1.5">
+              <Label>{editingPartner ? "Editar nome" : "Nome do sócio"}</Label>
+              <Input value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Ex: Gabriel" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>%</Label>
+              <Input value={partnerPct} onChange={(e) => setPartnerPct(e.target.value)} placeholder="33,3" />
+            </div>
+          </div>
+
+          <DialogFooter>
+            {editingPartner && (
+              <Button variant="outline" className="mr-auto" onClick={openAddPartner}>Cancelar edição</Button>
+            )}
+            <Button
+              onClick={handleSavePartner}
+              disabled={createPartner.isPending || updatePartner.isPending}
+              style={{ background: "var(--primary)" }}
+            >
+              {editingPartner ? "Salvar Alterações" : "Adicionar Sócio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── ALERT: Remover Sócio ─── */}
+      <AlertDialog open={!!deletingPartner} onOpenChange={(v) => !v && setDeletingPartner(undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover sócio?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{deletingPartner?.name}</strong> ({Number(deletingPartner?.percentage ?? 0).toFixed(1)}%) será removido da distribuição de lucros.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={async () => { if (deletingPartner) { await deletePartner.mutateAsync(deletingPartner.id); setDeletingPartner(undefined); } }}
+            >
               Remover
             </AlertDialogAction>
           </AlertDialogFooter>

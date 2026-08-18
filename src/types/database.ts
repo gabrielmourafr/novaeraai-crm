@@ -691,6 +691,21 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["revenue_goals"]["Insert"]>;
         Relationships: [];
       };
+      company_partners: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string | null;
+          name: string;
+          percentage: number;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["company_partners"]["Row"], "id" | "created_at" | "updated_at" | "active">> & { active?: boolean };
+        Update: Partial<Database["public"]["Tables"]["company_partners"]["Insert"]>;
+        Relationships: [];
+      };
       audit_logs: {
         Row: {
           id: string;
