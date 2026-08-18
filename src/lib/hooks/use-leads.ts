@@ -113,6 +113,9 @@ export const useUpdateLead = () => {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["leads"] });
       qc.invalidateQueries({ queryKey: ["lead", vars.id] });
+      // Editar o lead também pode mudar o stage_id pra um estágio "Ganho" e
+      // disparar a criação automática de projeto — mesma razão do useMoveLead.
+      if ("stage_id" in vars) qc.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Lead atualizado!");
     },
     onError: () => toast.error("Erro ao atualizar lead"),
@@ -145,6 +148,11 @@ export const useMoveLead = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads"] });
+      // Mover pra um estágio "Ganho" pode disparar a criação automática de
+      // projeto no banco (trigger) — invalida projetos também, senão a meta
+      // comercial e as demais telas de projeto ficam com dado desatualizado
+      // até um refresh manual.
+      qc.invalidateQueries({ queryKey: ["projects"] });
     },
     onError: () => toast.error("Erro ao mover lead"),
   });
