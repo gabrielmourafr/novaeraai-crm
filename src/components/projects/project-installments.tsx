@@ -63,6 +63,9 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
   const [configOpen, setConfigOpen] = useState(false);
   const [splits, setSplits] = useState<SplitRow[]>([]);
   const [quickEntradaPct, setQuickEntradaPct] = useState("");
+  const [quickEntradaPaymentMethod, setQuickEntradaPaymentMethod] = useState<PaymentMethod | "__none__">("__none__");
+  const [quickEntradaCardFeePct, setQuickEntradaCardFeePct] = useState("");
+  const [quickEntradaPixDiscountPct, setQuickEntradaPixDiscountPct] = useState("");
   const [quickQty, setQuickQty] = useState("");
   const [quickValue, setQuickValue] = useState("");
   const [quickFirstDueDate, setQuickFirstDueDate] = useState("");
@@ -104,7 +107,9 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
         { description: "Entrega 50%", percentage: 50, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
       ]);
     }
-    setQuickEntradaPct(""); setQuickQty(""); setQuickValue(""); setQuickFirstDueDate("");
+    setQuickEntradaPct(""); setQuickEntradaPaymentMethod("__none__");
+    setQuickEntradaCardFeePct(""); setQuickEntradaPixDiscountPct("");
+    setQuickQty(""); setQuickValue(""); setQuickFirstDueDate("");
     setConfigOpen(true);
   };
 
@@ -171,9 +176,9 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
         percentage: entradaPct,
         phase_id: null,
         due_date: quickFirstDueDate || null,
-        payment_method: null,
-        card_fee_percent: null,
-        pix_discount_percent: null,
+        payment_method: quickEntradaPaymentMethod === "__none__" ? null : quickEntradaPaymentMethod,
+        card_fee_percent: quickEntradaPaymentMethod === "cartao" && quickEntradaCardFeePct ? parseCurrencyInput(quickEntradaCardFeePct) : null,
+        pix_discount_percent: quickEntradaPaymentMethod === "pix" && quickEntradaPixDiscountPct ? parseCurrencyInput(quickEntradaPixDiscountPct) : null,
       });
     }
     installmentPcts.forEach((pct, idx) => {
@@ -373,7 +378,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
               <Wand2 size={13} />
               Gerar entrada + parcelas (ex: 30% entrada + 12x R$ 850,00)
             </p>
-            <div className="grid grid-cols-[90px_70px_1fr] gap-2 items-end">
+            <div className="grid grid-cols-[90px_1fr] gap-2 items-end">
               <div>
                 <label className="text-[10px] text-text-muted">Entrada (%)</label>
                 <Input
@@ -383,6 +388,39 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
                   className="h-9 text-xs"
                 />
               </div>
+              <div>
+                <label className="text-[10px] text-text-muted">Forma de pagamento da entrada</label>
+                <Select
+                  value={quickEntradaPaymentMethod}
+                  onValueChange={(v) => setQuickEntradaPaymentMethod(v as PaymentMethod | "__none__")}
+                >
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Não definida" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Não definida</SelectItem>
+                    {(Object.entries(PAYMENT_METHOD_LABEL) as [PaymentMethod, string][]).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {quickEntradaPaymentMethod === "cartao" && (
+              <Input
+                placeholder="Taxa da maquininha na entrada (%)"
+                value={quickEntradaCardFeePct}
+                onChange={(e) => setQuickEntradaCardFeePct(e.target.value)}
+                className="h-9 text-xs"
+              />
+            )}
+            {quickEntradaPaymentMethod === "pix" && (
+              <Input
+                placeholder="Desconto no pix da entrada (%)"
+                value={quickEntradaPixDiscountPct}
+                onChange={(e) => setQuickEntradaPixDiscountPct(e.target.value)}
+                className="h-9 text-xs"
+              />
+            )}
+            <div className="grid grid-cols-[70px_1fr] gap-2 items-end">
               <div>
                 <label className="text-[10px] text-text-muted">Qtd. parcelas</label>
                 <Input
