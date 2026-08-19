@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Settings, CalendarClock, AlertTriangle, Pencil } from "lucide-react";
-import { differenceInDays, parseISO, addDays } from "date-fns";
+import { differenceInDays, differenceInCalendarMonths, parseISO, addDays, addMonths, format as formatDateFns } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,12 +47,19 @@ export function ProjectBilling({ project }: Props) {
   const [open, setOpen] = useState(false);
   const [predictionOpen, setPredictionOpen] = useState(false);
   const [predictionOverride, setPredictionOverride] = useState(project.predicted_first_billing_override ?? "");
+  const computeDurationLabel = (start: string, end: string) => {
+    if (!start || !end) return "";
+    const months = differenceInCalendarMonths(parseISO(end), parseISO(start));
+    return months > 0 ? String(months) : "";
+  };
+
   const [form, setForm] = useState({
     billing_status: (project.billing_status ?? "sem_mensalidade") as NonNullable<ProjectWithRelations["billing_status"]>,
     billing_day: project.billing_day?.toString() ?? "",
     billing_amount: project.billing_amount?.toString() ?? "",
     contract_start: project.contract_start ?? "",
     contract_end: project.contract_end ?? "",
+    contract_duration: computeDurationLabel(project.contract_start ?? "", project.contract_end ?? ""),
     renewal_type: (project.renewal_type ?? "manual") as NonNullable<ProjectWithRelations["renewal_type"]>,
   });
 
@@ -63,9 +70,21 @@ export function ProjectBilling({ project }: Props) {
       billing_amount: project.billing_amount?.toString() ?? "",
       contract_start: project.contract_start ?? "",
       contract_end: project.contract_end ?? "",
+      contract_duration: computeDurationLabel(project.contract_start ?? "", project.contract_end ?? ""),
       renewal_type: (project.renewal_type ?? "manual") as NonNullable<ProjectWithRelations["renewal_type"]>,
     });
     setOpen(true);
+  };
+
+  // Duração é só uma conveniência pra preencher o término automaticamente —
+  // não existe coluna própria, é sempre derivada de início + término.
+  const applyDuration = (months: string) => {
+    setForm((f) => {
+      const base = f.contract_start || project.predicted_first_billing_override || "";
+      if (!base || !months) return { ...f, contract_duration: months };
+      const end = formatDateFns(addMonths(parseISO(base), Number(months)), "yyyy-MM-dd");
+      return { ...f, contract_duration: months, contract_start: f.contract_start || base, contract_end: end };
+    });
   };
 
   const handleSave = async () => {
@@ -100,6 +119,14 @@ export function ProjectBilling({ project }: Props) {
     : computedPrediction;
   const isOverridden = !!project.predicted_first_billing_override;
 
+  // Duração do contrato (meses), derivada de início + término — usada tanto
+  // pra clientes já ativos quanto pra previsão, já que a mensalidade (ativa
+  // ou prevista) só conta até essa data de término no Financeiro.
+  const projectDurationMonths =
+    project.contract_start && project.contract_end
+      ? differenceInCalendarMonths(parseISO(project.contract_end), parseISO(project.contract_start))
+      : null;
+
   const handleSavePrediction = async () => {
     await update.mutateAsync({
       id: project.id,
@@ -128,10 +155,18 @@ export function ProjectBilling({ project }: Props) {
           <p className="text-sm text-text-muted text-center py-4">
             Este projeto não possui contrato de mensalidade. Clique em <b>Configurar</b> para adicionar o valor previsto.
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Tile
               label="Mensalidade prevista"
               value={project.billing_amount ? formatCurrency(Number(project.billing_amount)) : "Não definida"}
+            />
+            <Tile
+              label="Tempo de Contrato"
+              value={
+                projectDurationMonths != null
+                  ? `${projectDurationMonths} meses (até ${formatDate(project.contract_end!)})`
+                  : "Não definido"
+              }
             />
             <div className="rounded-lg p-3 bg-white/5 border border-border flex items-center gap-2">
               <CalendarClock size={14} className="text-primary flex-shrink-0" />
@@ -203,6 +238,10 @@ export function ProjectBilling({ project }: Props) {
               value={project.contract_end ? formatDate(project.contract_end) : "—"}
               accent={daysToEnd !== null && daysToEnd <= 30 && daysToEnd >= 0 ? "#F59E0B" : daysToEnd !== null && daysToEnd < 0 ? "#EF4444" : undefined}
             />
+            <Tile
+              label="Tempo de Contrato"
+              value={projectDurationMonths != null ? `${projectDurationMonths} meses` : "—"}
+            />
           </div>
         </div>
       )}
@@ -261,42 +300,53 @@ export function ProjectBilling({ project }: Props) {
               </p>
             )}
 
-            {form.billing_status !== "sem_mensalidade" && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Início do contrato</Label>
-                    <Input
-                      type="date"
-                      value={form.contract_start}
-                      onChange={(e) => setForm((f) => ({ ...f, contract_start: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label>Término do contrato</Label>
-                    <Input
-                      type="date"
-                      value={form.contract_end}
-                      onChange={(e) => setForm((f) => ({ ...f, contract_end: e.target.value }))}
-                    />
-                  </div>
-                </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label>Início do contrato</Label>
+                <Input
+                  type="date"
+                  value={form.contract_start}
+                  onChange={(e) => setForm((f) => ({ ...f, contract_start: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Duração (meses)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="12"
+                  value={form.contract_duration}
+                  onChange={(e) => applyDuration(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Término do contrato</Label>
+                <Input
+                  type="date"
+                  value={form.contract_end}
+                  onChange={(e) => setForm((f) => ({ ...f, contract_end: e.target.value, contract_duration: computeDurationLabel(f.contract_start, e.target.value) }))}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-text-muted -mt-1.5">
+              A mensalidade é considerada ativa/prevista até essa data de término. Preencha a duração (ou o término direto) mesmo antes de ativar — vale pra previsão também.
+            </p>
 
-                <div>
-                  <Label>Tipo de renovação</Label>
-                  <Select
-                    value={form.renewal_type}
-                    onValueChange={(v) => setForm((f) => ({ ...f, renewal_type: v as typeof f.renewal_type }))}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(RENEWAL_LABEL).map(([k, v]) => (
-                        <SelectItem key={k} value={k}>{v}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
+            {form.billing_status !== "sem_mensalidade" && (
+              <div>
+                <Label>Tipo de renovação</Label>
+                <Select
+                  value={form.renewal_type}
+                  onValueChange={(v) => setForm((f) => ({ ...f, renewal_type: v as typeof f.renewal_type }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(RENEWAL_LABEL).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
 

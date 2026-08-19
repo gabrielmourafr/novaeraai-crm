@@ -706,7 +706,9 @@ export function FinanceiroTab() {
         return startOk && endOk ? s + Number(sub.billing_amount ?? 0) : s;
       }, 0);
       const prevista = upcomingMensalidades.reduce((s, { project: p, predicted }) => {
-        return predicted <= monthEnd ? s + Number(p.billing_amount ?? 0) : s;
+        const startedByThen = predicted <= monthEnd;
+        const endOk = !p.contract_end || new Date(p.contract_end) >= monthEnd;
+        return startedByThen && endOk ? s + Number(p.billing_amount ?? 0) : s;
       }, 0);
       return { name: m.label, ativa, prevista, total: ativa + prevista };
     });
@@ -1188,6 +1190,7 @@ export function FinanceiroTab() {
                     <TableHead style={{ color: "#7BA3C6" }}>Empresa</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }} className="text-right">Valor da Mensalidade</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Previsão 1ª Mensalidade</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Tempo de Contrato</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1205,6 +1208,9 @@ export function FinanceiroTab() {
                       <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>
                         {formatDate(predicted.toISOString())}
                         {overridden && <span className="ml-1.5 text-[10px]" style={{ color: "#7BA3C6" }}>(ajustada)</span>}
+                      </TableCell>
+                      <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>
+                        {p.contract_end ? `até ${formatDate(p.contract_end)}` : "Não definido"}
                       </TableCell>
                     </TableRow>
                   ))}
