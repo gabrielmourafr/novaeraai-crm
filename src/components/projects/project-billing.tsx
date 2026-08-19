@@ -126,27 +126,39 @@ export function ProjectBilling({ project }: Props) {
       {!hasMensalidade ? (
         <div className="space-y-3">
           <p className="text-sm text-text-muted text-center py-4">
-            Este projeto não possui contrato de mensalidade. Clique em <b>Configurar</b> para adicionar.
+            Este projeto não possui contrato de mensalidade. Clique em <b>Configurar</b> para adicionar o valor previsto.
           </p>
-          {predictedFirstBilling && (
+          <div className="grid grid-cols-2 gap-3">
+            <Tile
+              label="Mensalidade prevista"
+              value={project.billing_amount ? formatCurrency(Number(project.billing_amount)) : "Não definida"}
+            />
             <div className="rounded-lg p-3 bg-white/5 border border-border flex items-center gap-2">
               <CalendarClock size={14} className="text-primary flex-shrink-0" />
-              <p className="text-xs text-text-muted flex-1">
-                Previsão da 1ª mensalidade: <b className="text-text-primary">{formatDate(predictedFirstBilling.toISOString())}</b>
-                {" "}
-                {isOverridden ? "(ajustada manualmente)" : "(prazo de entrega + 30 dias de teste)"}
-              </p>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">Previsão da 1ª mensalidade</p>
+                {predictedFirstBilling ? (
+                  <p className="text-sm font-semibold mt-0.5">
+                    {formatDate(predictedFirstBilling.toISOString())}
+                    <span className="block text-[10px] font-normal text-text-muted">
+                      {isOverridden ? "ajustada manualmente" : "prazo de entrega + 30 dias de teste"}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-sm font-semibold mt-0.5 text-text-muted">Nenhuma previsão definida</p>
+                )}
+              </div>
               <Button
                 size="sm"
                 variant="ghost"
                 className="h-6 w-6 p-0 flex-shrink-0"
                 onClick={() => { setPredictionOverride(project.predicted_first_billing_override ?? ""); setPredictionOpen(true); }}
-                title="Ajustar previsão"
+                title="Definir/ajustar previsão"
               >
                 <Pencil size={12} />
               </Button>
             </div>
-          )}
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -220,32 +232,37 @@ export function ProjectBilling({ project }: Props) {
               </Select>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Valor mensal {form.billing_status === "sem_mensalidade" && "(previsto)"}</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={form.billing_amount}
+                  onChange={(e) => setForm((f) => ({ ...f, billing_amount: e.target.value }))}
+                  placeholder="0,00"
+                />
+              </div>
+              <div>
+                <Label>Dia do mês (1-31)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={form.billing_day}
+                  onChange={(e) => setForm((f) => ({ ...f, billing_day: e.target.value }))}
+                  placeholder="10"
+                />
+              </div>
+            </div>
+            {form.billing_status === "sem_mensalidade" && (
+              <p className="text-xs text-text-muted -mt-1.5">
+                Como o status ainda é &quot;Sem mensalidade&quot;, esse valor não gera cobrança — só fica registrado como previsão até você ativar.
+              </p>
+            )}
+
             {form.billing_status !== "sem_mensalidade" && (
               <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Valor mensal</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={form.billing_amount}
-                      onChange={(e) => setForm((f) => ({ ...f, billing_amount: e.target.value }))}
-                      placeholder="0,00"
-                    />
-                  </div>
-                  <div>
-                    <Label>Dia do mês (1-31)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={31}
-                      value={form.billing_day}
-                      onChange={(e) => setForm((f) => ({ ...f, billing_day: e.target.value }))}
-                      placeholder="10"
-                    />
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Início do contrato</Label>
