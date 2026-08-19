@@ -57,7 +57,7 @@ export function OverviewTab() {
       org_id: user.org_id,
       reference_month: `${year}-${String(month).padStart(2, "0")}-01`,
       revenue_target: revenueTargetInput ? parseCurrencyInput(revenueTargetInput) : 0,
-      commercial_target: commercialTargetInput ? parseInt(commercialTargetInput) : 0,
+      commercial_target: commercialTargetInput ? parseCurrencyInput(commercialTargetInput) : 0,
       notes: null,
     });
     setGoalDialogOpen(false);
@@ -69,7 +69,7 @@ export function OverviewTab() {
   // Saldo é caixa real: só conta receita já recebida, não o que ainda está pendente
   const balance = paidRevenues - totalExpenses;
 
-  const activeLeads = leads.filter((l) => !l.archived);
+  const activeLeads = leads.filter((l) => !l.archived && l.closed_at === null);
   const pendingTasks = tasks.filter((t) => t.status === "pendente");
   const overdueTasks = tasks.filter((t) => {
     if (!t.due_date || t.status === "concluida" || t.status === "cancelada") return false;
@@ -98,12 +98,14 @@ export function OverviewTab() {
     urgente: "#ef4444", alta: "#f59e0b", media: "#0B87C3", baixa: "#22c55e",
   };
 
-  // Metas do mês: faturamento = receita já paga no mês; comercial = novos
-  // contratos assinados (projetos criados) no mês.
-  const commercialClosedThisMonth = projects.filter((p) => {
-    const d = new Date(p.created_at);
-    return d.getFullYear() === year && d.getMonth() + 1 === month;
-  }).length;
+  // Metas do mês: faturamento = receita já paga no mês; comercial = valor em
+  // R$ de novos contratos assinados (projetos criados) no mês.
+  const commercialClosedThisMonth = projects
+    .filter((p) => {
+      const d = new Date(p.created_at);
+      return d.getFullYear() === year && d.getMonth() + 1 === month;
+    })
+    .reduce((sum, p) => sum + (p.contract_value ?? 0), 0);
   const revenueTarget = goal?.revenue_target ?? 0;
   const commercialTarget = goal?.commercial_target ?? 0;
   const revenueProgress = revenueTarget > 0 ? Math.min(100, (paidRevenues / revenueTarget) * 100) : 0;
@@ -236,9 +238,9 @@ export function OverviewTab() {
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs" style={{ color: "#7BA3C6" }}>Comercial (novos contratos)</span>
+                <span className="text-xs" style={{ color: "#7BA3C6" }}>Comercial (valor em novos contratos)</span>
                 <span className="text-xs font-medium" style={{ color: "#E2EBF8" }}>
-                  {commercialClosedThisMonth} / {commercialTarget}
+                  {formatCurrency(commercialClosedThisMonth)} / {formatCurrency(commercialTarget)}
                 </span>
               </div>
               <div className="h-2 rounded-full bg-white/5 overflow-hidden">
@@ -321,13 +323,11 @@ export function OverviewTab() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Meta comercial (novos contratos)</Label>
+              <Label>Meta comercial (R$ em novos contratos)</Label>
               <Input
-                type="number"
-                min={0}
                 value={commercialTargetInput}
                 onChange={(e) => setCommercialTargetInput(e.target.value)}
-                placeholder="0"
+                placeholder="0,00"
               />
             </div>
           </div>

@@ -29,7 +29,7 @@ export function ComercialTab() {
   const { data: leads = [] } = useLeads();
   const { data: proposals = [] } = useProposals();
 
-  const activeLeads = leads.filter((l) => !l.archived);
+  const activeLeads = leads.filter((l) => !l.archived && l.closed_at === null);
   const hotLeads = activeLeads.filter((l) => l.temperature === "quente");
   const sentProposals = proposals.filter((p) => p.status === "enviada");
   const pipelineValue = activeLeads.reduce((s, l) => s + (l.value ?? 0), 0);
