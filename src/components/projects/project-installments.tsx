@@ -62,6 +62,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
 
   const [configOpen, setConfigOpen] = useState(false);
   const [splits, setSplits] = useState<SplitRow[]>([]);
+  const [quickEntradaPct, setQuickEntradaPct] = useState("");
   const [quickQty, setQuickQty] = useState("");
   const [quickValue, setQuickValue] = useState("");
   const [quickFirstDueDate, setQuickFirstDueDate] = useState("");
@@ -103,7 +104,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
         { description: "Entrega 50%", percentage: 50, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
       ]);
     }
-    setQuickQty(""); setQuickValue(""); setQuickFirstDueDate("");
+    setQuickEntradaPct(""); setQuickQty(""); setQuickValue(""); setQuickFirstDueDate("");
     setConfigOpen(true);
   };
 
@@ -121,52 +122,76 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
     );
   };
 
-  // Gera N parcelas iguais de um valor fixo (ex: "12x 850") em vez de
-  // adicionar uma por uma. O % de cada parcela é calculado a partir do
-  // valor do contrato, e a última parcela absorve o arredondamento pra
-  // fechar exatamente 100%.
+  // Gera o plano de parcelas de uma vez: entrada opcional (%) + N parcelas
+  // iguais (ex: "30% entrada + 12x 850"). A entrada e as parcelas nunca
+  // ficam "perto" de 100% — o valor é sempre calculado por diferença
+  // (100 - entrada, e a última parcela absorve o resto do arredondamento),
+  // então a soma sempre fecha 100% certinho, mesmo com valores quebrados.
   const applyQuickGenerate = () => {
     const qty = parseInt(quickQty, 10);
-    const value = parseCurrencyInput(quickValue);
     if (!qty || qty <= 0) {
       toast.error("Informe a quantidade de parcelas.");
-      return;
-    }
-    if (!value || isNaN(value) || value <= 0) {
-      toast.error("Informe o valor de cada parcela.");
       return;
     }
     if (contractValue <= 0) {
       toast.error("Defina o valor do contrato no projeto antes de gerar parcelas.");
       return;
     }
-    const rawPct = (value / contractValue) * 100;
-    const rounded = Math.round(rawPct * 100) / 100;
-    const generated: SplitRow[] = Array.from({ length: qty }, (_, idx) => {
-      const isLast = idx === qty - 1;
-      const percentage = isLast
-        ? Math.max(0, Math.round((100 - rounded * (qty - 1)) * 100) / 100)
-        : rounded;
+    const entradaPct = quickEntradaPct ? parseCurrencyInput(quickEntradaPct) : 0;
+    if (isNaN(entradaPct) || entradaPct < 0 || entradaPct >= 100) {
+      toast.error("Entrada inválida — use um percentual entre 0 e 100.");
+      return;
+    }
+    const remainingPct = Math.round((100 - entradaPct) * 100) / 100;
+
+    const enteredValue = quickValue ? parseCurrencyInput(quickValue) : NaN;
+    let installmentPcts: number[];
+    if (!isNaN(enteredValue) && enteredValue > 0) {
+      const rawPct = Math.round(((enteredValue / contractValue) * 100) * 100) / 100;
+      installmentPcts = Array.from({ length: qty }, (_, idx) =>
+        idx === qty - 1 ? Math.max(0, Math.round((remainingPct - rawPct * (qty - 1)) * 100) / 100) : rawPct
+      );
+      const remainingValue = contractValue * (remainingPct / 100);
+      if (Math.abs(qty * enteredValue - remainingValue) > 0.5) {
+        toast.warning(
+          `${qty}x ${formatCurrency(enteredValue)} = ${formatCurrency(qty * enteredValue)}, mas o restante do contrato (após a entrada) é ${formatCurrency(remainingValue)}. Ajuste se necessário.`
+        );
+      }
+    } else {
+      const each = Math.round((remainingPct / qty) * 100) / 100;
+      installmentPcts = Array.from({ length: qty }, (_, idx) =>
+        idx === qty - 1 ? Math.max(0, Math.round((remainingPct - each * (qty - 1)) * 100) / 100) : each
+      );
+    }
+
+    const rows: SplitRow[] = [];
+    if (entradaPct > 0) {
+      rows.push({
+        description: "Entrada",
+        percentage: entradaPct,
+        phase_id: null,
+        due_date: quickFirstDueDate || null,
+        payment_method: null,
+        card_fee_percent: null,
+        pix_discount_percent: null,
+      });
+    }
+    installmentPcts.forEach((pct, idx) => {
+      const monthOffset = entradaPct > 0 ? idx + 1 : idx;
       const due_date = quickFirstDueDate
-        ? formatDateFns(addMonths(new Date(`${quickFirstDueDate}T00:00:00`), idx), "yyyy-MM-dd")
+        ? formatDateFns(addMonths(new Date(`${quickFirstDueDate}T00:00:00`), monthOffset), "yyyy-MM-dd")
         : null;
-      return {
+      rows.push({
         description: `Parcela ${idx + 1}/${qty}`,
-        percentage,
+        percentage: pct,
         phase_id: null,
         due_date,
         payment_method: null,
         card_fee_percent: null,
         pix_discount_percent: null,
-      };
+      });
     });
-    setSplits(generated);
-    const generatedTotal = qty * value;
-    if (Math.abs(generatedTotal - contractValue) > 0.5) {
-      toast.warning(
-        `${qty}x ${formatCurrency(value)} = ${formatCurrency(generatedTotal)}, mas o contrato é ${formatCurrency(contractValue)}. Ajuste se necessário.`
-      );
-    }
+    setSplits(rows);
   };
 
   const addSplit = () => {
@@ -342,15 +367,24 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
             ))}
           </div>
 
-          {/* Gerar N parcelas iguais (ex: 12x 850) */}
+          {/* Gerar entrada + N parcelas iguais (ex: 30% entrada + 12x 850) */}
           <div className="rounded-lg border border-border p-2.5 space-y-2 bg-muted/30">
             <p className="text-xs font-medium text-text-primary flex items-center gap-1.5">
               <Wand2 size={13} />
-              Gerar parcelas iguais (ex: 12x R$ 850,00)
+              Gerar entrada + parcelas (ex: 30% entrada + 12x R$ 850,00)
             </p>
-            <div className="grid grid-cols-[70px_1fr_1fr_auto] gap-2 items-end">
+            <div className="grid grid-cols-[90px_70px_1fr] gap-2 items-end">
               <div>
-                <label className="text-[10px] text-text-muted">Qtd.</label>
+                <label className="text-[10px] text-text-muted">Entrada (%)</label>
+                <Input
+                  placeholder="30 (opcional)"
+                  value={quickEntradaPct}
+                  onChange={(e) => setQuickEntradaPct(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-text-muted">Qtd. parcelas</label>
                 <Input
                   type="number"
                   min={1}
@@ -361,7 +395,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
                 />
               </div>
               <div>
-                <label className="text-[10px] text-text-muted">Valor de cada parcela</label>
+                <label className="text-[10px] text-text-muted">Valor de cada parcela (opcional — em branco divide o restante igualmente)</label>
                 <Input
                   placeholder="850,00"
                   value={quickValue}
@@ -369,8 +403,10 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
                   className="h-9 text-xs"
                 />
               </div>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
               <div>
-                <label className="text-[10px] text-text-muted">1ª parcela (opcional)</label>
+                <label className="text-[10px] text-text-muted">Vencimento da entrada / 1ª parcela (opcional)</label>
                 <Input
                   type="date"
                   value={quickFirstDueDate}
@@ -383,7 +419,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
               </Button>
             </div>
             <p className="text-[11px] text-text-muted">
-              Preenche a lista abaixo com as parcelas — você ainda pode editar, adicionar ou remover uma a uma antes de salvar.
+              Preenche a lista abaixo (entrada + parcelas) já somando 100% certinho — você ainda pode editar, adicionar ou remover uma a uma antes de salvar.
             </p>
           </div>
 
