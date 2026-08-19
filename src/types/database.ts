@@ -543,10 +543,11 @@ export interface Database {
           contract_end: string | null;
           is_recurring_template: boolean;
           template_id: string | null;
+          source_partner_payment_id: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["expenses"]["Row"], "id" | "created_at" | "updated_at" | "is_recurring_template"> & { is_recurring_template?: boolean };
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["expenses"]["Row"], "id" | "created_at" | "updated_at" | "is_recurring_template">> & { is_recurring_template?: boolean };
         Update: Partial<Database["public"]["Tables"]["expenses"]["Insert"]>;
         Relationships: [];
       };

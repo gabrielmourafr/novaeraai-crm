@@ -690,6 +690,20 @@ export function FinanceiroTab() {
     });
   }, [year, month]);
 
+  // Projeção de pagamentos a parceiros/devs — parcelas pendentes/atrasadas
+  // com vencimento dentro de cada um dos 6 meses a partir do selecionado,
+  // separadas por tipo (parceiro comercial x desenvolvedor)
+  const partnerPaymentsForecast = useMemo(() => {
+    const forecastable = partnerPayments.filter((p) => p.status !== "pago" && p.status !== "cancelado" && p.due_date);
+    return monthsForward.map((m) => {
+      const key = `${m.year}-${String(m.month).padStart(2, "0")}`;
+      const monthPayments = forecastable.filter((p) => p.due_date!.startsWith(key));
+      const parceiro = monthPayments.filter((p) => p.recipient_type === "parceiro").reduce((s, p) => s + Number(p.amount), 0);
+      const desenvolvedor = monthPayments.filter((p) => p.recipient_type === "desenvolvedor").reduce((s, p) => s + Number(p.amount), 0);
+      return { name: m.label, parceiro, desenvolvedor, total: parceiro + desenvolvedor };
+    });
+  }, [monthsForward, partnerPayments]);
+
   const totalRevenues = revenues.reduce((s, r) => s + r.value, 0);
   const totalExpenses = expenses.reduce((s, e) => s + e.value, 0);
   const paidRevenues = revenues.filter((r) => r.status === "pago").reduce((s, r) => s + r.value, 0);
@@ -1776,6 +1790,40 @@ export function FinanceiroTab() {
               value={formatCurrency(totalPendingPayments)}
               icon={Users}
             />
+          </div>
+
+          {/* Projeção de pagamentos a Parceiros/Devs */}
+          <div
+            className="rounded-xl p-5"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+          >
+            <div className="mb-4">
+              <h4 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Projeção de Pagamentos — Parceiros/Devs</h4>
+              <p className="text-xs" style={{ color: "#7BA3C6" }}>
+                {months[month - 1]}/{year} + próximos 5 meses — pendente/atrasado por vencimento, separado por tipo
+              </p>
+            </div>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={partnerPaymentsForecast} margin={{ top: 24, right: 4, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" />
+                <XAxis dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
+                <Legend verticalAlign="bottom" height={32} iconType="circle" wrapperStyle={{ fontSize: 12, color: "#7BA3C6" }} />
+                <Bar dataKey="desenvolvedor" name="Desenvolvedor" fill="#8B5CF6" radius={[4,4,0,0]} maxBarSize={32}>
+                  <LabelList dataKey="desenvolvedor" position="top" formatter={(v: React.ReactNode) => (Number(v) > 0 ? formatCurrency(Number(v)) : "")} style={{ fill: "#8B5CF6", fontSize: 10, fontWeight: 600 }} />
+                </Bar>
+                <Bar dataKey="parceiro" name="Parceiro Comercial" fill="#0CA8F5" radius={[4,4,0,0]} maxBarSize={32}>
+                  <LabelList dataKey="parceiro" position="top" formatter={(v: React.ReactNode) => (Number(v) > 0 ? formatCurrency(Number(v)) : "")} style={{ fill: "#0CA8F5", fontSize: 10, fontWeight: 600 }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            {pendingPayments.filter((p) => !p.due_date).length > 0 && (
+              <p className="text-[11px] mt-2" style={{ color: "#7BA3C6" }}>
+                {formatCurrency(pendingPayments.filter((p) => !p.due_date).reduce((s, p) => s + Number(p.amount), 0))}{" "}
+                em pagamentos pendentes sem vencimento definido não entram nessa projeção.
+              </p>
+            )}
           </div>
 
           {/* Resumo por desenvolvedor/parceiro + projeto */}
