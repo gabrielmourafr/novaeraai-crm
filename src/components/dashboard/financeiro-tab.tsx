@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { addDays, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Building2, Users, Download, Receipt, Layers, Clock, CalendarDays } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Building2, Users, Download, Receipt, Layers, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -764,10 +764,15 @@ export function FinanceiroTab() {
   }, [revenues]);
 
   const periodBadge = (
-    <div className="flex items-center gap-1.5 text-xs" style={{ color: "#7BA3C6" }}>
-      <CalendarDays size={12} />
-      Período selecionado:{" "}
-      <span className="font-semibold" style={{ color: "#E2EBF8" }}>{months[month - 1]} / {year}</span>
+    <div className="flex gap-3 items-center">
+      <Select value={month.toString()} onValueChange={(v) => setMonth(parseInt(v))}>
+        <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+        <SelectContent>{months.map((m, i) => (<SelectItem key={i+1} value={(i+1).toString()}>{m}</SelectItem>))}</SelectContent>
+      </Select>
+      <Select value={year.toString()} onValueChange={(v) => setYear(parseInt(v))}>
+        <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+        <SelectContent>{[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map((y) => (<SelectItem key={y} value={y.toString()}>{y}</SelectItem>))}</SelectContent>
+      </Select>
     </div>
   );
 
@@ -788,17 +793,6 @@ export function FinanceiroTab() {
         {/* ══════════════════ VISÃO GERAL ══════════════════ */}
         <TabsContent value="visao-geral" className="mt-4 space-y-6">
           {periodBadge}
-          {/* Month/Year Filter */}
-          <div className="flex gap-3 items-center">
-            <Select value={month.toString()} onValueChange={(v) => setMonth(parseInt(v))}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>{months.map((m, i) => (<SelectItem key={i+1} value={(i+1).toString()}>{m}</SelectItem>))}</SelectContent>
-            </Select>
-            <Select value={year.toString()} onValueChange={(v) => setYear(parseInt(v))}>
-              <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-              <SelectContent>{[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map((y) => (<SelectItem key={y} value={y.toString()}>{y}</SelectItem>))}</SelectContent>
-            </Select>
-          </div>
 
           {/* Resumo do mês selecionado */}
           <div>
