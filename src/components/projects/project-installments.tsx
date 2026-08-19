@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, Trash2, CheckCircle2, Settings, AlertCircle, Wand2 } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, Settings, AlertCircle, Wand2, Pencil } from "lucide-react";
 import { addMonths, format as formatDateFns } from "date-fns";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -15,6 +16,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { formatCurrency, formatDate, parseCurrencyInput } from "@/lib/utils/format";
 import {
   useProjectInstallments,
@@ -25,6 +36,7 @@ import {
   INSTALLMENT_STATUS_META,
   PAYMENT_METHOD_LABEL,
   type Installment,
+  type InstallmentWithRelations,
   type PaymentMethod,
 } from "@/lib/hooks/use-installments";
 
@@ -69,6 +81,16 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
   const [quickQty, setQuickQty] = useState("");
   const [quickValue, setQuickValue] = useState("");
   const [quickFirstDueDate, setQuickFirstDueDate] = useState("");
+
+  const [editingInstallment, setEditingInstallment] = useState<InstallmentWithRelations | undefined>();
+  const [deletingInstallment, setDeletingInstallment] = useState<Installment | undefined>();
+  const [editDesc, setEditDesc] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editPhaseId, setEditPhaseId] = useState("__none__");
+  const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod | "__none__">("__none__");
+  const [editCardFeePct, setEditCardFeePct] = useState("");
+  const [editPixDiscountPct, setEditPixDiscountPct] = useState("");
 
   const total = installments.reduce((s, i) => s + Number(i.amount), 0);
   const paid = installments.filter((i) => i.status === "pago").reduce((s, i) => s + Number(i.amount), 0);
@@ -214,6 +236,43 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
     setSplits((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  // Edição/exclusão direta de uma parcela já cadastrada, sem passar pelo
+  // fluxo de "Configurar Parcelas" (que reabre e revalida o plano inteiro)
+  const openEditInstallment = (inst: InstallmentWithRelations) => {
+    setEditingInstallment(inst);
+    setEditDesc(inst.description);
+    setEditAmount(String(inst.amount));
+    setEditDueDate(inst.due_date ?? "");
+    setEditPhaseId(inst.phase_id ?? "__none__");
+    setEditPaymentMethod(inst.payment_method ?? "__none__");
+    setEditCardFeePct(inst.card_fee_percent != null ? String(inst.card_fee_percent) : "");
+    setEditPixDiscountPct(inst.pix_discount_percent != null ? String(inst.pix_discount_percent) : "");
+  };
+
+  const handleSaveEditInstallment = async () => {
+    if (!editingInstallment) return;
+    const amount = parseCurrencyInput(editAmount);
+    if (!editDesc || isNaN(amount) || amount <= 0) {
+      toast.error("Preencha descrição e valor.");
+      return;
+    }
+    const percentage = contractValue > 0
+      ? Math.round((amount / contractValue) * 100 * 100) / 100
+      : Number(editingInstallment.percentage);
+    await updateIns.mutateAsync({
+      id: editingInstallment.id,
+      description: editDesc,
+      amount,
+      percentage,
+      due_date: editDueDate || null,
+      phase_id: editPhaseId === "__none__" ? null : editPhaseId,
+      payment_method: editPaymentMethod === "__none__" ? null : editPaymentMethod,
+      card_fee_percent: editPaymentMethod === "cartao" && editCardFeePct ? parseCurrencyInput(editCardFeePct) : null,
+      pix_discount_percent: editPaymentMethod === "pix" && editPixDiscountPct ? parseCurrencyInput(editPixDiscountPct) : null,
+    });
+    setEditingInstallment(undefined);
+  };
+
   const handleSave = async () => {
     if (Math.abs(splitsSum - 100) > 0.01) {
       toast.error(`A soma das parcelas deve ser 100% (atual: ${splitsSum}%)`);
@@ -339,6 +398,8 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
               onMarkPaid={() => markPaid.mutate(inst.id)}
               onCancel={() => updateIns.mutate({ id: inst.id, status: "cancelado" })}
               onReopen={() => updateIns.mutate({ id: inst.id, status: "pendente", paid_at: null })}
+              onEdit={() => openEditInstallment(inst)}
+              onDelete={() => setDeletingInstallment(inst)}
             />
           ))}
         </div>
@@ -616,6 +677,103 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Editar uma parcela específica, sem reabrir o plano inteiro */}
+      <Dialog open={!!editingInstallment} onOpenChange={(v) => !v && setEditingInstallment(undefined)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Parcela</DialogTitle>
+            <DialogDescription>Altere os dados dessa parcela específica.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Descrição</Label>
+              <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Valor (R$)</Label>
+                <Input value={editAmount} onChange={(e) => setEditAmount(e.target.value)} placeholder="0,00" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Vencimento</Label>
+                <Input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Etapa vinculada</Label>
+              <Select value={editPhaseId} onValueChange={setEditPhaseId}>
+                <SelectTrigger><SelectValue placeholder="Sem etapa" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sem etapa</SelectItem>
+                  {phases.map((ph) => (
+                    <SelectItem key={ph.id} value={ph.id}>{ph.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Forma de pagamento</Label>
+              <Select
+                value={editPaymentMethod}
+                onValueChange={(v) => setEditPaymentMethod(v as PaymentMethod | "__none__")}
+              >
+                <SelectTrigger><SelectValue placeholder="Não definida" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Não definida</SelectItem>
+                  {(Object.entries(PAYMENT_METHOD_LABEL) as [PaymentMethod, string][]).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {editPaymentMethod === "cartao" && (
+              <div className="space-y-1.5">
+                <Label>Taxa da maquininha (%)</Label>
+                <Input value={editCardFeePct} onChange={(e) => setEditCardFeePct(e.target.value)} placeholder="0,00" />
+              </div>
+            )}
+            {editPaymentMethod === "pix" && (
+              <div className="space-y-1.5">
+                <Label>Desconto no pix (%)</Label>
+                <Input value={editPixDiscountPct} onChange={(e) => setEditPixDiscountPct(e.target.value)} placeholder="0,00" />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingInstallment(undefined)}>Cancelar</Button>
+            <Button onClick={handleSaveEditInstallment} disabled={updateIns.isPending} style={{ background: "var(--primary)" }}>
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Excluir uma parcela específica */}
+      <AlertDialog open={!!deletingInstallment} onOpenChange={(v) => !v && setDeletingInstallment(undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir parcela?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A parcela <strong>{deletingInstallment?.description}</strong> ({formatCurrency(Number(deletingInstallment?.amount ?? 0))}) será removida definitivamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={async () => {
+                if (deletingInstallment) {
+                  await deleteIns.mutateAsync(deletingInstallment.id);
+                  setDeletingInstallment(undefined);
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -626,12 +784,16 @@ function InstallmentRow({
   onMarkPaid,
   onCancel,
   onReopen,
+  onEdit,
+  onDelete,
 }: {
   installment: Installment & { phase?: { id: string; name: string; status: string } | null };
   phases: { id: string; name: string }[];
   onMarkPaid: () => void;
   onCancel: () => void;
   onReopen: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const meta = INSTALLMENT_STATUS_META[installment.status];
   const phase = phases.find((p) => p.id === installment.phase_id);
@@ -677,30 +839,38 @@ function InstallmentRow({
       <p className="text-sm font-semibold text-text-primary whitespace-nowrap">
         {formatCurrency(Number(installment.amount))}
       </p>
-      {installment.status === "pago" ? (
-        <Button variant="outline" size="sm" onClick={onReopen} className="h-7 text-xs">
-          Reabrir
-        </Button>
-      ) : installment.status === "cancelado" ? (
-        <Button variant="outline" size="sm" onClick={onReopen} className="h-7 text-xs">
-          Restaurar
-        </Button>
-      ) : (
-        <div className="flex gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onMarkPaid}
-            className="h-7 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-          >
-            <CheckCircle2 size={13} className="mr-1" />
-            Pago
+      <div className="flex gap-1 items-center">
+        {installment.status === "pago" ? (
+          <Button variant="outline" size="sm" onClick={onReopen} className="h-7 text-xs">
+            Reabrir
           </Button>
-          <Button variant="outline" size="sm" onClick={onCancel} className="h-7 text-xs">
-            Cancelar
+        ) : installment.status === "cancelado" ? (
+          <Button variant="outline" size="sm" onClick={onReopen} className="h-7 text-xs">
+            Restaurar
           </Button>
-        </div>
-      )}
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onMarkPaid}
+              className="h-7 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+            >
+              <CheckCircle2 size={13} className="mr-1" />
+              Pago
+            </Button>
+            <Button variant="outline" size="sm" onClick={onCancel} className="h-7 text-xs">
+              Cancelar
+            </Button>
+          </>
+        )}
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-text-muted hover:text-primary" onClick={onEdit}>
+          <Pencil size={13} />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-text-muted hover:text-red-600" onClick={onDelete}>
+          <Trash2 size={13} />
+        </Button>
+      </div>
     </div>
   );
 }

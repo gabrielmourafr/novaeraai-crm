@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LabelList,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -1082,15 +1082,30 @@ export function FinanceiroTab() {
                 {months[month - 1]}/{year} + próximos 5 meses — soma do que está ativo, descontando contratos que terminam no período
               </p>
             </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={mensalidadeForecast} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={mensalidadeForecast} margin={{ top: 24, right: 4, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" />
                 <XAxis dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
-                <Bar dataKey="total" name="Mensalidade Ativa" fill="#0B87C3" radius={[4,4,0,0]} maxBarSize={40} />
+                <Bar dataKey="total" name="Mensalidade Ativa" fill="#0B87C3" radius={[4,4,0,0]} maxBarSize={40}>
+                  <LabelList
+                    dataKey="total"
+                    position="top"
+                    formatter={(v: React.ReactNode) => formatCurrency(Number(v))}
+                    style={{ fill: "#E2EBF8", fontSize: 11, fontWeight: 600 }}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-3">
+              {mensalidadeForecast.map((m) => (
+                <div key={m.name} className="rounded-lg p-2 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+                  <p className="text-[10px]" style={{ color: "#7BA3C6" }}>{m.name}</p>
+                  <p className="text-xs font-semibold" style={{ color: "#E2EBF8" }}>{formatCurrency(m.total)}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Mensalidades recebidas por mês */}
