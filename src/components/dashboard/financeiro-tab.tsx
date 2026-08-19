@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LabelList,
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LabelList, Legend,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -693,20 +693,24 @@ export function FinanceiroTab() {
     });
   }, [monthsForward, revenuesForwardMonths]);
 
-  // Previsão de mensalidade ativa mês a mês, a partir do mês selecionado —
-  // soma o billing_amount de quem está ativo e ainda dentro do contrato
-  // (contract_end) naquele mês, então contratos que terminam já saem da conta
+  // Previsão de mensalidade mês a mês, a partir do mês selecionado — soma
+  // do que está ativo (contract_end descontado) + o que ainda é previsão
+  // (projetos "sem_mensalidade" com data prevista de 1ª cobrança já dentro
+  // do mês, usando o valor cadastrado como mensalidade prevista)
   const mensalidadeForecast = useMemo(() => {
     return monthsForward.map((m) => {
       const monthEnd = new Date(m.year, m.month, 0);
-      const total = activeSubscriptions.reduce((s, sub) => {
+      const ativa = activeSubscriptions.reduce((s, sub) => {
         const startOk = !sub.contract_start || new Date(sub.contract_start) <= monthEnd;
         const endOk = !sub.contract_end || new Date(sub.contract_end) >= monthEnd;
         return startOk && endOk ? s + Number(sub.billing_amount ?? 0) : s;
       }, 0);
-      return { name: m.label, total };
+      const prevista = upcomingMensalidades.reduce((s, { project: p, predicted }) => {
+        return predicted <= monthEnd ? s + Number(p.billing_amount ?? 0) : s;
+      }, 0);
+      return { name: m.label, ativa, prevista, total: ativa + prevista };
     });
-  }, [monthsForward, activeSubscriptions]);
+  }, [monthsForward, activeSubscriptions, upcomingMensalidades]);
 
   const paidExpenses = expenses.filter((e) => e.status === "pago").reduce((s, e) => s + e.value, 0);
   const expensesToPayValue = expenses.filter((e) => e.status !== "pago").reduce((s, e) => s + e.value, 0);
@@ -1079,21 +1083,35 @@ export function FinanceiroTab() {
             <div className="mb-4">
               <h4 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Previsão de Mensalidade Ativa</h4>
               <p className="text-xs" style={{ color: "#7BA3C6" }}>
-                {months[month - 1]}/{year} + próximos 5 meses — soma do que está ativo, descontando contratos que terminam no período
+                {months[month - 1]}/{year} + próximos 5 meses — ativa (já cobrando) + prevista (clientes ainda &quot;sem mensalidade&quot; com previsão de 1ª cobrança)
               </p>
             </div>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart data={mensalidadeForecast} margin={{ top: 24, right: 4, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" />
                 <XAxis dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
-                <Bar dataKey="total" name="Mensalidade Ativa" fill="#0B87C3" radius={[4,4,0,0]} maxBarSize={40}>
+                <Legend
+                  verticalAlign="bottom"
+                  height={32}
+                  iconType="circle"
+                  wrapperStyle={{ fontSize: 12, color: "#7BA3C6" }}
+                />
+                <Bar dataKey="ativa" name="Mensalidade Ativa" fill="#22c55e" radius={[4,4,0,0]} maxBarSize={32}>
                   <LabelList
-                    dataKey="total"
+                    dataKey="ativa"
                     position="top"
-                    formatter={(v: React.ReactNode) => formatCurrency(Number(v))}
-                    style={{ fill: "#E2EBF8", fontSize: 11, fontWeight: 600 }}
+                    formatter={(v: React.ReactNode) => (Number(v) > 0 ? formatCurrency(Number(v)) : "")}
+                    style={{ fill: "#22c55e", fontSize: 10, fontWeight: 600 }}
+                  />
+                </Bar>
+                <Bar dataKey="prevista" name="Mensalidade Prevista" fill="#0B87C3" radius={[4,4,0,0]} maxBarSize={32}>
+                  <LabelList
+                    dataKey="prevista"
+                    position="top"
+                    formatter={(v: React.ReactNode) => (Number(v) > 0 ? formatCurrency(Number(v)) : "")}
+                    style={{ fill: "#0B87C3", fontSize: 10, fontWeight: 600 }}
                   />
                 </Bar>
               </BarChart>
@@ -1103,6 +1121,10 @@ export function FinanceiroTab() {
                 <div key={m.name} className="rounded-lg p-2 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
                   <p className="text-[10px]" style={{ color: "#7BA3C6" }}>{m.name}</p>
                   <p className="text-xs font-semibold" style={{ color: "#E2EBF8" }}>{formatCurrency(m.total)}</p>
+                  <p className="text-[10px] mt-0.5">
+                    <span style={{ color: "#22c55e" }}>{formatCurrency(m.ativa)}</span>
+                    {m.prevista > 0 && <span style={{ color: "#0B87C3" }}> +{formatCurrency(m.prevista)}</span>}
+                  </p>
                 </div>
               ))}
             </div>
