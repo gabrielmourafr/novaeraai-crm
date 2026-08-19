@@ -195,6 +195,19 @@ export function FinanceiroTab() {
     return map;
   }, [partnerAdvances]);
 
+  // Recebido no mês selecionado — separado do "Valor no Mês" (que é só o
+  // cálculo teórico em cima do %). É a soma real do que cada sócio retirou
+  // no mês, registrada como adiantamento com a data dentro do período.
+  const advancesByPartnerMonth = useMemo(() => {
+    const prefix = `${year}-${String(month).padStart(2, "0")}`;
+    const map = new Map<string, number>();
+    for (const a of partnerAdvances) {
+      if (!a.date || !a.date.startsWith(prefix)) continue;
+      map.set(a.partner_id, (map.get(a.partner_id) ?? 0) + Number(a.value));
+    }
+    return map;
+  }, [partnerAdvances, year, month]);
+
   const openAddPartner = () => {
     setEditingPartner(undefined);
     setPartnerMode("manual");
@@ -1967,7 +1980,8 @@ export function FinanceiroTab() {
                     <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
                       <TableHead style={{ color: "#7BA3C6" }}>Sócio</TableHead>
                       <TableHead style={{ color: "#7BA3C6" }} className="text-center">%</TableHead>
-                      <TableHead style={{ color: "#7BA3C6" }} className="text-right">Valor no Mês</TableHead>
+                      <TableHead style={{ color: "#7BA3C6" }} className="text-right">Previsto no Mês (%)</TableHead>
+                      <TableHead style={{ color: "#7BA3C6" }} className="text-right">Recebido no Mês</TableHead>
                       <TableHead style={{ color: "#7BA3C6" }} className="text-right">Adiantado (total)</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1976,8 +1990,11 @@ export function FinanceiroTab() {
                       <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
                         <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>{p.name}</TableCell>
                         <TableCell className="text-center text-sm" style={{ color: "#7BA3C6" }}>{Number(p.percentage).toFixed(1)}%</TableCell>
-                        <TableCell className="text-right text-sm font-semibold" style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>
+                        <TableCell className="text-right text-sm" style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>
                           {formatCurrency(balance * (Number(p.percentage) / 100))}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-semibold" style={{ color: (advancesByPartnerMonth.get(p.id) ?? 0) > 0 ? "#0B87C3" : "#3D5A78" }}>
+                          {formatCurrency(advancesByPartnerMonth.get(p.id) ?? 0)}
                         </TableCell>
                         <TableCell className="text-right text-sm" style={{ color: (advancesByPartner.get(p.id) ?? 0) > 0 ? "#F59E0B" : "#3D5A78" }}>
                           {formatCurrency(advancesByPartner.get(p.id) ?? 0)}
