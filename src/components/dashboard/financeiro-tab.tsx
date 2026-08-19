@@ -1505,8 +1505,15 @@ export function FinanceiroTab() {
               label={`Despesas do Mês — A Pagar (${expensesToPayCount})`}
               value={formatCurrency(expensesToPayValue)}
               icon={TrendingDown}
+              onClick={() => setDespesasMesBreakdownOpen(true)}
             />
-            <StatCard size="sm" label="Despesas do Mês — Pago" value={formatCurrency(paidExpenses)} icon={TrendingDown} />
+            <StatCard
+              size="sm"
+              label="Despesas do Mês — Pago"
+              value={formatCurrency(paidExpenses)}
+              icon={TrendingDown}
+              onClick={() => setDespesasMesBreakdownOpen(true)}
+            />
           </div>
 
           {/* Despesas por Categoria */}
@@ -3019,34 +3026,73 @@ export function FinanceiroTab() {
               Total: <strong>{formatCurrency(totalExpenses)}</strong>
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className="max-h-[65vh] overflow-y-auto space-y-4">
             {expenses.length === 0 ? (
               <p className="text-sm text-text-muted text-center py-6">Nenhuma despesa neste mês.</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {expenses.map((e) => (
-                    <TableRow key={e.id}>
-                      <TableCell className="text-sm font-medium text-text-primary">{e.description}</TableCell>
-                      <TableCell className="text-sm text-text-muted">{e.due_date ? formatDate(e.due_date) : "—"}</TableCell>
-                      <TableCell className="text-sm">
-                        <span className={e.status === "pago" ? "text-green-500" : e.status === "atrasado" ? "text-red-500" : "text-amber-500"}>
-                          {e.status === "pago" ? "Pago" : e.status === "atrasado" ? "Atrasado" : "Pendente"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right text-sm font-semibold text-text-primary">{formatCurrency(e.value)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
+                    A Pagar ({expensesToPayCount}) — {formatCurrency(expensesToPayValue)}
+                  </p>
+                  {expenses.filter((e) => e.status !== "pago").length === 0 ? (
+                    <p className="text-sm text-text-muted py-2">Nada pendente neste mês.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead>Vencimento</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {expenses.filter((e) => e.status !== "pago").map((e) => (
+                          <TableRow key={e.id}>
+                            <TableCell className="text-sm font-medium text-text-primary">{e.description}</TableCell>
+                            <TableCell className="text-sm text-text-muted">{e.due_date ? formatDate(e.due_date) : "—"}</TableCell>
+                            <TableCell className="text-sm">
+                              <span className={e.status === "atrasado" ? "text-red-500" : "text-amber-500"}>
+                                {e.status === "atrasado" ? "Atrasado" : "Pendente"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-semibold text-amber-500">{formatCurrency(e.value)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
+                    Pago ({expenses.filter((e) => e.status === "pago").length}) — {formatCurrency(paidExpenses)}
+                  </p>
+                  {expenses.filter((e) => e.status === "pago").length === 0 ? (
+                    <p className="text-sm text-text-muted py-2">Nada pago neste mês ainda.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead>Pago em</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {expenses.filter((e) => e.status === "pago").map((e) => (
+                          <TableRow key={e.id}>
+                            <TableCell className="text-sm font-medium text-text-primary">{e.description}</TableCell>
+                            <TableCell className="text-sm text-text-muted">{e.paid_at ? formatDate(e.paid_at) : "—"}</TableCell>
+                            <TableCell className="text-right text-sm font-semibold text-green-500">{formatCurrency(e.value)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </DialogContent>
