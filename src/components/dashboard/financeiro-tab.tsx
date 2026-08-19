@@ -134,6 +134,8 @@ export function FinanceiroTab() {
   const [revStatus, setRevStatus] = useState<"pendente" | "pago" | "atrasado" | "cancelado">("pendente");
   const [revRecurrence, setRevRecurrence] = useState<"pontual" | "mensal" | "trimestral" | "anual">("pontual");
   const [revCompanyId, setRevCompanyId] = useState("__none__");
+  const [revProjectId, setRevProjectId] = useState("__none__");
+  const [revPaidAt, setRevPaidAt] = useState("");
 
   // Expense form state
   const [expDesc, setExpDesc] = useState("");
@@ -468,11 +470,14 @@ export function FinanceiroTab() {
       business_unit: "intelligence",
       recurrence: revRecurrence,
       company_id: revCompanyId !== "__none__" ? revCompanyId : null,
-      contact_id: null, proposal_id: null, project_id: null,
-      payment_method: null, installment: null, paid_at: null,
+      contact_id: null, proposal_id: null,
+      project_id: revProjectId !== "__none__" ? revProjectId : null,
+      payment_method: null, installment: null,
+      paid_at: revStatus === "pago" ? (revPaidAt || new Date().toISOString().slice(0, 10)) : null,
     });
     setCreateRevenueOpen(false);
     setRevDesc(""); setRevValue(""); setRevDueDate(""); setRevCompanyId("__none__");
+    setRevProjectId("__none__"); setRevPaidAt("");
     setRevCategory("consultoria"); setRevStatus("pendente"); setRevRecurrence("pontual");
   };
 
@@ -1914,6 +1919,23 @@ export function FinanceiroTab() {
                 Vincular a uma empresa faz essa receita entrar no acumulado por cliente
               </p>
             </div>
+            <div className="space-y-1.5">
+              <Label>Projeto (opcional)</Label>
+              <Select value={revProjectId} onValueChange={setRevProjectId}>
+                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum</SelectItem>
+                  {projects
+                    .filter((p) => revCompanyId === "__none__" || p.company_id === revCompanyId)
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px]" style={{ color: "#7BA3C6" }}>
+                Vincular a um projeto (categoria Projeto + status Pago) já abate do valor a receber do projeto
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Valor (R$) *</Label>
@@ -1924,6 +1946,12 @@ export function FinanceiroTab() {
                 <Input type="date" value={revDueDate} onChange={(e) => setRevDueDate(e.target.value)} />
               </div>
             </div>
+            {revStatus === "pago" && (
+              <div className="space-y-1.5">
+                <Label>Data de Recebimento</Label>
+                <Input type="date" value={revPaidAt} onChange={(e) => setRevPaidAt(e.target.value)} placeholder="Hoje, se em branco" />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Categoria</Label>

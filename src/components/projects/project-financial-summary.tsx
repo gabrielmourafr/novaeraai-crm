@@ -38,6 +38,7 @@ export function ProjectFinancialSummary({ project }: Props) {
     infra_setup_cost: project.infra_setup_cost?.toString() ?? "",
     infra_monthly_cost: project.infra_monthly_cost?.toString() ?? "",
     billing_amount: project.billing_amount?.toString() ?? "",
+    receivable_value: project.receivable_value?.toString() ?? "",
   });
 
   const commission = useMemo(() => {
@@ -68,6 +69,7 @@ export function ProjectFinancialSummary({ project }: Props) {
       infra_setup_cost: project.infra_setup_cost?.toString() ?? "",
       infra_monthly_cost: project.infra_monthly_cost?.toString() ?? "",
       billing_amount: project.billing_amount?.toString() ?? "",
+      receivable_value: project.receivable_value?.toString() ?? "",
     });
     setOpen(true);
   };
@@ -81,9 +83,12 @@ export function ProjectFinancialSummary({ project }: Props) {
       infra_setup_cost: form.infra_setup_cost ? Number(form.infra_setup_cost) : null,
       infra_monthly_cost: form.infra_monthly_cost ? Number(form.infra_monthly_cost) : null,
       billing_amount: form.billing_amount ? Number(form.billing_amount) : null,
+      receivable_value: form.receivable_value ? Number(form.receivable_value) : null,
     });
     setOpen(false);
   };
+
+  const receivableValue = project.receivable_value ?? project.contract_value ?? null;
 
   const planLabel = CONTRACT_PLANS.find((p) => p.value === project.contract_plan)?.label ?? "—";
 
@@ -107,6 +112,12 @@ export function ProjectFinancialSummary({ project }: Props) {
           icon={DollarSign}
           label="Implementação"
           value={project.contract_value ? formatCurrency(Number(project.contract_value)) : "—"}
+        />
+        <Tile
+          icon={DollarSign}
+          label="A Receber"
+          value={receivableValue != null ? formatCurrency(Number(receivableValue)) : "—"}
+          accent="#F59E0B"
         />
         <Tile
           icon={DollarSign}
@@ -177,6 +188,20 @@ export function ProjectFinancialSummary({ project }: Props) {
                   placeholder="1500.00"
                 />
               </div>
+            </div>
+
+            <div>
+              <Label>A Receber (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={form.receivable_value}
+                onChange={(e) => setForm((f) => ({ ...f, receivable_value: e.target.value }))}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-text-muted mt-1">
+                Diminui sozinho conforme você registra receitas pagas deste projeto em Financeiro &gt; Receitas.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">

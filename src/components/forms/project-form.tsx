@@ -42,8 +42,6 @@ const projectSchema = z.object({
   billing_amount: z.string().optional(),
   receivable_value: z.string().optional(),
   receivable_due_date: z.string().optional(),
-  received_value: z.string().optional(),
-  received_date: z.string().optional(),
   description: z.string().optional(),
   tags: z.string().optional(),
   // V2
@@ -103,8 +101,6 @@ export const ProjectForm = ({ open, onClose, project }: ProjectFormProps) => {
         billing_amount: project.billing_amount?.toString() ?? "",
         receivable_value: project.receivable_value?.toString() ?? "",
         receivable_due_date: project.receivable_due_date ?? "",
-        received_value: project.received_value?.toString() ?? "",
-        received_date: project.received_date ?? "",
         description: project.description ?? "",
         tags: project.tags?.join(", ") ?? "",
         niche: project.niche ?? "",
@@ -156,8 +152,6 @@ export const ProjectForm = ({ open, onClose, project }: ProjectFormProps) => {
       billing_amount: values.billing_amount ? parseFloat(values.billing_amount) : null,
       receivable_value: values.receivable_value ? parseFloat(values.receivable_value) : null,
       receivable_due_date: values.receivable_due_date || null,
-      received_value: values.received_value ? parseFloat(values.received_value) : null,
-      received_date: values.received_date || null,
       description: values.description || null,
       tags,
       progress: project?.progress ?? 0,
@@ -289,29 +283,14 @@ export const ProjectForm = ({ open, onClose, project }: ProjectFormProps) => {
                 {...register("receivable_value")}
                 placeholder="0,00"
               />
-              <p className="text-xs text-text-muted">Ainda vai cair — não conta no faturamento total.</p>
+              <p className="text-xs text-text-muted">
+                Diminui automaticamente conforme você registra receitas pagas deste projeto
+                em Financeiro &gt; Receitas — não precisa editar aqui toda vez.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="receivable_due_date">Previsão de Recebimento</Label>
               <Input id="receivable_due_date" type="date" {...register("receivable_due_date")} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="received_value">Valor Recebido (R$)</Label>
-              <Input
-                id="received_value"
-                type="number"
-                step="0.01"
-                {...register("received_value")}
-                placeholder="0,00"
-              />
-              <p className="text-xs text-text-muted">Já caiu — conta no faturamento total.</p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="received_date">Data do Recebimento</Label>
-              <Input id="received_date" type="date" {...register("received_date")} />
             </div>
           </div>
 
