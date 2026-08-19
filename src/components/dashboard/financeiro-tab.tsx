@@ -104,6 +104,7 @@ export function FinanceiroTab() {
   const [receitasMesBreakdownOpen, setReceitasMesBreakdownOpen] = useState(false);
   const [aReceberMesBreakdownOpen, setAReceberMesBreakdownOpen] = useState(false);
   const [despesasMesBreakdownOpen, setDespesasMesBreakdownOpen] = useState(false);
+  const [saldoBreakdownOpen, setSaldoBreakdownOpen] = useState(false);
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<PartnerPaymentWithRelations | undefined>();
   const [deletingPayment, setDeletingPayment] = useState<PartnerPaymentWithRelations | undefined>();
@@ -693,8 +694,12 @@ export function FinanceiroTab() {
   const totalExpenses = expenses.reduce((s, e) => s + e.value, 0);
   const paidRevenues = revenues.filter((r) => r.status === "pago").reduce((s, r) => s + r.value, 0);
   const pendingRevenues = revenues.filter((r) => r.status === "pendente" || r.status === "atrasado").reduce((s, r) => s + r.value, 0);
-  // Saldo é caixa real: só conta receita já recebida, não o que ainda está pendente
-  const balance = paidRevenues - totalExpenses;
+  const paidExpenses = expenses.filter((e) => e.status === "pago").reduce((s, e) => s + e.value, 0);
+  // Saldo é caixa real: só conta receita já recebida e despesa já paga, não
+  // o que ainda está pendente de nenhum dos dois lados (antes só a receita
+  // seguia essa regra — despesa pendente entrava inteira, subtraindo caixa
+  // que ainda nem tinha saído de fato).
+  const balance = paidRevenues - paidExpenses;
 
   // Implementação do mês selecionado (sem ser acumulado all-time) — previsibilidade
   const aReceberNoMes = revenues
@@ -733,7 +738,6 @@ export function FinanceiroTab() {
     });
   }, [monthsForward, activeSubscriptions, upcomingMensalidades]);
 
-  const paidExpenses = expenses.filter((e) => e.status === "pago").reduce((s, e) => s + e.value, 0);
   const expensesToPayValue = expenses.filter((e) => e.status !== "pago").reduce((s, e) => s + e.value, 0);
   const expensesToPayCount = expenses.filter((e) => e.status !== "pago").length;
   const filteredExpenses = expenses.filter((e) => expenseTypeFilter === "all" || e.expense_type === expenseTypeFilter);
@@ -843,7 +847,7 @@ export function FinanceiroTab() {
                 icon={TrendingDown}
                 onClick={() => setDespesasMesBreakdownOpen(true)}
               />
-              <StatCard label="Saldo" value={formatCurrency(balance)} icon={DollarSign} />
+              <StatCard label="Saldo" value={formatCurrency(balance)} icon={DollarSign} onClick={() => setSaldoBreakdownOpen(true)} />
             </div>
           </div>
 
@@ -2951,6 +2955,69 @@ export function FinanceiroTab() {
                   ))}
                 </TableBody>
               </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: Composição do Saldo ─── */}
+      <Dialog open={saldoBreakdownOpen} onOpenChange={setSaldoBreakdownOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>De onde vem o Saldo — {months[month - 1]} / {year}</DialogTitle>
+            <DialogDescription>
+              Saldo = Receitas recebidas − Despesas pagas (só o que já entrou/saiu de fato, nada pendente conta)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto space-y-4">
+            <div className="rounded-lg p-3" style={{ background: "rgba(34,197,94,0.08)" }}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold text-green-500">+ Receitas Recebidas</p>
+                <p className="text-sm font-bold text-green-500">{formatCurrency(paidRevenues)}</p>
+              </div>
+              {revenues.filter((r) => r.status === "pago").length === 0 ? (
+                <p className="text-xs text-text-muted">Nenhuma receita recebida neste mês.</p>
+              ) : (
+                <div className="space-y-1">
+                  {revenues.filter((r) => r.status === "pago").map((r) => (
+                    <div key={r.id} className="flex items-center justify-between text-xs">
+                      <span className="text-text-muted truncate mr-2">{r.description}</span>
+                      <span className="text-text-primary whitespace-nowrap">{formatCurrency(r.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-lg p-3" style={{ background: "rgba(239,68,68,0.08)" }}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold text-red-500">− Despesas Pagas</p>
+                <p className="text-sm font-bold text-red-500">{formatCurrency(paidExpenses)}</p>
+              </div>
+              {expenses.filter((e) => e.status === "pago").length === 0 ? (
+                <p className="text-xs text-text-muted">Nenhuma despesa paga neste mês.</p>
+              ) : (
+                <div className="space-y-1">
+                  {expenses.filter((e) => e.status === "pago").map((e) => (
+                    <div key={e.id} className="flex items-center justify-between text-xs">
+                      <span className="text-text-muted truncate mr-2">{e.description}</span>
+                      <span className="text-text-primary whitespace-nowrap">{formatCurrency(e.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-border">
+              <p className="text-sm font-semibold text-text-primary">= Saldo</p>
+              <p className="text-base font-bold" style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>
+                {formatCurrency(balance)}
+              </p>
+            </div>
+            {(pendingRevenues > 0 || expensesToPayValue > 0) && (
+              <p className="text-[11px] text-text-muted">
+                Não entram aqui: {formatCurrency(pendingRevenues)} de receitas ainda a receber e {formatCurrency(expensesToPayValue)} de despesas ainda a pagar neste mês.
+              </p>
             )}
           </div>
         </DialogContent>
