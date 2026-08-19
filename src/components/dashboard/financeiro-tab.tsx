@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { addDays, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Building2, Users, Download, Receipt, Layers, Clock } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Building2, Users, Download, Receipt, Layers, Clock, CalendarDays } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,7 @@ import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatDate, parseCurrencyInput } from "@/lib/utils/format";
 import { exportToCsv } from "@/lib/utils/csv";
 import {
-  useRevenues, useExpenses, useRevenuesLastMonths, useExpensesLastMonths, useUpcomingFixedExpenses,
+  useRevenues, useExpenses, useRevenuesLastMonths, useRevenuesForwardMonths, useExpensesLastMonths, useUpcomingFixedExpenses,
   useRecurringExpenseTemplates, useEnsureMonthlyFixedExpenses,
   useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues,
   type Revenue, type Expense, type ExpenseWithCompany,
@@ -426,6 +426,7 @@ export function FinanceiroTab() {
   const { data: upcomingFixedExpenses = [] } = useUpcomingFixedExpenses();
   const { data: recurringTemplates = [] } = useRecurringExpenseTemplates();
   const { data: revenuesLastMonths = {} } = useRevenuesLastMonths(year, month, 6);
+  const { data: revenuesForwardMonths = {} } = useRevenuesForwardMonths(year, month, 6);
   const { data: expensesLastMonths = {} } = useExpensesLastMonths(year, month, 6);
   const { data: installmentsPending = [], isLoading: installmentsLoading } = useAllInstallments([
     "pendente",
@@ -660,6 +661,15 @@ export function FinanceiroTab() {
     });
   }, [year, month]);
 
+  // 6 meses pra frente a partir do mês selecionado — usado nos gráficos de
+  // previsibilidade (Implementação, Mensalidade), que olham pro futuro
+  const monthsForward = useMemo(() => {
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(year, month - 1 + i, 1);
+      return { year: d.getFullYear(), month: d.getMonth() + 1, label: monthsShort[d.getMonth()] };
+    });
+  }, [year, month]);
+
   const totalRevenues = revenues.reduce((s, r) => s + r.value, 0);
   const totalExpenses = expenses.reduce((s, e) => s + e.value, 0);
   const paidRevenues = revenues.filter((r) => r.status === "pago").reduce((s, r) => s + r.value, 0);
@@ -672,16 +682,31 @@ export function FinanceiroTab() {
     .filter((r) => r.category === "projeto" && (r.status === "pendente" || r.status === "atrasado"))
     .reduce((s, r) => s + r.value, 0);
   const implementacaoPorMes = useMemo(() => {
-    return monthsBack.map((m) => {
+    return monthsForward.map((m) => {
       const key = `${m.year}-${String(m.month).padStart(2, "0")}`;
-      const monthRevenues = (revenuesLastMonths[key] ?? []).filter((r) => r.category === "projeto");
+      const monthRevenues = (revenuesForwardMonths[key] ?? []).filter((r) => r.category === "projeto");
       return {
         name: m.label,
         recebido: monthRevenues.filter((r) => r.status === "pago").reduce((s, r) => s + r.value, 0),
         aReceber: monthRevenues.filter((r) => r.status === "pendente" || r.status === "atrasado").reduce((s, r) => s + r.value, 0),
       };
     });
-  }, [monthsBack, revenuesLastMonths]);
+  }, [monthsForward, revenuesForwardMonths]);
+
+  // Previsão de mensalidade ativa mês a mês, a partir do mês selecionado —
+  // soma o billing_amount de quem está ativo e ainda dentro do contrato
+  // (contract_end) naquele mês, então contratos que terminam já saem da conta
+  const mensalidadeForecast = useMemo(() => {
+    return monthsForward.map((m) => {
+      const monthEnd = new Date(m.year, m.month, 0);
+      const total = activeSubscriptions.reduce((s, sub) => {
+        const startOk = !sub.contract_start || new Date(sub.contract_start) <= monthEnd;
+        const endOk = !sub.contract_end || new Date(sub.contract_end) >= monthEnd;
+        return startOk && endOk ? s + Number(sub.billing_amount ?? 0) : s;
+      }, 0);
+      return { name: m.label, total };
+    });
+  }, [monthsForward, activeSubscriptions]);
 
   const paidExpenses = expenses.filter((e) => e.status === "pago").reduce((s, e) => s + e.value, 0);
   const expensesToPayValue = expenses.filter((e) => e.status !== "pago").reduce((s, e) => s + e.value, 0);
@@ -738,6 +763,14 @@ export function FinanceiroTab() {
     }));
   }, [revenues]);
 
+  const periodBadge = (
+    <div className="flex items-center gap-1.5 text-xs" style={{ color: "#7BA3C6" }}>
+      <CalendarDays size={12} />
+      Período selecionado:{" "}
+      <span className="font-semibold" style={{ color: "#E2EBF8" }}>{months[month - 1]} / {year}</span>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Sub-navegação: telas separadas por área do Financeiro */}
@@ -754,6 +787,7 @@ export function FinanceiroTab() {
 
         {/* ══════════════════ VISÃO GERAL ══════════════════ */}
         <TabsContent value="visao-geral" className="mt-4 space-y-6">
+          {periodBadge}
           {/* Month/Year Filter */}
           <div className="flex gap-3 items-center">
             <Select value={month.toString()} onValueChange={(v) => setMonth(parseInt(v))}>
@@ -848,6 +882,7 @@ export function FinanceiroTab() {
 
         {/* ══════════════════ IMPLEMENTAÇÃO ══════════════════ */}
         <TabsContent value="implementacao" className="mt-4 space-y-6">
+          {periodBadge}
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
               Implementação
@@ -904,7 +939,9 @@ export function FinanceiroTab() {
             >
               <div className="mb-4">
                 <h4 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Implementação por Mês</h4>
-                <p className="text-xs" style={{ color: "#7BA3C6" }}>Últimos 6 meses — recebido vs a receber</p>
+                <p className="text-xs" style={{ color: "#7BA3C6" }}>
+                  {months[month - 1]}/{year} + próximos 5 meses — recebido vs a receber
+                </p>
               </div>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={implementacaoPorMes} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
@@ -1018,6 +1055,7 @@ export function FinanceiroTab() {
 
         {/* ══════════════════ MENSALIDADE ══════════════════ */}
         <TabsContent value="mensalidade" className="mt-4 space-y-4">
+          {periodBadge}
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
               Mensalidade
@@ -1037,6 +1075,28 @@ export function FinanceiroTab() {
                 icon={Wallet}
               />
             </div>
+          </div>
+
+          {/* Previsão de mensalidades ativas */}
+          <div
+            className="rounded-xl p-5"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
+          >
+            <div className="mb-4">
+              <h4 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Previsão de Mensalidade Ativa</h4>
+              <p className="text-xs" style={{ color: "#7BA3C6" }}>
+                {months[month - 1]}/{year} + próximos 5 meses — soma do que está ativo, descontando contratos que terminam no período
+              </p>
+            </div>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={mensalidadeForecast} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,135,195,0.08)" />
+                <XAxis dataKey="name" tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#7BA3C6", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrency(Number(v))} />
+                <Bar dataKey="total" name="Mensalidade Ativa" fill="#0B87C3" radius={[4,4,0,0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
 
           {/* Mensalidades recebidas por mês */}
@@ -1198,6 +1258,7 @@ export function FinanceiroTab() {
         </TabsContent>
 
         <TabsContent value="receitas-despesas" className="mt-4 space-y-4">
+          {periodBadge}
           {/* Fluxo de Caixa (compartilhado entre receitas e despesas) */}
           <div
             className="rounded-xl p-5"
@@ -1633,6 +1694,7 @@ export function FinanceiroTab() {
 
         {/* ══════════════════ PARCEIROS & DEVS ══════════════════ */}
         <TabsContent value="parceiros" className="mt-4 space-y-4">
+          {periodBadge}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <StatCard
               size="sm"
@@ -1769,7 +1831,8 @@ export function FinanceiroTab() {
         </TabsContent>
 
         {/* ══════════════════ CLIENTES ══════════════════ */}
-        <TabsContent value="clientes" className="mt-4">
+        <TabsContent value="clientes" className="mt-4 space-y-4">
+          {periodBadge}
           <div
             className="rounded-xl overflow-hidden"
             style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
@@ -1819,6 +1882,7 @@ export function FinanceiroTab() {
 
         {/* ══════════════════ LUCRO E DISTRIBUIÇÃO ══════════════════ */}
         <TabsContent value="lucro-distribuicao" className="mt-4 space-y-4">
+          {periodBadge}
           {/* Distribuição de Lucros por Sócio */}
           <div
             className="rounded-xl overflow-hidden"

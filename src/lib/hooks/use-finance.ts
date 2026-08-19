@@ -145,6 +145,37 @@ export const useRevenuesLastMonths = (year: number, month: number, months = 6) =
   });
 };
 
+// Igual a useRevenuesLastMonths, mas olhando pra frente: começa no mês
+// selecionado e segue os N meses seguintes — usado nos gráficos de
+// previsibilidade (Implementação), onde o que importa é o que vem
+// depois do período escolhido, não o histórico.
+export const useRevenuesForwardMonths = (year: number, month: number, months = 6) => {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["revenues", "months-forward", year, month, months],
+    queryFn: async () => {
+      const result: Record<string, Revenue[]> = {};
+      for (let i = 0; i < months; i++) {
+        const d = new Date(year, month - 1 + i, 1);
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const from = `${y}-${String(m).padStart(2, "0")}-01`;
+        const lastDay = new Date(y, m, 0).getDate();
+        const to = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        const { data, error } = await supabase
+          .from("revenues")
+          .select("*")
+          .gte("due_date", from)
+          .lte("due_date", to)
+          .order("due_date", { ascending: false });
+        if (error) throw error;
+        result[`${y}-${String(m).padStart(2, "0")}`] = data as Revenue[];
+      }
+      return result;
+    },
+  });
+};
+
 export const useExpensesLastMonths = (year: number, month: number, months = 6) => {
   const supabase = createClient();
   return useQuery({
