@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { addDays, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Building2, Users, Download, Receipt, Layers } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, DollarSign, Trash2, Wallet, Pencil, Building2, Users, Download, Receipt, Layers, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,6 +99,9 @@ export function FinanceiroTab() {
   const [implReceberBreakdownOpen, setImplReceberBreakdownOpen] = useState(false);
   const [implRecebidaBreakdownOpen, setImplRecebidaBreakdownOpen] = useState(false);
   const [parcelasBreakdownOpen, setParcelasBreakdownOpen] = useState(false);
+  const [receitasMesBreakdownOpen, setReceitasMesBreakdownOpen] = useState(false);
+  const [aReceberMesBreakdownOpen, setAReceberMesBreakdownOpen] = useState(false);
+  const [despesasMesBreakdownOpen, setDespesasMesBreakdownOpen] = useState(false);
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
   const [deletingPayment, setDeletingPayment] = useState<PartnerPaymentWithRelations | undefined>();
 
@@ -622,6 +625,7 @@ export function FinanceiroTab() {
   const totalRevenues = revenues.reduce((s, r) => s + r.value, 0);
   const totalExpenses = expenses.reduce((s, e) => s + e.value, 0);
   const paidRevenues = revenues.filter((r) => r.status === "pago").reduce((s, r) => s + r.value, 0);
+  const pendingRevenues = revenues.filter((r) => r.status === "pendente" || r.status === "atrasado").reduce((s, r) => s + r.value, 0);
   // Saldo é caixa real: só conta receita já recebida, não o que ainda está pendente
   const balance = paidRevenues - totalExpenses;
 
@@ -730,10 +734,25 @@ export function FinanceiroTab() {
               Resumo de {months[month - 1]} / {year}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard label="Receitas (mês)" value={formatCurrency(totalRevenues)} icon={TrendingUp} />
-              <StatCard label="Despesas (mês)" value={formatCurrency(totalExpenses)} icon={TrendingDown} />
+              <StatCard
+                label="Receitas Recebidas (mês)"
+                value={formatCurrency(paidRevenues)}
+                icon={TrendingUp}
+                onClick={() => setReceitasMesBreakdownOpen(true)}
+              />
+              <StatCard
+                label="A Receber (mês)"
+                value={formatCurrency(pendingRevenues)}
+                icon={Clock}
+                onClick={() => setAReceberMesBreakdownOpen(true)}
+              />
+              <StatCard
+                label="Despesas (mês)"
+                value={formatCurrency(totalExpenses)}
+                icon={TrendingDown}
+                onClick={() => setDespesasMesBreakdownOpen(true)}
+              />
               <StatCard label="Saldo" value={formatCurrency(balance)} icon={DollarSign} />
-              <StatCard label="Recebido" value={formatCurrency(paidRevenues)} icon={TrendingUp} />
             </div>
           </div>
 
@@ -2679,6 +2698,126 @@ export function FinanceiroTab() {
                       <TableCell className="text-right text-sm text-text-muted">
                         {c.finalDueDate ? formatDate(c.finalDueDate) : "—"}
                       </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: Receitas Recebidas do Mês ─── */}
+      <Dialog open={receitasMesBreakdownOpen} onOpenChange={setReceitasMesBreakdownOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Receitas Recebidas — {months[month - 1]} / {year}</DialogTitle>
+            <DialogDescription>
+              Total: <strong>{formatCurrency(paidRevenues)}</strong> — só o que já caiu na conta
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {revenues.filter((r) => r.status === "pago").length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-6">Nenhuma receita recebida neste mês.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Pago em</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {revenues.filter((r) => r.status === "pago").map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="text-sm font-medium text-text-primary">{r.description}</TableCell>
+                      <TableCell className="text-sm text-text-muted">{r.paid_at ? formatDate(r.paid_at) : "—"}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-green-500">{formatCurrency(r.value)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: A Receber no Mês ─── */}
+      <Dialog open={aReceberMesBreakdownOpen} onOpenChange={setAReceberMesBreakdownOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>A Receber — {months[month - 1]} / {year}</DialogTitle>
+            <DialogDescription>
+              Total: <strong>{formatCurrency(pendingRevenues)}</strong> — pendente ou atrasado, ainda não conta no recebido
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {revenues.filter((r) => r.status === "pendente" || r.status === "atrasado").length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-6">Nada pendente neste mês.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Vencimento</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {revenues.filter((r) => r.status === "pendente" || r.status === "atrasado").map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="text-sm font-medium text-text-primary">{r.description}</TableCell>
+                      <TableCell className="text-sm text-text-muted">{r.due_date ? formatDate(r.due_date) : "—"}</TableCell>
+                      <TableCell className="text-sm">
+                        <span className={r.status === "atrasado" ? "text-red-500" : "text-amber-500"}>
+                          {r.status === "atrasado" ? "Atrasado" : "Pendente"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-amber-500">{formatCurrency(r.value)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: Despesas do Mês ─── */}
+      <Dialog open={despesasMesBreakdownOpen} onOpenChange={setDespesasMesBreakdownOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Despesas — {months[month - 1]} / {year}</DialogTitle>
+            <DialogDescription>
+              Total: <strong>{formatCurrency(totalExpenses)}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {expenses.length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-6">Nenhuma despesa neste mês.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Vencimento</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {expenses.map((e) => (
+                    <TableRow key={e.id}>
+                      <TableCell className="text-sm font-medium text-text-primary">{e.description}</TableCell>
+                      <TableCell className="text-sm text-text-muted">{e.due_date ? formatDate(e.due_date) : "—"}</TableCell>
+                      <TableCell className="text-sm">
+                        <span className={e.status === "pago" ? "text-green-500" : e.status === "atrasado" ? "text-red-500" : "text-amber-500"}>
+                          {e.status === "pago" ? "Pago" : e.status === "atrasado" ? "Atrasado" : "Pendente"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-text-primary">{formatCurrency(e.value)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
