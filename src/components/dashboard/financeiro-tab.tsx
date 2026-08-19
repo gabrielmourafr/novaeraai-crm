@@ -1153,7 +1153,10 @@ export function FinanceiroTab() {
                   Previsão de Início de Mensalidade ({upcomingMensalidades.length})
                 </h4>
                 <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
-                  Prazo de entrega + 30 dias de período de teste, para projetos que ainda não têm mensalidade ativa
+                  Prazo de entrega + 30 dias de período de teste, para projetos que ainda não têm mensalidade ativa — total previsto: {" "}
+                  <b style={{ color: "#E2EBF8" }}>
+                    {formatCurrency(upcomingMensalidades.reduce((s, { project: p }) => s + Number(p.billing_amount ?? 0), 0))}
+                  </b>
                 </p>
               </div>
               <Table>
@@ -1161,6 +1164,7 @@ export function FinanceiroTab() {
                   <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
                     <TableHead style={{ color: "#7BA3C6" }}>Projeto</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Empresa</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Valor da Mensalidade</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Previsão 1ª Mensalidade</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1173,6 +1177,9 @@ export function FinanceiroTab() {
                         </Link>
                       </TableCell>
                       <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{p.company?.name ?? "—"}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold" style={{ color: p.billing_amount ? "#22c55e" : "#3D5A78" }}>
+                        {p.billing_amount ? formatCurrency(Number(p.billing_amount)) : "Não definido"}
+                      </TableCell>
                       <TableCell className="text-sm" style={{ color: "#E2EBF8" }}>
                         {formatDate(predicted.toISOString())}
                         {overridden && <span className="ml-1.5 text-[10px]" style={{ color: "#7BA3C6" }}>(ajustada)</span>}

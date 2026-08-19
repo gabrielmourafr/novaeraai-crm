@@ -44,6 +44,12 @@ interface SplitRow {
   id?: string;
   description: string;
   percentage: number;
+  // Valor em R$ dessa parcela — é sempre o que efetivamente vai ser salvo.
+  // Continua junto do percentage (usado só pra exibir/validar a soma de
+  // 100%), mas nunca é recalculado a partir dele na hora de salvar — foi
+  // exatamente essa recomputação que causava a parcela salvar um valor
+  // diferente do que a pessoa digitou (perda de precisão do % arredondado).
+  amount: number;
   phase_id: string | null;
   due_date: string | null;
   payment_method: PaymentMethod | null;
@@ -116,6 +122,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
           id: i.id,
           description: i.description,
           percentage: Number(i.percentage),
+          amount: Number(i.amount),
           phase_id: i.phase_id,
           due_date: i.due_date,
           payment_method: i.payment_method,
@@ -124,9 +131,10 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
         }))
       );
     } else {
+      const half = contractValue > 0 ? Math.round(contractValue * 0.5 * 100) / 100 : 0;
       setSplits([
-        { description: "Sinal 50%", percentage: 50, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
-        { description: "Entrega 50%", percentage: 50, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
+        { description: "Sinal 50%", percentage: 50, amount: half, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
+        { description: "Entrega 50%", percentage: 50, amount: contractValue - half, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
       ]);
     }
     setQuickEntradaPct(""); setQuickEntradaPaymentMethod("__none__");
@@ -140,6 +148,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
       preset.map((p, idx) => ({
         description: preset.length === 1 ? "Pagamento único" : `Parcela ${idx + 1} (${p}%)`,
         percentage: p,
+        amount: contractValue > 0 ? Math.round(contractValue * (p / 100) * 100) / 100 : 0,
         phase_id: null,
         due_date: null,
         payment_method: null,
@@ -150,10 +159,12 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
   };
 
   // Gera o plano de parcelas de uma vez: entrada opcional (%) + N parcelas
-  // iguais (ex: "30% entrada + 12x 850"). A entrada e as parcelas nunca
-  // ficam "perto" de 100% — o valor é sempre calculado por diferença
-  // (100 - entrada, e a última parcela absorve o resto do arredondamento),
-  // então a soma sempre fecha 100% certinho, mesmo com valores quebrados.
+  // iguais (ex: "30% entrada + 12x 850"). Os valores em R$ são calculados
+  // primeiro (a última parcela/entrada absorve o resto do arredondamento
+  // pra sempre fechar exatamente o valor do contrato) e o percentual é só
+  // derivado deles pra exibição/validação — nunca o contrário, porque
+  // arredondar o % e depois recalcular o valor a partir dele é o que fazia
+  // a parcela salvar um valor diferente do que foi digitado.
   const applyQuickGenerate = () => {
     const qty = parseInt(quickQty, 10);
     if (!qty || qty <= 0) {
@@ -169,25 +180,26 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
       toast.error("Entrada inválida — use um percentual entre 0 e 100.");
       return;
     }
-    const remainingPct = Math.round((100 - entradaPct) * 100) / 100;
+    const entradaAmount = entradaPct > 0 ? Math.round(contractValue * (entradaPct / 100) * 100) / 100 : 0;
+    const remainingValue = Math.round((contractValue - entradaAmount) * 100) / 100;
 
     const enteredValue = quickValue ? parseCurrencyInput(quickValue) : NaN;
-    let installmentPcts: number[];
+    let installmentAmounts: number[];
     if (!isNaN(enteredValue) && enteredValue > 0) {
-      const rawPct = Math.round(((enteredValue / contractValue) * 100) * 100) / 100;
-      installmentPcts = Array.from({ length: qty }, (_, idx) =>
-        idx === qty - 1 ? Math.max(0, Math.round((remainingPct - rawPct * (qty - 1)) * 100) / 100) : rawPct
+      installmentAmounts = Array.from({ length: qty }, (_, idx) =>
+        idx === qty - 1
+          ? Math.round((remainingValue - enteredValue * (qty - 1)) * 100) / 100
+          : Math.round(enteredValue * 100) / 100
       );
-      const remainingValue = contractValue * (remainingPct / 100);
       if (Math.abs(qty * enteredValue - remainingValue) > 0.5) {
         toast.warning(
           `${qty}x ${formatCurrency(enteredValue)} = ${formatCurrency(qty * enteredValue)}, mas o restante do contrato (após a entrada) é ${formatCurrency(remainingValue)}. Ajuste se necessário.`
         );
       }
     } else {
-      const each = Math.round((remainingPct / qty) * 100) / 100;
-      installmentPcts = Array.from({ length: qty }, (_, idx) =>
-        idx === qty - 1 ? Math.max(0, Math.round((remainingPct - each * (qty - 1)) * 100) / 100) : each
+      const each = Math.round((remainingValue / qty) * 100) / 100;
+      installmentAmounts = Array.from({ length: qty }, (_, idx) =>
+        idx === qty - 1 ? Math.round((remainingValue - each * (qty - 1)) * 100) / 100 : each
       );
     }
 
@@ -195,7 +207,8 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
     if (entradaPct > 0) {
       rows.push({
         description: "Entrada",
-        percentage: entradaPct,
+        percentage: (entradaAmount / contractValue) * 100,
+        amount: entradaAmount,
         phase_id: null,
         due_date: quickFirstDueDate || null,
         payment_method: quickEntradaPaymentMethod === "__none__" ? null : quickEntradaPaymentMethod,
@@ -203,14 +216,15 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
         pix_discount_percent: quickEntradaPaymentMethod === "pix" && quickEntradaPixDiscountPct ? parseCurrencyInput(quickEntradaPixDiscountPct) : null,
       });
     }
-    installmentPcts.forEach((pct, idx) => {
+    installmentAmounts.forEach((amt, idx) => {
       const monthOffset = entradaPct > 0 ? idx + 1 : idx;
       const due_date = quickFirstDueDate
         ? formatDateFns(addMonths(new Date(`${quickFirstDueDate}T00:00:00`), monthOffset), "yyyy-MM-dd")
         : null;
       rows.push({
         description: `Parcela ${idx + 1}/${qty}`,
-        percentage: pct,
+        percentage: (amt / contractValue) * 100,
+        amount: amt,
         phase_id: null,
         due_date,
         payment_method: null,
@@ -224,7 +238,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
   const addSplit = () => {
     setSplits((prev) => [
       ...prev,
-      { description: `Parcela ${prev.length + 1}`, percentage: 0, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
+      { description: `Parcela ${prev.length + 1}`, percentage: 0, amount: 0, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
     ]);
   };
 
@@ -275,7 +289,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
 
   const handleSave = async () => {
     if (Math.abs(splitsSum - 100) > 0.01) {
-      toast.error(`A soma das parcelas deve ser 100% (atual: ${splitsSum}%)`);
+      toast.error(`A soma das parcelas deve ser 100% (atual: ${splitsSum.toFixed(2)}%)`);
       return;
     }
     if (contractValue <= 0) {
@@ -295,7 +309,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
       }
       for (let i = 0; i < splits.length; i++) {
         const s = splits[i];
-        const amount = Math.round((contractValue * s.percentage) / 100 * 100) / 100;
+        const amount = s.amount;
         if (s.id) {
           await updateIns.mutateAsync({
             id: s.id,
@@ -539,8 +553,14 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
                     max={100}
                     step={0.01}
                     placeholder="%"
-                    value={row.percentage || ""}
-                    onChange={(e) => updateSplit(idx, { percentage: parseFloat(e.target.value) || 0 })}
+                    value={row.percentage ? Number(row.percentage.toFixed(2)) : ""}
+                    onChange={(e) => {
+                      const pct = parseFloat(e.target.value) || 0;
+                      updateSplit(idx, {
+                        percentage: pct,
+                        amount: contractValue > 0 ? Math.round(contractValue * (pct / 100) * 100) / 100 : 0,
+                      });
+                    }}
                     className="h-9 text-xs"
                   />
                   <button
@@ -552,6 +572,9 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
                     <Trash2 size={14} />
                   </button>
                 </div>
+                <p className="text-[11px] text-text-muted">
+                  Valor desta parcela: <span className="font-semibold text-text-primary">{formatCurrency(row.amount)}</span>
+                </p>
                 <div className="grid grid-cols-3 gap-2">
                   <Select
                     value={row.phase_id ?? "__none__"}
@@ -610,7 +633,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
                     />
                     {!!row.card_fee_percent && (
                       <span className="text-[11px] text-red-600 whitespace-nowrap">
-                        -{formatCurrency((contractValue * row.percentage / 100) * row.card_fee_percent / 100)}
+                        -{formatCurrency(row.amount * row.card_fee_percent / 100)}
                       </span>
                     )}
                   </div>
@@ -629,7 +652,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
                     />
                     {!!row.pix_discount_percent && (
                       <span className="text-[11px] text-red-600 whitespace-nowrap">
-                        -{formatCurrency((contractValue * row.percentage / 100) * row.pix_discount_percent / 100)}
+                        -{formatCurrency(row.amount * row.pix_discount_percent / 100)}
                       </span>
                     )}
                   </div>
