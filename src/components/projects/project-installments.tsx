@@ -34,6 +34,8 @@ interface SplitRow {
   phase_id: string | null;
   due_date: string | null;
   payment_method: PaymentMethod | null;
+  card_fee_percent: number | null;
+  pix_discount_percent: number | null;
 }
 
 interface Props {
@@ -63,6 +65,14 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
   const total = installments.reduce((s, i) => s + Number(i.amount), 0);
   const paid = installments.filter((i) => i.status === "pago").reduce((s, i) => s + Number(i.amount), 0);
   const pending = total - paid;
+  const totalCardFees = installments.reduce(
+    (s, i) => s + (i.card_fee_percent ? (Number(i.amount) * Number(i.card_fee_percent)) / 100 : 0),
+    0
+  );
+  const totalPixDiscounts = installments.reduce(
+    (s, i) => s + (i.pix_discount_percent ? (Number(i.amount) * Number(i.pix_discount_percent)) / 100 : 0),
+    0
+  );
 
   const splitsSum = useMemo(
     () => splits.reduce((s, r) => s + (Number(r.percentage) || 0), 0),
@@ -79,12 +89,14 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
           phase_id: i.phase_id,
           due_date: i.due_date,
           payment_method: i.payment_method,
+          card_fee_percent: i.card_fee_percent,
+          pix_discount_percent: i.pix_discount_percent,
         }))
       );
     } else {
       setSplits([
-        { description: "Sinal 50%", percentage: 50, phase_id: null, due_date: null, payment_method: null },
-        { description: "Entrega 50%", percentage: 50, phase_id: null, due_date: null, payment_method: null },
+        { description: "Sinal 50%", percentage: 50, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
+        { description: "Entrega 50%", percentage: 50, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
       ]);
     }
     setConfigOpen(true);
@@ -98,6 +110,8 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
         phase_id: null,
         due_date: null,
         payment_method: null,
+        card_fee_percent: null,
+        pix_discount_percent: null,
       }))
     );
   };
@@ -105,7 +119,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
   const addSplit = () => {
     setSplits((prev) => [
       ...prev,
-      { description: `Parcela ${prev.length + 1}`, percentage: 0, phase_id: null, due_date: null, payment_method: null },
+      { description: `Parcela ${prev.length + 1}`, percentage: 0, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
     ]);
   };
 
@@ -150,6 +164,8 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
             phase_id: s.phase_id,
             due_date: s.due_date,
             payment_method: s.payment_method,
+            card_fee_percent: s.payment_method === "cartao" ? s.card_fee_percent : null,
+            pix_discount_percent: s.payment_method === "pix" ? s.pix_discount_percent : null,
           });
         } else {
           await createIns.mutateAsync({
@@ -162,6 +178,8 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
             phase_id: s.phase_id,
             due_date: s.due_date,
             payment_method: s.payment_method,
+            card_fee_percent: s.payment_method === "cartao" ? s.card_fee_percent : null,
+            pix_discount_percent: s.payment_method === "pix" ? s.pix_discount_percent : null,
             status: "pendente",
           });
         }
@@ -203,6 +221,22 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
             <p className="text-xs text-text-muted">A Receber</p>
             <p className="text-lg font-bold text-amber-600">{formatCurrency(pending)}</p>
           </div>
+        </div>
+      )}
+      {(totalCardFees > 0 || totalPixDiscounts > 0) && (
+        <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-border">
+          {totalCardFees > 0 && (
+            <div>
+              <p className="text-xs text-text-muted">Taxa de Cartão (total)</p>
+              <p className="text-sm font-bold text-red-600">-{formatCurrency(totalCardFees)}</p>
+            </div>
+          )}
+          {totalPixDiscounts > 0 && (
+            <div>
+              <p className="text-xs text-text-muted">Desconto Pix (total)</p>
+              <p className="text-sm font-bold text-red-600">-{formatCurrency(totalPixDiscounts)}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -310,7 +344,13 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
                   />
                   <Select
                     value={row.payment_method ?? "__none__"}
-                    onValueChange={(v) => updateSplit(idx, { payment_method: v === "__none__" ? null : (v as PaymentMethod) })}
+                    onValueChange={(v) =>
+                      updateSplit(idx, {
+                        payment_method: v === "__none__" ? null : (v as PaymentMethod),
+                        card_fee_percent: v === "cartao" ? row.card_fee_percent : null,
+                        pix_discount_percent: v === "pix" ? row.pix_discount_percent : null,
+                      })
+                    }
                   >
                     <SelectTrigger className="h-9 text-xs">
                       <SelectValue placeholder="Forma de pagto..." />
@@ -323,6 +363,44 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
                     </SelectContent>
                   </Select>
                 </div>
+                {row.payment_method === "cartao" && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      placeholder="Taxa da maquininha (%)"
+                      value={row.card_fee_percent ?? ""}
+                      onChange={(e) => updateSplit(idx, { card_fee_percent: e.target.value === "" ? null : parseFloat(e.target.value) })}
+                      className="h-9 text-xs"
+                    />
+                    {!!row.card_fee_percent && (
+                      <span className="text-[11px] text-red-600 whitespace-nowrap">
+                        -{formatCurrency((contractValue * row.percentage / 100) * row.card_fee_percent / 100)}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {row.payment_method === "pix" && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      placeholder="Desconto no pix (%)"
+                      value={row.pix_discount_percent ?? ""}
+                      onChange={(e) => updateSplit(idx, { pix_discount_percent: e.target.value === "" ? null : parseFloat(e.target.value) })}
+                      className="h-9 text-xs"
+                    />
+                    {!!row.pix_discount_percent && (
+                      <span className="text-[11px] text-red-600 whitespace-nowrap">
+                        -{formatCurrency((contractValue * row.percentage / 100) * row.pix_discount_percent / 100)}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
             <Button type="button" variant="outline" size="sm" onClick={addSplit} className="w-full">
@@ -415,6 +493,12 @@ function InstallmentRow({
         <p className="text-xs text-text-muted mt-0.5">
           {installment.percentage}% • {installment.due_date ? `Vence ${formatDate(installment.due_date)}` : "Sem data"}
           {installment.payment_method && ` • ${PAYMENT_METHOD_LABEL[installment.payment_method]}`}
+          {installment.payment_method === "cartao" && installment.card_fee_percent
+            ? ` (taxa ${installment.card_fee_percent}% = -${formatCurrency((Number(installment.amount) * Number(installment.card_fee_percent)) / 100)})`
+            : ""}
+          {installment.payment_method === "pix" && installment.pix_discount_percent
+            ? ` (desconto ${installment.pix_discount_percent}% = -${formatCurrency((Number(installment.amount) * Number(installment.pix_discount_percent)) / 100)})`
+            : ""}
           {installment.paid_at && ` • Pago em ${formatDate(installment.paid_at)}`}
         </p>
       </div>

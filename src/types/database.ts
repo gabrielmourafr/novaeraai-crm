@@ -462,6 +462,8 @@ export interface Database {
           nf_issued_at: string | null;
           notes: string | null;
           payment_method: "pix" | "boleto" | "cartao" | "transferencia" | null;
+          card_fee_percent: number | null;
+          pix_discount_percent: number | null;
           created_at: string;
           updated_at: string;
         };
