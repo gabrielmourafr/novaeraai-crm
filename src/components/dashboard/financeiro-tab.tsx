@@ -464,20 +464,26 @@ export function FinanceiroTab() {
     if (!revDesc || !revValue) { toast.error("Preencha descrição e valor."); return; }
     const parsedValue = parseCurrencyInput(revValue);
     if (isNaN(parsedValue)) { toast.error("Valor inválido — use um número, ex: 1500,00."); return; }
+    // Receita sem due_date nunca aparece em nenhuma tela (Receitas, gráficos,
+    // Faturamento Total etc. filtram tudo por mês/vencimento) — se ficar em
+    // branco numa receita já paga, usa a data de recebimento como vencimento
+    // também, senão ela é salva no banco mas nunca aparece em lugar nenhum.
+    const resolvedPaidAt = revStatus === "pago" ? (revPaidAt || new Date().toISOString().slice(0, 10)) : null;
+    const resolvedDueDate = revDueDate || resolvedPaidAt || null;
     await createRevenue.mutateAsync({
       org_id: user.org_id,
       description: revDesc,
       category: revCategory,
       value: parsedValue,
       status: revStatus,
-      due_date: revDueDate || null,
+      due_date: resolvedDueDate,
       business_unit: "intelligence",
       recurrence: revRecurrence,
       company_id: revCompanyId !== "__none__" ? revCompanyId : null,
       contact_id: null, proposal_id: null,
       project_id: revProjectId !== "__none__" ? revProjectId : null,
       payment_method: null, installment: null,
-      paid_at: revStatus === "pago" ? (revPaidAt || new Date().toISOString().slice(0, 10)) : null,
+      paid_at: resolvedPaidAt,
     });
     setCreateRevenueOpen(false);
     setRevDesc(""); setRevValue(""); setRevDueDate(""); setRevCompanyId("__none__");
@@ -2086,6 +2092,9 @@ export function FinanceiroTab() {
               <div className="space-y-1.5">
                 <Label>Vencimento</Label>
                 <Input type="date" value={revDueDate} onChange={(e) => setRevDueDate(e.target.value)} />
+                {revStatus === "pago" && (
+                  <p className="text-[11px]" style={{ color: "#7BA3C6" }}>Em branco, usa a data de recebimento</p>
+                )}
               </div>
             </div>
             {revStatus === "pago" && (
