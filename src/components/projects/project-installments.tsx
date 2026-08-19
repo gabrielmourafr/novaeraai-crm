@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, Trash2, CheckCircle2, Settings, AlertCircle } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, Settings, AlertCircle, Wand2 } from "lucide-react";
+import { addMonths, format as formatDateFns } from "date-fns";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatCurrency, formatDate } from "@/lib/utils/format";
+import { formatCurrency, formatDate, parseCurrencyInput } from "@/lib/utils/format";
 import {
   useProjectInstallments,
   useCreateInstallment,
@@ -61,6 +62,9 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
 
   const [configOpen, setConfigOpen] = useState(false);
   const [splits, setSplits] = useState<SplitRow[]>([]);
+  const [quickQty, setQuickQty] = useState("");
+  const [quickValue, setQuickValue] = useState("");
+  const [quickFirstDueDate, setQuickFirstDueDate] = useState("");
 
   const total = installments.reduce((s, i) => s + Number(i.amount), 0);
   const paid = installments.filter((i) => i.status === "pago").reduce((s, i) => s + Number(i.amount), 0);
@@ -99,6 +103,7 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
         { description: "Entrega 50%", percentage: 50, phase_id: null, due_date: null, payment_method: null, card_fee_percent: null, pix_discount_percent: null },
       ]);
     }
+    setQuickQty(""); setQuickValue(""); setQuickFirstDueDate("");
     setConfigOpen(true);
   };
 
@@ -114,6 +119,54 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
         pix_discount_percent: null,
       }))
     );
+  };
+
+  // Gera N parcelas iguais de um valor fixo (ex: "12x 850") em vez de
+  // adicionar uma por uma. O % de cada parcela é calculado a partir do
+  // valor do contrato, e a última parcela absorve o arredondamento pra
+  // fechar exatamente 100%.
+  const applyQuickGenerate = () => {
+    const qty = parseInt(quickQty, 10);
+    const value = parseCurrencyInput(quickValue);
+    if (!qty || qty <= 0) {
+      toast.error("Informe a quantidade de parcelas.");
+      return;
+    }
+    if (!value || isNaN(value) || value <= 0) {
+      toast.error("Informe o valor de cada parcela.");
+      return;
+    }
+    if (contractValue <= 0) {
+      toast.error("Defina o valor do contrato no projeto antes de gerar parcelas.");
+      return;
+    }
+    const rawPct = (value / contractValue) * 100;
+    const rounded = Math.round(rawPct * 100) / 100;
+    const generated: SplitRow[] = Array.from({ length: qty }, (_, idx) => {
+      const isLast = idx === qty - 1;
+      const percentage = isLast
+        ? Math.max(0, Math.round((100 - rounded * (qty - 1)) * 100) / 100)
+        : rounded;
+      const due_date = quickFirstDueDate
+        ? formatDateFns(addMonths(new Date(`${quickFirstDueDate}T00:00:00`), idx), "yyyy-MM-dd")
+        : null;
+      return {
+        description: `Parcela ${idx + 1}/${qty}`,
+        percentage,
+        phase_id: null,
+        due_date,
+        payment_method: null,
+        card_fee_percent: null,
+        pix_discount_percent: null,
+      };
+    });
+    setSplits(generated);
+    const generatedTotal = qty * value;
+    if (Math.abs(generatedTotal - contractValue) > 0.5) {
+      toast.warning(
+        `${qty}x ${formatCurrency(value)} = ${formatCurrency(generatedTotal)}, mas o contrato é ${formatCurrency(contractValue)}. Ajuste se necessário.`
+      );
+    }
   };
 
   const addSplit = () => {
@@ -287,6 +340,51 @@ export function ProjectInstallments({ projectId, orgId, contractValue, phases }:
                 {p.label}
               </Button>
             ))}
+          </div>
+
+          {/* Gerar N parcelas iguais (ex: 12x 850) */}
+          <div className="rounded-lg border border-border p-2.5 space-y-2 bg-muted/30">
+            <p className="text-xs font-medium text-text-primary flex items-center gap-1.5">
+              <Wand2 size={13} />
+              Gerar parcelas iguais (ex: 12x R$ 850,00)
+            </p>
+            <div className="grid grid-cols-[70px_1fr_1fr_auto] gap-2 items-end">
+              <div>
+                <label className="text-[10px] text-text-muted">Qtd.</label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="12"
+                  value={quickQty}
+                  onChange={(e) => setQuickQty(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-text-muted">Valor de cada parcela</label>
+                <Input
+                  placeholder="850,00"
+                  value={quickValue}
+                  onChange={(e) => setQuickValue(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-text-muted">1ª parcela (opcional)</label>
+                <Input
+                  type="date"
+                  value={quickFirstDueDate}
+                  onChange={(e) => setQuickFirstDueDate(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <Button type="button" size="sm" variant="outline" onClick={applyQuickGenerate} className="h-9">
+                Gerar
+              </Button>
+            </div>
+            <p className="text-[11px] text-text-muted">
+              Preenche a lista abaixo com as parcelas — você ainda pode editar, adicionar ou remover uma a uma antes de salvar.
+            </p>
           </div>
 
           {/* Splits */}
