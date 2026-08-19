@@ -700,12 +700,14 @@ export interface Database {
           org_id: string;
           user_id: string | null;
           name: string;
-          percentage: number;
+          percentage: number | null;
+          distribution_type: "percentage" | "fixed_value";
+          fixed_value: number | null;
           active: boolean;
           created_at: string;
           updated_at: string;
         };
-        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["company_partners"]["Row"], "id" | "created_at" | "updated_at" | "active">> & { active?: boolean };
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["company_partners"]["Row"], "id" | "created_at" | "updated_at" | "active" | "distribution_type">> & { active?: boolean; distribution_type?: "percentage" | "fixed_value" };
         Update: Partial<Database["public"]["Tables"]["company_partners"]["Insert"]>;
         Relationships: [];
       };

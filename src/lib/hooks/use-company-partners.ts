@@ -18,7 +18,7 @@ export const useCompanyPartners = () => {
         .from("company_partners")
         .select("*")
         .eq("active", true)
-        .order("percentage", { ascending: false });
+        .order("created_at", { ascending: true });
       if (error) throw error;
       return data as CompanyPartner[];
     },

@@ -177,8 +177,12 @@ export function FinanceiroTab() {
   const [partnerMode, setPartnerMode] = useState<"manual" | "user">("manual");
   const [partnerUserId, setPartnerUserId] = useState("__none__");
   const [partnerName, setPartnerName] = useState("");
+  const [partnerDistributionType, setPartnerDistributionType] = useState<"percentage" | "fixed_value">("percentage");
   const [partnerPct, setPartnerPct] = useState("");
-  const totalPartnerPct = companyPartners.reduce((s, p) => s + Number(p.percentage), 0);
+  const [partnerFixedValue, setPartnerFixedValue] = useState("");
+  const totalPartnerPct = companyPartners
+    .filter((p) => p.distribution_type === "percentage")
+    .reduce((s, p) => s + Number(p.percentage ?? 0), 0);
 
   // Adiantamentos por sócio
   const { data: partnerAdvances = [] } = usePartnerAdvances();
@@ -214,14 +218,18 @@ export function FinanceiroTab() {
     setPartnerMode("manual");
     setPartnerUserId("__none__");
     setPartnerName("");
+    setPartnerDistributionType("percentage");
     setPartnerPct("");
+    setPartnerFixedValue("");
   };
   const openEditPartner = (p: CompanyPartner) => {
     setEditingPartner(p);
     setPartnerMode(p.user_id ? "user" : "manual");
     setPartnerUserId(p.user_id ?? "__none__");
     setPartnerName(p.name);
-    setPartnerPct(p.percentage.toString());
+    setPartnerDistributionType(p.distribution_type);
+    setPartnerPct(p.percentage?.toString() ?? "");
+    setPartnerFixedValue(p.fixed_value?.toString() ?? "");
   };
   const handleSavePartner = async () => {
     if (!user) return;
@@ -229,14 +237,30 @@ export function FinanceiroTab() {
       ? orgUsersList.find((u) => u.id === partnerUserId)?.full_name ?? ""
       : partnerName.trim();
     if (partnerMode === "user" && partnerUserId === "__none__") { toast.error("Selecione o sócio."); return; }
-    if (!resolvedName || !partnerPct) { toast.error("Preencha nome e percentual."); return; }
-    const pct = parseFloat(partnerPct.replace(",", "."));
-    if (isNaN(pct) || pct <= 0 || pct > 100) { toast.error("Percentual inválido — use um número entre 0 e 100."); return; }
+    if (!resolvedName) { toast.error("Preencha o nome."); return; }
     const resolvedUserId = partnerMode === "user" && partnerUserId !== "__none__" ? partnerUserId : null;
-    if (editingPartner) {
-      await updatePartner.mutateAsync({ id: editingPartner.id, name: resolvedName, percentage: pct, user_id: resolvedUserId });
+
+    let pct: number | null = null;
+    let fixedValue: number | null = null;
+    if (partnerDistributionType === "percentage") {
+      pct = parseFloat(partnerPct.replace(",", "."));
+      if (isNaN(pct) || pct <= 0 || pct > 100) { toast.error("Percentual inválido — use um número entre 0 e 100."); return; }
     } else {
-      await createPartner.mutateAsync({ org_id: user.org_id, user_id: resolvedUserId, name: resolvedName, percentage: pct });
+      fixedValue = parseCurrencyInput(partnerFixedValue);
+      if (isNaN(fixedValue) || fixedValue <= 0) { toast.error("Valor fixo inválido."); return; }
+    }
+
+    const payload = {
+      name: resolvedName,
+      user_id: resolvedUserId,
+      distribution_type: partnerDistributionType,
+      percentage: pct,
+      fixed_value: fixedValue,
+    };
+    if (editingPartner) {
+      await updatePartner.mutateAsync({ id: editingPartner.id, ...payload });
+    } else {
+      await createPartner.mutateAsync({ org_id: user.org_id, ...payload });
     }
     openAddPartner();
   };
@@ -2031,33 +2055,45 @@ export function FinanceiroTab() {
                   <TableHeader>
                     <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
                       <TableHead style={{ color: "#7BA3C6" }}>Sócio</TableHead>
-                      <TableHead style={{ color: "#7BA3C6" }} className="text-center">%</TableHead>
-                      <TableHead style={{ color: "#7BA3C6" }} className="text-right">Previsto no Mês (%)</TableHead>
+                      <TableHead style={{ color: "#7BA3C6" }} className="text-center">Distribuição</TableHead>
+                      <TableHead style={{ color: "#7BA3C6" }} className="text-right">Previsto no Mês</TableHead>
                       <TableHead style={{ color: "#7BA3C6" }} className="text-right">Recebido no Mês</TableHead>
                       <TableHead style={{ color: "#7BA3C6" }} className="text-right">Adiantado (total)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {companyPartners.map((p) => (
-                      <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
-                        <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>{p.name}</TableCell>
-                        <TableCell className="text-center text-sm" style={{ color: "#7BA3C6" }}>{Number(p.percentage).toFixed(1)}%</TableCell>
-                        <TableCell className="text-right text-sm" style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>
-                          {formatCurrency(balance * (Number(p.percentage) / 100))}
-                        </TableCell>
-                        <TableCell className="text-right text-sm font-semibold" style={{ color: (advancesByPartnerMonth.get(p.id) ?? 0) > 0 ? "#0B87C3" : "#3D5A78" }}>
-                          {formatCurrency(advancesByPartnerMonth.get(p.id) ?? 0)}
-                        </TableCell>
-                        <TableCell className="text-right text-sm" style={{ color: (advancesByPartner.get(p.id) ?? 0) > 0 ? "#F59E0B" : "#3D5A78" }}>
-                          {formatCurrency(advancesByPartner.get(p.id) ?? 0)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {companyPartners.map((p) => {
+                      const previsto = p.distribution_type === "fixed_value"
+                        ? Number(p.fixed_value ?? 0)
+                        : balance * (Number(p.percentage ?? 0) / 100);
+                      return (
+                        <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                          <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>{p.name}</TableCell>
+                          <TableCell className="text-center text-sm" style={{ color: "#7BA3C6" }}>
+                            {p.distribution_type === "fixed_value" ? (
+                              <span>Fixo — {formatCurrency(Number(p.fixed_value ?? 0))}</span>
+                            ) : (
+                              <span>{Number(p.percentage ?? 0).toFixed(1)}%</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right text-sm" style={{ color: previsto >= 0 ? "#22c55e" : "#ef4444" }}>
+                            {formatCurrency(previsto)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm font-semibold" style={{ color: (advancesByPartnerMonth.get(p.id) ?? 0) > 0 ? "#0B87C3" : "#3D5A78" }}>
+                            {formatCurrency(advancesByPartnerMonth.get(p.id) ?? 0)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm" style={{ color: (advancesByPartner.get(p.id) ?? 0) > 0 ? "#F59E0B" : "#3D5A78" }}>
+                            {formatCurrency(advancesByPartner.get(p.id) ?? 0)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
-                {Math.abs(totalPartnerPct - 100) > 0.01 && (
+                {totalPartnerPct > 0 && Math.abs(totalPartnerPct - 100) > 0.01 && (
                   <div className="px-5 py-2.5 text-xs" style={{ color: "#F59E0B", borderTop: "1px solid rgba(11,135,195,0.1)" }}>
-                    ⚠ Os percentuais somam {totalPartnerPct.toFixed(1)}%, não 100%. Ajuste em &quot;Gerenciar Sócios&quot;.
+                    ⚠ Os sócios por percentual somam {totalPartnerPct.toFixed(1)}%, não 100%. Ajuste em &quot;Gerenciar Sócios&quot;.
+                    {companyPartners.some((p) => p.distribution_type === "fixed_value") && " (sócios de valor fixo não entram nessa soma)"}
                   </div>
                 )}
               </>
@@ -2595,7 +2631,11 @@ export function FinanceiroTab() {
                 <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-border p-2.5">
                   <div>
                     <p className="text-sm font-medium text-text-primary">{p.name}</p>
-                    <p className="text-xs text-text-muted">{Number(p.percentage).toFixed(1)}%</p>
+                    <p className="text-xs text-text-muted">
+                      {p.distribution_type === "fixed_value"
+                        ? `Fixo — ${formatCurrency(Number(p.fixed_value ?? 0))}/mês`
+                        : `${Number(p.percentage ?? 0).toFixed(1)}%`}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditPartner(p)}>
@@ -2630,31 +2670,59 @@ export function FinanceiroTab() {
               </button>
             </div>
 
-            <div className="grid grid-cols-[1fr_100px] gap-2">
-              {partnerMode === "user" ? (
-                <div className="space-y-1.5">
-                  <Label>Sócio</Label>
-                  <Select value={partnerUserId} onValueChange={setPartnerUserId}>
-                    <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Selecionar...</SelectItem>
-                      {orgUsersList.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  <Label>Nome do sócio</Label>
-                  <Input value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Ex: Gabriel" />
-                </div>
-              )}
+            {partnerMode === "user" ? (
               <div className="space-y-1.5">
+                <Label>Sócio</Label>
+                <Select value={partnerUserId} onValueChange={setPartnerUserId}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Selecionar...</SelectItem>
+                    {orgUsersList.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>Nome do sócio</Label>
+                <Input value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Ex: Gabriel" />
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label>Forma de distribuição</Label>
+              <div className="flex gap-1 rounded-lg p-1 w-fit" style={{ background: "rgba(11,135,195,0.05)", border: "1px solid rgba(11,135,195,0.15)" }}>
+                <button
+                  type="button"
+                  onClick={() => setPartnerDistributionType("percentage")}
+                  className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                  style={partnerDistributionType === "percentage" ? { background: "var(--primary)", color: "#fff" } : { color: "#7BA3C6" }}
+                >
+                  % do saldo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPartnerDistributionType("fixed_value")}
+                  className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                  style={partnerDistributionType === "fixed_value" ? { background: "var(--primary)", color: "#fff" } : { color: "#7BA3C6" }}
+                >
+                  Valor fixo (R$)
+                </button>
+              </div>
+            </div>
+
+            {partnerDistributionType === "percentage" ? (
+              <div className="space-y-1.5 w-32">
                 <Label>%</Label>
                 <Input value={partnerPct} onChange={(e) => setPartnerPct(e.target.value)} placeholder="33,3" />
               </div>
-            </div>
+            ) : (
+              <div className="space-y-1.5 w-40">
+                <Label>Valor por mês (R$)</Label>
+                <Input value={partnerFixedValue} onChange={(e) => setPartnerFixedValue(e.target.value)} placeholder="3000,00" />
+              </div>
+            )}
           </div>
 
           <DialogFooter>
