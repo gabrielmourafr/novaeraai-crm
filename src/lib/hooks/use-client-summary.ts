@@ -79,3 +79,38 @@ export const useClientsFinancialSummary = () => {
     },
   });
 };
+
+export interface ClientTotalRevenue {
+  companyId: string;
+  companyName: string;
+  total: number;
+}
+
+// Faturamento total (todas as categorias de receita, já pago) agrupado por
+// cliente — usado no breakdown do card "Faturamento Total" em Implementação.
+export const useFaturamentoTotalByClient = () => {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["clients-financial-summary", "faturamento-total"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("revenues")
+        .select("company_id, value, company:companies(id, name)")
+        .eq("status", "pago");
+      if (error) throw error;
+
+      type RevenueRow = { company_id: string | null; value: number; company: { id: string; name: string } | null };
+
+      const map = new Map<string, ClientTotalRevenue>();
+      for (const r of (data ?? []) as unknown as RevenueRow[]) {
+        const companyId = r.company_id ?? "__sem_empresa__";
+        const companyName = r.company?.name ?? "Sem empresa";
+        const entry = map.get(companyId) ?? { companyId, companyName, total: 0 };
+        entry.total += Number(r.value);
+        map.set(companyId, entry);
+      }
+
+      return Array.from(map.values()).sort((a, b) => b.total - a.total);
+    },
+  });
+};

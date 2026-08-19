@@ -32,7 +32,7 @@ import {
   nextBillingDate, formatMonthLabel, RENEWAL_LABEL,
   type ActiveSubscription, type MensalidadeReceivedMonth,
 } from "@/lib/hooks/use-subscriptions";
-import { useClientsFinancialSummary } from "@/lib/hooks/use-client-summary";
+import { useClientsFinancialSummary, useFaturamentoTotalByClient } from "@/lib/hooks/use-client-summary";
 import { useCompanies } from "@/lib/hooks/use-companies";
 import { useUpdateProject, useProjects } from "@/lib/hooks/use-projects";
 import { useUser, useOrgUsers } from "@/lib/hooks/use-user";
@@ -99,6 +99,7 @@ export function FinanceiroTab() {
   const [implReceberBreakdownOpen, setImplReceberBreakdownOpen] = useState(false);
   const [implRecebidaBreakdownOpen, setImplRecebidaBreakdownOpen] = useState(false);
   const [parcelasBreakdownOpen, setParcelasBreakdownOpen] = useState(false);
+  const [faturamentoTotalBreakdownOpen, setFaturamentoTotalBreakdownOpen] = useState(false);
   const [receitasMesBreakdownOpen, setReceitasMesBreakdownOpen] = useState(false);
   const [aReceberMesBreakdownOpen, setAReceberMesBreakdownOpen] = useState(false);
   const [despesasMesBreakdownOpen, setDespesasMesBreakdownOpen] = useState(false);
@@ -246,6 +247,7 @@ export function FinanceiroTab() {
   };
   const { data: mensalidadeSummary = [] } = useClientMensalidadeSummary();
   const { data: clientsSummary = [] } = useClientsFinancialSummary();
+  const { data: faturamentoTotalByClient = [] } = useFaturamentoTotalByClient();
   const { data: clientInstallmentsSummary = [] } = useClientInstallmentsSummary();
   const updateInstallment = useUpdateInstallment();
   const totalParcelasRestantes = clientInstallmentsSummary.reduce((s, c) => s + c.remainingCount, 0);
@@ -815,7 +817,13 @@ export function FinanceiroTab() {
               Implementação
             </h3>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard size="sm" label="Faturamento Total" value={formatCurrency(totalRevenuesAllTime)} icon={Wallet} />
+              <StatCard
+                size="sm"
+                label="Faturamento Total"
+                value={formatCurrency(totalRevenuesAllTime)}
+                icon={Wallet}
+                onClick={() => setFaturamentoTotalBreakdownOpen(true)}
+              />
               <StatCard
                 size="sm"
                 label={`Parcelas Restantes (${totalParcelasRestantes})`}
@@ -2697,6 +2705,42 @@ export function FinanceiroTab() {
                       </TableCell>
                       <TableCell className="text-right text-sm text-text-muted">
                         {c.finalDueDate ? formatDate(c.finalDueDate) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: Faturamento Total por Cliente ─── */}
+      <Dialog open={faturamentoTotalBreakdownOpen} onOpenChange={setFaturamentoTotalBreakdownOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Faturamento Total por Cliente</DialogTitle>
+            <DialogDescription>
+              Total acumulado: <strong>{formatCurrency(totalRevenuesAllTime)}</strong> — todas as receitas já pagas, de todos os tipos
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {faturamentoTotalByClient.length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-6">Nenhum faturamento registrado ainda.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="text-right">Faturado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {faturamentoTotalByClient.map((c) => (
+                    <TableRow key={c.companyId}>
+                      <TableCell className="text-sm font-medium text-text-primary">{c.companyName}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-green-500">
+                        {formatCurrency(c.total)}
                       </TableCell>
                     </TableRow>
                   ))}
