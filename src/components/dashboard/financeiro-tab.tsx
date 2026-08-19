@@ -48,6 +48,7 @@ import { useCashFlowForecast } from "@/lib/hooks/use-cash-flow-forecast";
 import {
   usePartnerPayments,
   useCreatePartnerPayment,
+  useUpdatePartnerPayment,
   useMarkPartnerPaymentPaid,
   useDeletePartnerPayment,
   RECIPIENT_TYPE_LABEL,
@@ -104,6 +105,7 @@ export function FinanceiroTab() {
   const [aReceberMesBreakdownOpen, setAReceberMesBreakdownOpen] = useState(false);
   const [despesasMesBreakdownOpen, setDespesasMesBreakdownOpen] = useState(false);
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<PartnerPaymentWithRelations | undefined>();
   const [deletingPayment, setDeletingPayment] = useState<PartnerPaymentWithRelations | undefined>();
 
   // Nota fiscal (parcela de implementação)
@@ -378,6 +380,7 @@ export function FinanceiroTab() {
     return Array.from(map.values()).sort((a, b) => b.pendingValue - a.pendingValue);
   }, [partnerPayments]);
   const createPayment = useCreatePartnerPayment();
+  const updatePayment = useUpdatePartnerPayment();
   const markPaymentPaid = useMarkPartnerPaymentPaid();
   const deletePayment = useDeletePartnerPayment();
   const pendingPayments = partnerPayments.filter((p) => p.status !== "pago" && p.status !== "cancelado");
@@ -559,29 +562,57 @@ export function FinanceiroTab() {
     resetExpenseForm();
   };
 
-  const handleCreatePayment = async (e: React.FormEvent) => {
+  const openEditPayment = (p: PartnerPaymentWithRelations) => {
+    setEditingPayment(p);
+    setPayType(p.recipient_type);
+    setPayName(p.recipient_name);
+    setPayProjectId(p.project_id ?? "__none__");
+    setPayDesc(p.description);
+    setPayAmount(String(p.amount));
+    setPayDueDate(p.due_date ?? "");
+    setCreatePaymentOpen(true);
+  };
+
+  const resetPaymentForm = () => {
+    setEditingPayment(undefined);
+    setPayType("desenvolvedor"); setPayName(""); setPayProjectId("__none__");
+    setPayDesc(""); setPayAmount(""); setPayDueDate("");
+  };
+
+  const handleSavePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) { toast.error("Sessão não carregada ainda — recarregue a página e tente de novo."); return; }
     if (!payName || !payDesc || !payAmount) { toast.error("Preencha nome, descrição e valor."); return; }
     const parsedAmount = parseCurrencyInput(payAmount);
     if (isNaN(parsedAmount)) { toast.error("Valor inválido — use um número, ex: 1500,00."); return; }
-    await createPayment.mutateAsync({
-      org_id: user.org_id,
-      recipient_type: payType,
-      recipient_name: payName,
-      recipient_user_id: null,
-      project_id: payProjectId !== "__none__" ? payProjectId : null,
-      description: payDesc,
-      amount: parsedAmount,
-      due_date: payDueDate || null,
-      paid_at: null,
-      status: "pendente",
-      notes: null,
-      created_by: user.id,
-    });
+    if (editingPayment) {
+      await updatePayment.mutateAsync({
+        id: editingPayment.id,
+        recipient_type: payType,
+        recipient_name: payName,
+        project_id: payProjectId !== "__none__" ? payProjectId : null,
+        description: payDesc,
+        amount: parsedAmount,
+        due_date: payDueDate || null,
+      });
+    } else {
+      await createPayment.mutateAsync({
+        org_id: user.org_id,
+        recipient_type: payType,
+        recipient_name: payName,
+        recipient_user_id: null,
+        project_id: payProjectId !== "__none__" ? payProjectId : null,
+        description: payDesc,
+        amount: parsedAmount,
+        due_date: payDueDate || null,
+        paid_at: null,
+        status: "pendente",
+        notes: null,
+        created_by: user.id,
+      });
+    }
     setCreatePaymentOpen(false);
-    setPayType("desenvolvedor"); setPayName(""); setPayProjectId("__none__");
-    setPayDesc(""); setPayAmount(""); setPayDueDate("");
+    resetPaymentForm();
   };
 
   // Preenche o valor sugerido com base na comissão do projeto selecionado
@@ -1654,7 +1685,7 @@ export function FinanceiroTab() {
           )}
 
           <div className="flex justify-end mb-3">
-            <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => setCreatePaymentOpen(true)}>
+            <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => { resetPaymentForm(); setCreatePaymentOpen(true); }}>
               <Plus size={14} className="mr-1" />Novo Pagamento
             </Button>
           </div>
@@ -1720,6 +1751,9 @@ export function FinanceiroTab() {
                                 ✓ Pago
                               </Button>
                             )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7" style={{ color: "#7BA3C6" }} onClick={() => openEditPayment(p)}>
+                              <Pencil size={13} />
+                            </Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => setDeletingPayment(p)}>
                               <Trash2 size={13} />
                             </Button>
@@ -2172,13 +2206,15 @@ export function FinanceiroTab() {
       </Dialog>
 
       {/* Create Partner/Dev Payment Dialog */}
-      <Dialog open={createPaymentOpen} onOpenChange={(v) => !v && setCreatePaymentOpen(false)}>
+      <Dialog open={createPaymentOpen} onOpenChange={(v) => { if (!v) { setCreatePaymentOpen(false); resetPaymentForm(); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Novo Pagamento</DialogTitle>
-            <DialogDescription>Registre uma comissão ou pagamento a parceiro/desenvolvedor</DialogDescription>
+            <DialogTitle>{editingPayment ? "Editar Pagamento" : "Novo Pagamento"}</DialogTitle>
+            <DialogDescription>
+              {editingPayment ? "Atualize os dados desse pagamento" : "Registre uma comissão ou pagamento a parceiro/desenvolvedor"}
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreatePayment} className="space-y-4 mt-2">
+          <form onSubmit={handleSavePayment} className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Tipo *</Label>
@@ -2227,9 +2263,9 @@ export function FinanceiroTab() {
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setCreatePaymentOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createPayment.isPending} style={{ background: "var(--primary)" }}>
-                Salvar Pagamento
+              <Button type="button" variant="outline" onClick={() => { setCreatePaymentOpen(false); resetPaymentForm(); }}>Cancelar</Button>
+              <Button type="submit" disabled={createPayment.isPending || updatePayment.isPending} style={{ background: "var(--primary)" }}>
+                {editingPayment ? "Salvar Alterações" : "Salvar Pagamento"}
               </Button>
             </div>
           </form>
