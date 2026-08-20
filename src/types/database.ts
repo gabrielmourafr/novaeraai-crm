@@ -716,6 +716,7 @@ export interface Database {
           id: string;
           org_id: string;
           partner_id: string;
+          project_id: string | null;
           description: string | null;
           value: number;
           date: string;

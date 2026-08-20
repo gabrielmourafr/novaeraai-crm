@@ -44,6 +44,7 @@ import {
 import {
   usePartnerAdvances, useCreatePartnerAdvance, useDeletePartnerAdvance, type PartnerAdvance,
 } from "@/lib/hooks/use-partner-advances";
+import { useProjectProfitSummary } from "@/lib/hooks/use-project-profit";
 import { useCashFlowForecast } from "@/lib/hooks/use-cash-flow-forecast";
 import {
   usePartnerPayments,
@@ -191,12 +192,25 @@ export function FinanceiroTab() {
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
   const [deletingAdvance, setDeletingAdvance] = useState<PartnerAdvance | undefined>();
   const [advancePartnerId, setAdvancePartnerId] = useState("__none__");
+  const [advanceProjectId, setAdvanceProjectId] = useState("__none__");
   const [advanceValue, setAdvanceValue] = useState("");
   const [advanceDate, setAdvanceDate] = useState("");
   const [advanceDesc, setAdvanceDesc] = useState("");
   const advancesByPartner = useMemo(() => {
     const map = new Map<string, number>();
     for (const a of partnerAdvances) map.set(a.partner_id, (map.get(a.partner_id) ?? 0) + Number(a.value));
+    return map;
+  }, [partnerAdvances]);
+
+  // Lucro por projeto (recebido - custos, all-time, só o que já foi pago de
+  // fato) + quanto já foi distribuído aos sócios daquele projeto especificamente
+  const { data: projectProfitMap = new Map<string, { projectId: string; recebido: number; custos: number }>() } = useProjectProfitSummary();
+  const distributedByProject = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of partnerAdvances) {
+      if (!a.project_id) continue;
+      map.set(a.project_id, (map.get(a.project_id) ?? 0) + Number(a.value));
+    }
     return map;
   }, [partnerAdvances]);
 
@@ -265,8 +279,9 @@ export function FinanceiroTab() {
     openAddPartner();
   };
 
-  const openCreateAdvance = () => {
+  const openCreateAdvance = (projectId?: string) => {
     setAdvancePartnerId("__none__");
+    setAdvanceProjectId(projectId ?? "__none__");
     setAdvanceValue("");
     setAdvanceDate(new Date().toISOString().slice(0, 10));
     setAdvanceDesc("");
@@ -280,6 +295,7 @@ export function FinanceiroTab() {
     await createAdvance.mutateAsync({
       org_id: user.org_id,
       partner_id: advancePartnerId,
+      project_id: advanceProjectId !== "__none__" ? advanceProjectId : null,
       description: advanceDesc.trim() || null,
       value: parsedValue,
       date: advanceDate || new Date().toISOString().slice(0, 10),
@@ -332,6 +348,28 @@ export function FinanceiroTab() {
       .filter((x): x is { project: (typeof projects)[number]; predicted: Date; overridden: boolean } => x !== null)
       .sort((a, b) => a.predicted.getTime() - b.predicted.getTime());
   }, [projects]);
+
+  const projectProfitList = useMemo(() => {
+    return projects
+      .map((p) => {
+        const entry = projectProfitMap.get(p.id);
+        if (!entry) return null;
+        const lucro = entry.recebido - entry.custos;
+        const distribuido = distributedByProject.get(p.id) ?? 0;
+        return {
+          projectId: p.id,
+          projectName: p.name,
+          companyName: p.company?.name ?? null,
+          recebido: entry.recebido,
+          custos: entry.custos,
+          lucro,
+          distribuido,
+          saldoDisponivel: lucro - distribuido,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null && (x.recebido > 0 || x.custos > 0))
+      .sort((a, b) => b.saldoDisponivel - a.saldoDisponivel);
+  }, [projects, projectProfitMap, distributedByProject]);
 
   // Previsão por cliente: junta implementação, mensalidade, parcelas e custo
   // de infra dos projetos — tudo que já existe em hooks separados, num lugar só.
@@ -2100,6 +2138,72 @@ export function FinanceiroTab() {
             )}
           </div>
 
+          {/* Lucro por Projeto */}
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+          >
+            <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+              <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Lucro por Projeto</h3>
+              <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
+                Recebido − custos (despesas e comissões pagas) de cada projeto, all-time. Distribuir aqui abate do saldo daquele projeto — quando zera, não sobra mais lucro pra dividir dele.
+              </p>
+            </div>
+            {projectProfitList.length === 0 ? (
+              <div className="p-6 text-center text-sm" style={{ color: "#3D5A78" }}>
+                Nenhum projeto com receita ou custo lançado ainda.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+                    <TableHead style={{ color: "#7BA3C6" }}>Projeto</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Recebido</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Custos</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Lucro</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Distribuído</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }} className="text-right">Saldo Disponível</TableHead>
+                    <TableHead className="w-[110px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {projectProfitList.map((row) => (
+                    <TableRow key={row.projectId} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                      <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>
+                        <Link href={`/projects/${row.projectId}?tab=financeiro`} className="hover:underline text-[#0B87C3]">
+                          {row.projectName}
+                        </Link>
+                        {row.companyName && <span className="block text-[10px] font-normal" style={{ color: "#7BA3C6" }}>{row.companyName}</span>}
+                      </TableCell>
+                      <TableCell className="text-right text-sm text-green-400">{formatCurrency(row.recebido)}</TableCell>
+                      <TableCell className="text-right text-sm text-red-400">{formatCurrency(row.custos)}</TableCell>
+                      <TableCell className="text-right text-sm font-semibold" style={{ color: row.lucro >= 0 ? "#22c55e" : "#ef4444" }}>
+                        {formatCurrency(row.lucro)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm" style={{ color: row.distribuido > 0 ? "#0B87C3" : "#3D5A78" }}>
+                        {formatCurrency(row.distribuido)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold" style={{ color: row.saldoDisponivel > 0 ? "#F59E0B" : "#3D5A78" }}>
+                        {row.saldoDisponivel > 0 ? formatCurrency(row.saldoDisponivel) : "Sem saldo"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          disabled={row.saldoDisponivel <= 0 || companyPartners.length === 0}
+                          onClick={() => openCreateAdvance(row.projectId)}
+                        >
+                          Distribuir
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
           {/* Adiantamentos por Sócio */}
           <div
             className="rounded-xl overflow-hidden"
@@ -2110,7 +2214,7 @@ export function FinanceiroTab() {
                 <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Adiantamentos por Sócio</h3>
                 <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>Valores já retirados por cada sócio, pra abater da distribuição</p>
               </div>
-              <Button size="sm" style={{ background: "var(--primary)" }} onClick={openCreateAdvance} disabled={companyPartners.length === 0}>
+              <Button size="sm" style={{ background: "var(--primary)" }} onClick={() => openCreateAdvance()} disabled={companyPartners.length === 0}>
                 <Plus size={14} className="mr-1.5" />Novo Adiantamento
               </Button>
             </div>
@@ -2124,6 +2228,7 @@ export function FinanceiroTab() {
                   <TableRow style={{ borderColor: "rgba(11,135,195,0.1)" }}>
                     <TableHead style={{ color: "#7BA3C6" }}>Sócio</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Descrição</TableHead>
+                    <TableHead style={{ color: "#7BA3C6" }}>Projeto</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Data</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }} className="text-right">Valor</TableHead>
                     <TableHead className="w-[60px]" />
@@ -2136,6 +2241,9 @@ export function FinanceiroTab() {
                         {companyPartners.find((p) => p.id === a.partner_id)?.name ?? "—"}
                       </TableCell>
                       <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{a.description ?? "—"}</TableCell>
+                      <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>
+                        {a.project_id ? (projects.find((p) => p.id === a.project_id)?.name ?? "—") : "—"}
+                      </TableCell>
                       <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{formatDate(a.date)}</TableCell>
                       <TableCell className="text-right text-sm font-semibold" style={{ color: "#F59E0B" }}>{formatCurrency(Number(a.value))}</TableCell>
                       <TableCell>
@@ -2759,6 +2867,21 @@ export function FinanceiroTab() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Projeto (opcional)</Label>
+              <Select value={advanceProjectId} onValueChange={setAdvanceProjectId}>
+                <SelectTrigger><SelectValue placeholder="Nenhum — adiantamento geral" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum — adiantamento geral</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px]" style={{ color: "#7BA3C6" }}>
+                Vincular a um projeto abate do saldo disponível do lucro daquele projeto especificamente
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
