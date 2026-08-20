@@ -2148,6 +2148,18 @@ export function FinanceiroTab() {
               <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
                 Recebido − custos (despesas e comissões pagas) de cada projeto, all-time. Distribuir aqui abate do saldo daquele projeto — quando zera, não sobra mais lucro pra dividir dele.
               </p>
+              {companyPartners.length === 0 && (
+                <p className="text-xs mt-2 px-2.5 py-1.5 rounded" style={{ color: "#F59E0B", background: "rgba(245,158,11,0.1)" }}>
+                  ⚠ O botão &quot;Distribuir&quot; só libera depois de cadastrar pelo menos um sócio em{" "}
+                  <button
+                    type="button"
+                    className="underline font-medium"
+                    onClick={() => { openAddPartner(); setManagePartnersOpen(true); }}
+                  >
+                    Gerenciar Sócios
+                  </button>.
+                </p>
+              )}
             </div>
             {projectProfitList.length === 0 ? (
               <div className="p-6 text-center text-sm" style={{ color: "#3D5A78" }}>
@@ -2193,6 +2205,13 @@ export function FinanceiroTab() {
                           className="h-7 text-xs"
                           disabled={row.saldoDisponivel <= 0 || companyPartners.length === 0}
                           onClick={() => openCreateAdvance(row.projectId)}
+                          title={
+                            companyPartners.length === 0
+                              ? "Cadastre um sócio em \"Gerenciar Sócios\" primeiro"
+                              : row.saldoDisponivel <= 0
+                              ? "Sem saldo disponível pra distribuir desse projeto"
+                              : undefined
+                          }
                         >
                           Distribuir
                         </Button>
