@@ -175,7 +175,7 @@ export function FinanceiroTab() {
   const [managePartnersOpen, setManagePartnersOpen] = useState(false);
   const [editingPartner, setEditingPartner] = useState<CompanyPartner | undefined>();
   const [deletingPartner, setDeletingPartner] = useState<CompanyPartner | undefined>();
-  const [partnerMode, setPartnerMode] = useState<"manual" | "user">("manual");
+  const [partnerMode, setPartnerMode] = useState<"manual" | "user" | "company">("manual");
   const [partnerUserId, setPartnerUserId] = useState("__none__");
   const [partnerName, setPartnerName] = useState("");
   const [partnerDistributionType, setPartnerDistributionType] = useState<"percentage" | "fixed_value">("percentage");
@@ -238,20 +238,27 @@ export function FinanceiroTab() {
   };
   const openEditPartner = (p: CompanyPartner) => {
     setEditingPartner(p);
-    setPartnerMode(p.user_id ? "user" : "manual");
+    setPartnerMode(p.is_company ? "company" : p.user_id ? "user" : "manual");
     setPartnerUserId(p.user_id ?? "__none__");
     setPartnerName(p.name);
     setPartnerDistributionType(p.distribution_type);
     setPartnerPct(p.percentage?.toString() ?? "");
     setPartnerFixedValue(p.fixed_value?.toString() ?? "");
   };
+  const existingCompanyRow = companyPartners.find((p) => p.is_company);
   const handleSavePartner = async () => {
     if (!user) return;
-    const resolvedName = partnerMode === "user"
+    const resolvedName = partnerMode === "company"
+      ? (partnerName.trim() || "Empresa")
+      : partnerMode === "user"
       ? orgUsersList.find((u) => u.id === partnerUserId)?.full_name ?? ""
       : partnerName.trim();
     if (partnerMode === "user" && partnerUserId === "__none__") { toast.error("Selecione o sócio."); return; }
     if (!resolvedName) { toast.error("Preencha o nome."); return; }
+    if (partnerMode === "company" && existingCompanyRow && existingCompanyRow.id !== editingPartner?.id) {
+      toast.error("Já existe uma linha de Empresa cadastrada — edite ela em vez de criar outra.");
+      return;
+    }
     const resolvedUserId = partnerMode === "user" && partnerUserId !== "__none__" ? partnerUserId : null;
 
     let pct: number | null = null;
@@ -270,6 +277,7 @@ export function FinanceiroTab() {
       distribution_type: partnerDistributionType,
       percentage: pct,
       fixed_value: fixedValue,
+      is_company: partnerMode === "company",
     };
     if (editingPartner) {
       await updatePartner.mutateAsync({ id: editingPartner.id, ...payload });
@@ -776,6 +784,15 @@ export function FinanceiroTab() {
   // seguia essa regra — despesa pendente entrava inteira, subtraindo caixa
   // que ainda nem tinha saído de fato).
   const balance = paidRevenues - paidExpenses;
+
+  // Parte do lucro retida pra empresa (linha is_company em company_partners)
+  // — já abate do que sobra pra distribuir entre os sócios.
+  const companyPartnerRow = companyPartners.find((p) => p.is_company);
+  const companyRetention = companyPartnerRow
+    ? companyPartnerRow.distribution_type === "fixed_value"
+      ? Number(companyPartnerRow.fixed_value ?? 0)
+      : balance * (Number(companyPartnerRow.percentage ?? 0) / 100)
+    : 0;
 
   // Implementação do mês selecionado (sem ser acumulado all-time) — previsibilidade
   const aReceberNoMes = revenues
@@ -2077,6 +2094,12 @@ export function FinanceiroTab() {
                 <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Distribuição de Lucros por Sócio</h3>
                 <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
                   Sobre o Saldo de {months[month - 1]} / {year}: <b style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>{formatCurrency(balance)}</b>
+                  {companyRetention > 0 && (
+                    <>
+                      {" "}— Empresa retém <b style={{ color: "#8B5CF6" }}>{formatCurrency(companyRetention)}</b>
+                      {" "}— Sobra pros sócios: <b style={{ color: "#22c55e" }}>{formatCurrency(balance - companyRetention)}</b>
+                    </>
+                  )}
                 </p>
               </div>
               <Button size="sm" variant="outline" onClick={() => { openAddPartner(); setManagePartnersOpen(true); }}>
@@ -2105,8 +2128,15 @@ export function FinanceiroTab() {
                         ? Number(p.fixed_value ?? 0)
                         : balance * (Number(p.percentage ?? 0) / 100);
                       return (
-                        <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)" }}>
-                          <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>{p.name}</TableCell>
+                        <TableRow key={p.id} style={{ borderColor: "rgba(11,135,195,0.06)", background: p.is_company ? "rgba(139,92,246,0.06)" : undefined }}>
+                          <TableCell className="text-sm font-medium" style={{ color: "#E2EBF8" }}>
+                            {p.name}
+                            {p.is_company && (
+                              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)", color: "#8B5CF6" }}>
+                                Empresa
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-center text-sm" style={{ color: "#7BA3C6" }}>
                             {p.distribution_type === "fixed_value" ? (
                               <span>Fixo — {formatCurrency(Number(p.fixed_value ?? 0))}</span>
@@ -2757,7 +2787,14 @@ export function FinanceiroTab() {
               companyPartners.map((p) => (
                 <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-border p-2.5">
                   <div>
-                    <p className="text-sm font-medium text-text-primary">{p.name}</p>
+                    <p className="text-sm font-medium text-text-primary flex items-center gap-1.5">
+                      {p.name}
+                      {p.is_company && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)", color: "#8B5CF6" }}>
+                          Empresa
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-text-muted">
                       {p.distribution_type === "fixed_value"
                         ? `Fixo — ${formatCurrency(Number(p.fixed_value ?? 0))}/mês`
@@ -2795,6 +2832,16 @@ export function FinanceiroTab() {
               >
                 Selecionar sócio do sistema
               </button>
+              <button
+                type="button"
+                onClick={() => { setPartnerMode("company"); setPartnerName((n) => n || "Empresa"); }}
+                className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                style={partnerMode === "company" ? { background: "var(--primary)", color: "#fff" } : { color: "#7BA3C6" }}
+                disabled={!!existingCompanyRow && existingCompanyRow.id !== editingPartner?.id}
+                title={existingCompanyRow && existingCompanyRow.id !== editingPartner?.id ? "Já existe uma linha de Empresa — edite ela em vez de criar outra" : undefined}
+              >
+                Parte da Empresa
+              </button>
             </div>
 
             {partnerMode === "user" ? (
@@ -2809,6 +2856,14 @@ export function FinanceiroTab() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            ) : partnerMode === "company" ? (
+              <div className="space-y-1.5">
+                <Label>Rótulo</Label>
+                <Input value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Empresa" />
+                <p className="text-[11px]" style={{ color: "#7BA3C6" }}>
+                  A parte que fica retida na empresa — não é paga a ninguém, só reduz o que sobra pra dividir entre os sócios.
+                </p>
               </div>
             ) : (
               <div className="space-y-1.5">

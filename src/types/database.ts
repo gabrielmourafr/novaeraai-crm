@@ -703,11 +703,12 @@ export interface Database {
           percentage: number | null;
           distribution_type: "percentage" | "fixed_value";
           fixed_value: number | null;
+          is_company: boolean;
           active: boolean;
           created_at: string;
           updated_at: string;
         };
-        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["company_partners"]["Row"], "id" | "created_at" | "updated_at" | "active" | "distribution_type">> & { active?: boolean; distribution_type?: "percentage" | "fixed_value" };
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["company_partners"]["Row"], "id" | "created_at" | "updated_at" | "active" | "distribution_type" | "is_company">> & { active?: boolean; distribution_type?: "percentage" | "fixed_value"; is_company?: boolean };
         Update: Partial<Database["public"]["Tables"]["company_partners"]["Insert"]>;
         Relationships: [];
       };
