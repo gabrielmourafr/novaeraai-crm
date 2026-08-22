@@ -2175,7 +2175,16 @@ export function FinanceiroTab() {
               é a última retirada vinculada a um projeto específico (Lucro por Projeto) */}
           {(() => {
             const lastProjectAdvance = partnerAdvances.find((a) => a.project_id);
-            if (!lastProjectAdvance) return null;
+            if (!lastProjectAdvance) {
+              return (
+                <StatCard
+                  size="sm"
+                  label="Última Distribuição Feita (por projeto)"
+                  value="Nenhuma ainda — use o botão Distribuir na tabela de Lucro por Projeto"
+                  icon={Wallet}
+                />
+              );
+            }
             const partnerName = companyPartners.find((p) => p.id === lastProjectAdvance.partner_id)?.name ?? "—";
             const projectName = projects.find((p) => p.id === lastProjectAdvance.project_id)?.name ?? "—";
             return (
