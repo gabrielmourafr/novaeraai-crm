@@ -195,6 +195,10 @@ export function FinanceiroTab() {
   const [distValue, setDistValue] = useState("");
   const [distDate, setDistDate] = useState("");
   const [distDesc, setDistDesc] = useState("");
+  // Valor por sócio nessa distribuição. O percentual só sugere o rateio
+  // inicial — cada linha é editável, porque a parte de cada um (a da
+  // empresa em especial) varia de mês pra mês.
+  const [distRows, setDistRows] = useState<{ partnerId: string; value: string }[]>([]);
   const [editingAdvance, setEditingAdvance] = useState<PartnerAdvance | undefined>();
   const [deletingAdvance, setDeletingAdvance] = useState<PartnerAdvance | undefined>();
   const [advancePartnerId, setAdvancePartnerId] = useState("__none__");
@@ -340,14 +344,34 @@ export function FinanceiroTab() {
     return rows;
   };
 
-  const distribuicaoPreview = useMemo(
-    () => splitDistribuicao(distValue ? parseCurrencyInput(distValue) : 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [distValue, companyPartners]
-  );
+  // Digitar o total só pré-preenche o rateio sugerido; a partir daí cada
+  // linha pode ser ajustada à mão, e o que vale é a soma das linhas.
+  const handleDistValueChange = (v: string) => {
+    setDistValue(v);
+    const total = v ? parseCurrencyInput(v) : 0;
+    const rows = splitDistribuicao(isNaN(total) ? 0 : total);
+    setDistRows(rows.map((r) => ({ partnerId: r.partner.id, value: r.value > 0 ? r.value.toFixed(2) : "" })));
+  };
+
+  const setDistRowValue = (partnerId: string, value: string) => {
+    setDistRows((prev) => {
+      const exists = prev.some((r) => r.partnerId === partnerId);
+      if (exists) return prev.map((r) => (r.partnerId === partnerId ? { ...r, value } : r));
+      return [...prev, { partnerId, value }];
+    });
+  };
+
+  const distRowValue = (partnerId: string) => distRows.find((r) => r.partnerId === partnerId)?.value ?? "";
+  const distTotalRateado = companyPartners.reduce((s, p) => {
+    const raw = distRowValue(p.id);
+    if (!raw) return s;
+    const v = parseCurrencyInput(raw);
+    return isNaN(v) ? s : s + v;
+  }, 0);
 
   const openRegistrarDistribuicao = () => {
     setDistValue("");
+    setDistRows([]);
     setDistDate(new Date().toISOString().slice(0, 10));
     setDistDesc("Distribuição de lucros");
     setDistDialogOpen(true);
@@ -355,10 +379,14 @@ export function FinanceiroTab() {
 
   const handleRegistrarDistribuicao = async () => {
     if (!user) return;
-    const total = parseCurrencyInput(distValue);
-    if (isNaN(total) || total <= 0) { toast.error("Informe o valor total a distribuir."); return; }
-    const rows = splitDistribuicao(total).filter((r) => r.value > 0);
-    if (rows.length === 0) { toast.error("Nenhum sócio elegível pra receber."); return; }
+    const rows = companyPartners
+      .map((p) => {
+        const raw = distRowValue(p.id);
+        const v = raw ? parseCurrencyInput(raw) : 0;
+        return { partner: p, value: isNaN(v) ? 0 : Math.round(v * 100) / 100 };
+      })
+      .filter((r) => r.value > 0);
+    if (rows.length === 0) { toast.error("Informe pelo menos um valor pra distribuir."); return; }
     const date = distDate || new Date().toISOString().slice(0, 10);
     const description = distDesc.trim() || "Distribuição de lucros";
     for (const r of rows) {
@@ -3112,54 +3140,60 @@ export function FinanceiroTab() {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Valor total (R$) *</Label>
-                <Input value={distValue} onChange={(e) => setDistValue(e.target.value)} placeholder="0,00" />
+                <Label>Valor total (R$)</Label>
+                <Input value={distValue} onChange={(e) => handleDistValueChange(e.target.value)} placeholder="0,00" />
               </div>
               <div className="space-y-1.5">
                 <Label>Data</Label>
                 <Input type="date" value={distDate} onChange={(e) => setDistDate(e.target.value)} />
               </div>
             </div>
+            <p className="text-[11px] -mt-1.5" style={{ color: "#7BA3C6" }}>
+              Só sugere o rateio pelo percentual — ajuste as linhas abaixo à vontade. Vale o que estiver nelas.
+            </p>
             <div className="space-y-1.5">
               <Label>Descrição</Label>
               <Input value={distDesc} onChange={(e) => setDistDesc(e.target.value)} placeholder="Distribuição de lucros" />
             </div>
 
-            {distribuicaoPreview.length > 0 && (
-              <div className="rounded-lg border border-border p-3 space-y-2">
-                <p className="text-xs font-medium text-text-primary">Como vai ser dividido</p>
-                {distribuicaoPreview.map((r) => (
-                  <div key={r.partner.id} className="flex items-center justify-between text-xs">
-                    <span className="text-text-muted">
-                      {r.partner.name}
-                      <span className="ml-1.5 text-[10px]">
-                        {r.partner.distribution_type === "fixed_value"
-                          ? "(fixo)"
-                          : `(${Number(r.partner.percentage ?? 0).toFixed(1)}%)`}
-                      </span>
-                      {r.partner.is_company && (
-                        <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)", color: "#8B5CF6" }}>
-                          Empresa
-                        </span>
-                      )}
+            <div className="rounded-lg border border-border p-3 space-y-2">
+              <p className="text-xs font-medium text-text-primary">Valor de cada um</p>
+              {companyPartners.map((p) => (
+                <div key={p.id} className="grid grid-cols-[1fr_120px] gap-2 items-center">
+                  <span className="text-xs text-text-muted truncate">
+                    {p.name}
+                    <span className="ml-1.5 text-[10px]">
+                      {p.distribution_type === "fixed_value"
+                        ? "(fixo)"
+                        : `(${Number(p.percentage ?? 0).toFixed(1)}%)`}
                     </span>
-                    <span className="font-semibold text-text-primary">{formatCurrency(r.value)}</span>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
-                  <span className="font-semibold text-text-primary">Total</span>
-                  <span className="font-bold" style={{ color: "#0B87C3" }}>
-                    {formatCurrency(distribuicaoPreview.reduce((s, r) => s + r.value, 0))}
+                    {p.is_company && (
+                      <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)", color: "#8B5CF6" }}>
+                        Empresa
+                      </span>
+                    )}
                   </span>
+                  <Input
+                    value={distRowValue(p.id)}
+                    onChange={(e) => setDistRowValue(p.id, e.target.value)}
+                    placeholder="0,00"
+                    className="h-8 text-xs"
+                  />
                 </div>
+              ))}
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
+                <span className="font-semibold text-text-primary">Total a distribuir</span>
+                <span className="font-bold" style={{ color: "#0B87C3" }}>{formatCurrency(distTotalRateado)}</span>
+              </div>
+              {distTotalRateado > 0 && (
                 <p className="text-[11px] text-text-muted">
                   Caixa depois desta distribuição:{" "}
-                  <b style={{ color: "#E2EBF8" }}>
-                    {formatCurrency(caixaAposDistribuicoes - distribuicaoPreview.reduce((s, r) => s + r.value, 0))}
+                  <b style={{ color: caixaAposDistribuicoes - distTotalRateado >= 0 ? "#22c55e" : "#ef4444" }}>
+                    {formatCurrency(caixaAposDistribuicoes - distTotalRateado)}
                   </b>
                 </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDistDialogOpen(false)}>Cancelar</Button>
