@@ -2084,16 +2084,28 @@ export function FinanceiroTab() {
         {/* ══════════════════ LUCRO E DISTRIBUIÇÃO ══════════════════ */}
         <TabsContent value="lucro-distribuicao" className="mt-4 space-y-4">
           {periodBadge}
-          {/* Última Antecipação */}
-          {partnerAdvances.length > 0 && (() => {
-            const last = partnerAdvances[0];
-            const lastPartnerName = companyPartners.find((p) => p.id === last.partner_id)?.name ?? "—";
-            const lastProjectName = last.project_id ? projects.find((p) => p.id === last.project_id)?.name ?? null : null;
+          {/* Última Antecipação — do último projeto que entrou */}
+          {projects.length > 0 && (() => {
+            const lastProject = [...projects].sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )[0];
+            const profitEntry = projectProfitMap.get(lastProject.id);
+            const distribuido = distributedByProject.get(lastProject.id) ?? 0;
+            const advancesFromProject = partnerAdvances.filter((a) => a.project_id === lastProject.id);
+            const lastAdvance = advancesFromProject[0];
+            const lastAdvancePartnerName = lastAdvance ? companyPartners.find((p) => p.id === lastAdvance.partner_id)?.name ?? "—" : null;
+
             return (
               <StatCard
                 size="sm"
-                label={`Última Antecipação — ${lastPartnerName}${lastProjectName ? ` (${lastProjectName})` : " (geral)"}`}
-                value={`${formatCurrency(Number(last.value))} em ${formatDate(last.date)}`}
+                label={`Último Projeto que Entrou — ${lastProject.name}`}
+                value={
+                  lastAdvance
+                    ? `${formatCurrency(Number(lastAdvance.value))} pra ${lastAdvancePartnerName} em ${formatDate(lastAdvance.date)}`
+                    : profitEntry
+                    ? `Ainda sem distribuição — lucro ${formatCurrency(profitEntry.recebido - profitEntry.custos - distribuido)} disponível`
+                    : "Ainda sem receita ou custo lançado"
+                }
                 icon={Wallet}
               />
             );
