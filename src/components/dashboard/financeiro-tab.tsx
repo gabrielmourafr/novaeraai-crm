@@ -2084,41 +2084,14 @@ export function FinanceiroTab() {
         {/* ══════════════════ LUCRO E DISTRIBUIÇÃO ══════════════════ */}
         <TabsContent value="lucro-distribuicao" className="mt-4 space-y-4">
           {periodBadge}
-          {/* Última Antecipação — do último projeto que entrou */}
-          {projects.length > 0 && (() => {
-            const lastProject = [...projects].sort(
-              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            )[0];
-            const profitEntry = projectProfitMap.get(lastProject.id);
-            const distribuido = distributedByProject.get(lastProject.id) ?? 0;
-            const advancesFromProject = partnerAdvances.filter((a) => a.project_id === lastProject.id);
-            const lastAdvance = advancesFromProject[0];
-            const lastAdvancePartnerName = lastAdvance ? companyPartners.find((p) => p.id === lastAdvance.partner_id)?.name ?? "—" : null;
-
-            return (
-              <StatCard
-                size="sm"
-                label={`Último Projeto que Entrou — ${lastProject.name}`}
-                value={
-                  lastAdvance
-                    ? `${formatCurrency(Number(lastAdvance.value))} pra ${lastAdvancePartnerName} em ${formatDate(lastAdvance.date)}`
-                    : profitEntry
-                    ? `Ainda sem distribuição — lucro ${formatCurrency(profitEntry.recebido - profitEntry.custos - distribuido)} disponível`
-                    : "Ainda sem receita ou custo lançado"
-                }
-                icon={Wallet}
-              />
-            );
-          })()}
-
-          {/* Distribuição de Lucros por Sócio */}
+          {/* Distribuição de Lucros por Sócio no Mês */}
           <div
             className="rounded-xl overflow-hidden"
             style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
           >
             <div className="px-5 py-4 border-b flex items-center justify-between gap-2 flex-wrap" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
               <div>
-                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Distribuição de Lucros por Sócio</h3>
+                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Distribuição de Lucros por Sócio no Mês</h3>
                 <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
                   Sobre o Saldo de {months[month - 1]} / {year}: <b style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>{formatCurrency(balance)}</b>
                   {companyRetention > 0 && (
@@ -2127,6 +2100,9 @@ export function FinanceiroTab() {
                       {" "}— Sobra pros sócios: <b style={{ color: "#22c55e" }}>{formatCurrency(balance - companyRetention)}</b>
                     </>
                   )}
+                  {" "}— Tirado no mês (todos os sócios): <b style={{ color: "#0B87C3" }}>
+                    {formatCurrency(Array.from(advancesByPartnerMonth.values()).reduce((s, v) => s + v, 0))}
+                  </b>
                 </p>
               </div>
               <Button size="sm" variant="outline" onClick={() => { openAddPartner(); setManagePartnersOpen(true); }}>
@@ -2194,6 +2170,23 @@ export function FinanceiroTab() {
               </>
             )}
           </div>
+
+          {/* Última Distribuição Feita — separada da distribuição geral do mês,
+              é a última retirada vinculada a um projeto específico (Lucro por Projeto) */}
+          {(() => {
+            const lastProjectAdvance = partnerAdvances.find((a) => a.project_id);
+            if (!lastProjectAdvance) return null;
+            const partnerName = companyPartners.find((p) => p.id === lastProjectAdvance.partner_id)?.name ?? "—";
+            const projectName = projects.find((p) => p.id === lastProjectAdvance.project_id)?.name ?? "—";
+            return (
+              <StatCard
+                size="sm"
+                label={`Última Distribuição Feita — ${projectName}`}
+                value={`${formatCurrency(Number(lastProjectAdvance.value))} pra ${partnerName} em ${formatDate(lastProjectAdvance.date)}`}
+                icon={Wallet}
+              />
+            );
+          })()}
 
           {/* Lucro por Projeto */}
           <div
