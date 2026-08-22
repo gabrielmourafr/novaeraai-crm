@@ -808,6 +808,16 @@ export function FinanceiroTab() {
   // que ainda nem tinha saído de fato).
   const balance = paidRevenues - paidExpenses;
 
+  // Distribuições pagas aos sócios no mês — dinheiro que de fato saiu do
+  // caixa, mas que não é despesa (não entra em `expenses`). O `balance`
+  // continua sendo o lucro do mês (base pro rateio por percentual); o caixa
+  // é o que sobra depois de já ter tirado as distribuições.
+  const totalDistribuidoNoMes = useMemo(
+    () => Array.from(advancesByPartnerMonth.values()).reduce((s, v) => s + v, 0),
+    [advancesByPartnerMonth]
+  );
+  const caixaAposDistribuicoes = balance - totalDistribuidoNoMes;
+
   // Parte do lucro retida pra empresa (linha is_company em company_partners)
   // — já abate do que sobra pra distribuir entre os sócios.
   const companyPartnerRow = companyPartners.find((p) => p.is_company);
@@ -2123,9 +2133,8 @@ export function FinanceiroTab() {
                       {" "}— Sobra pros sócios: <b style={{ color: "#22c55e" }}>{formatCurrency(balance - companyRetention)}</b>
                     </>
                   )}
-                  {" "}— Tirado no mês (todos os sócios): <b style={{ color: "#0B87C3" }}>
-                    {formatCurrency(Array.from(advancesByPartnerMonth.values()).reduce((s, v) => s + v, 0))}
-                  </b>
+                  {" "}— Tirado no mês (todos os sócios): <b style={{ color: "#0B87C3" }}>{formatCurrency(totalDistribuidoNoMes)}</b>
+                  {" "}— Caixa após distribuições: <b style={{ color: caixaAposDistribuicoes >= 0 ? "#22c55e" : "#ef4444" }}>{formatCurrency(caixaAposDistribuicoes)}</b>
                 </p>
               </div>
               <Button size="sm" variant="outline" onClick={() => { openAddPartner(); setManagePartnersOpen(true); }}>
@@ -2194,31 +2203,38 @@ export function FinanceiroTab() {
             )}
           </div>
 
-          {/* Última Distribuição Feita — separada da distribuição geral do mês,
-              é a última retirada vinculada a um projeto específico (Lucro por Projeto) */}
-          {(() => {
-            const lastProjectAdvance = partnerAdvances.find((a) => a.project_id);
-            if (!lastProjectAdvance) {
+          {/* Última Distribuição Feita — a retirada mais recente, com ou sem
+              projeto vinculado, e o caixa que sobrou depois dela */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {(() => {
+              const lastAdvance = partnerAdvances[0];
+              if (!lastAdvance) {
+                return (
+                  <StatCard
+                    size="sm"
+                    label="Última Distribuição Feita"
+                    value="Nenhuma ainda"
+                    icon={Wallet}
+                  />
+                );
+              }
+              const partnerName = companyPartners.find((p) => p.id === lastAdvance.partner_id)?.name ?? "—";
               return (
                 <StatCard
                   size="sm"
-                  label="Última Distribuição Feita (por projeto)"
-                  value="Nenhuma ainda — use o botão Distribuir na tabela de Lucro por Projeto"
+                  label={`Última Distribuição Feita — ${partnerName}`}
+                  value={`${formatCurrency(Number(lastAdvance.value))} em ${formatDate(lastAdvance.date)}`}
                   icon={Wallet}
                 />
               );
-            }
-            const partnerName = companyPartners.find((p) => p.id === lastProjectAdvance.partner_id)?.name ?? "—";
-            const projectName = projects.find((p) => p.id === lastProjectAdvance.project_id)?.name ?? "—";
-            return (
-              <StatCard
-                size="sm"
-                label={`Última Distribuição Feita — ${projectName}`}
-                value={`${formatCurrency(Number(lastProjectAdvance.value))} pra ${partnerName} em ${formatDate(lastProjectAdvance.date)}`}
-                icon={Wallet}
-              />
-            );
-          })()}
+            })()}
+            <StatCard
+              size="sm"
+              label="Caixa da Empresa (após distribuições)"
+              value={formatCurrency(caixaAposDistribuicoes)}
+              icon={DollarSign}
+            />
+          </div>
 
           {/* Lucro por Projeto */}
           <div
@@ -3381,11 +3397,40 @@ export function FinanceiroTab() {
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-border">
-              <p className="text-sm font-semibold text-text-primary">= Saldo</p>
+              <p className="text-sm font-semibold text-text-primary">= Saldo (lucro do mês)</p>
               <p className="text-base font-bold" style={{ color: balance >= 0 ? "#22c55e" : "#ef4444" }}>
                 {formatCurrency(balance)}
               </p>
             </div>
+
+            {totalDistribuidoNoMes > 0 && (
+              <>
+                <div className="rounded-lg p-3" style={{ background: "rgba(11,135,195,0.08)" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-semibold" style={{ color: "#0B87C3" }}>− Distribuições aos Sócios</p>
+                    <p className="text-sm font-bold" style={{ color: "#0B87C3" }}>{formatCurrency(totalDistribuidoNoMes)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    {companyPartners
+                      .filter((p) => (advancesByPartnerMonth.get(p.id) ?? 0) > 0)
+                      .map((p) => (
+                        <div key={p.id} className="flex items-center justify-between text-xs">
+                          <span className="text-text-muted truncate mr-2">{p.name}</span>
+                          <span className="text-text-primary whitespace-nowrap">{formatCurrency(advancesByPartnerMonth.get(p.id) ?? 0)}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <p className="text-sm font-semibold text-text-primary">= Caixa da Empresa</p>
+                  <p className="text-base font-bold" style={{ color: caixaAposDistribuicoes >= 0 ? "#22c55e" : "#ef4444" }}>
+                    {formatCurrency(caixaAposDistribuicoes)}
+                  </p>
+                </div>
+              </>
+            )}
+
             {(pendingRevenues > 0 || expensesToPayValue > 0) && (
               <p className="text-[11px] text-text-muted">
                 Não entram aqui: {formatCurrency(pendingRevenues)} de receitas ainda a receber e {formatCurrency(expensesToPayValue)} de despesas ainda a pagar neste mês.
