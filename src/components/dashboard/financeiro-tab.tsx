@@ -2084,6 +2084,21 @@ export function FinanceiroTab() {
         {/* ══════════════════ LUCRO E DISTRIBUIÇÃO ══════════════════ */}
         <TabsContent value="lucro-distribuicao" className="mt-4 space-y-4">
           {periodBadge}
+          {/* Última Antecipação */}
+          {partnerAdvances.length > 0 && (() => {
+            const last = partnerAdvances[0];
+            const lastPartnerName = companyPartners.find((p) => p.id === last.partner_id)?.name ?? "—";
+            const lastProjectName = last.project_id ? projects.find((p) => p.id === last.project_id)?.name ?? null : null;
+            return (
+              <StatCard
+                size="sm"
+                label={`Última Antecipação — ${lastPartnerName}${lastProjectName ? ` (${lastProjectName})` : " (geral)"}`}
+                value={`${formatCurrency(Number(last.value))} em ${formatDate(last.date)}`}
+                icon={Wallet}
+              />
+            );
+          })()}
+
           {/* Distribuição de Lucros por Sócio */}
           <div
             className="rounded-xl overflow-hidden"
