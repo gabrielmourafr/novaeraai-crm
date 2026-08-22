@@ -191,6 +191,10 @@ export function FinanceiroTab() {
   const updateAdvance = useUpdatePartnerAdvance();
   const deleteAdvance = useDeletePartnerAdvance();
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
+  const [distDialogOpen, setDistDialogOpen] = useState(false);
+  const [distValue, setDistValue] = useState("");
+  const [distDate, setDistDate] = useState("");
+  const [distDesc, setDistDesc] = useState("");
   const [editingAdvance, setEditingAdvance] = useState<PartnerAdvance | undefined>();
   const [deletingAdvance, setDeletingAdvance] = useState<PartnerAdvance | undefined>();
   const [advancePartnerId, setAdvancePartnerId] = useState("__none__");
@@ -287,6 +291,88 @@ export function FinanceiroTab() {
       await createPartner.mutateAsync({ org_id: user.org_id, ...payload });
     }
     openAddPartner();
+  };
+
+  // Uma "distribuição" é um conjunto de adiantamentos lançados juntos — mesma
+  // data e mesma descrição. Agrupa pra mostrar a última como um evento só,
+  // em vez de uma retirada solta por sócio.
+  const ultimaDistribuicao = useMemo(() => {
+    if (partnerAdvances.length === 0) return null;
+    const first = partnerAdvances[0];
+    const key = `${first.date}__${first.description ?? ""}`;
+    const items = partnerAdvances
+      .filter((a) => `${a.date}__${a.description ?? ""}` === key)
+      .map((a) => ({
+        id: a.id,
+        partnerName: companyPartners.find((p) => p.id === a.partner_id)?.name ?? "—",
+        value: Number(a.value),
+      }));
+    return {
+      date: first.date,
+      description: first.description ?? "Distribuição de lucros",
+      total: items.reduce((s, i) => s + i.value, 0),
+      items,
+    };
+  }, [partnerAdvances, companyPartners]);
+
+  // Divide um valor total entre os sócios: quem é de valor fixo recebe o
+  // fixo, e o que sobra é rateado entre os de percentual proporcionalmente
+  // (normalizado, então não depende dos percentuais somarem 100% exato).
+  // A última linha absorve o arredondamento pra fechar o total cravado.
+  const splitDistribuicao = (total: number) => {
+    if (!(total > 0) || companyPartners.length === 0) return [];
+    const fixos = companyPartners.filter((p) => p.distribution_type === "fixed_value");
+    const percentuais = companyPartners.filter((p) => p.distribution_type === "percentage");
+    const totalFixo = fixos.reduce((s, p) => s + Number(p.fixed_value ?? 0), 0);
+    const sobra = Math.max(0, total - totalFixo);
+    const somaPct = percentuais.reduce((s, p) => s + Number(p.percentage ?? 0), 0);
+
+    const rows = [
+      ...fixos.map((p) => ({ partner: p, value: Math.round(Number(p.fixed_value ?? 0) * 100) / 100 })),
+      ...percentuais.map((p) => ({
+        partner: p,
+        value: somaPct > 0 ? Math.round((sobra * (Number(p.percentage ?? 0) / somaPct)) * 100) / 100 : 0,
+      })),
+    ];
+    const soma = rows.reduce((s, r) => s + r.value, 0);
+    const diff = Math.round((total - soma) * 100) / 100;
+    if (diff !== 0 && rows.length > 0) rows[rows.length - 1].value = Math.round((rows[rows.length - 1].value + diff) * 100) / 100;
+    return rows;
+  };
+
+  const distribuicaoPreview = useMemo(
+    () => splitDistribuicao(distValue ? parseCurrencyInput(distValue) : 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [distValue, companyPartners]
+  );
+
+  const openRegistrarDistribuicao = () => {
+    setDistValue("");
+    setDistDate(new Date().toISOString().slice(0, 10));
+    setDistDesc("Distribuição de lucros");
+    setDistDialogOpen(true);
+  };
+
+  const handleRegistrarDistribuicao = async () => {
+    if (!user) return;
+    const total = parseCurrencyInput(distValue);
+    if (isNaN(total) || total <= 0) { toast.error("Informe o valor total a distribuir."); return; }
+    const rows = splitDistribuicao(total).filter((r) => r.value > 0);
+    if (rows.length === 0) { toast.error("Nenhum sócio elegível pra receber."); return; }
+    const date = distDate || new Date().toISOString().slice(0, 10);
+    const description = distDesc.trim() || "Distribuição de lucros";
+    for (const r of rows) {
+      await createAdvance.mutateAsync({
+        org_id: user.org_id,
+        partner_id: r.partner.id,
+        project_id: null,
+        description,
+        value: r.value,
+        date,
+        notes: null,
+      });
+    }
+    setDistDialogOpen(false);
   };
 
   const openCreateAdvance = (projectId?: string) => {
@@ -2203,37 +2289,56 @@ export function FinanceiroTab() {
             )}
           </div>
 
-          {/* Última Distribuição Feita — a retirada mais recente, com ou sem
-              projeto vinculado, e o caixa que sobrou depois dela */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {(() => {
-              const lastAdvance = partnerAdvances[0];
-              if (!lastAdvance) {
-                return (
-                  <StatCard
-                    size="sm"
-                    label="Última Distribuição Feita"
-                    value="Nenhuma ainda"
-                    icon={Wallet}
-                  />
-                );
-              }
-              const partnerName = companyPartners.find((p) => p.id === lastAdvance.partner_id)?.name ?? "—";
-              return (
-                <StatCard
-                  size="sm"
-                  label={`Última Distribuição Feita — ${partnerName}`}
-                  value={`${formatCurrency(Number(lastAdvance.value))} em ${formatDate(lastAdvance.date)}`}
-                  icon={Wallet}
-                />
-              );
-            })()}
-            <StatCard
-              size="sm"
-              label="Caixa da Empresa (após distribuições)"
-              value={formatCurrency(caixaAposDistribuicoes)}
-              icon={DollarSign}
-            />
+          {/* Última Distribuição Feita — registrada manualmente, dividindo um
+              valor total entre os sócios e abatendo do caixa */}
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.12)" }}
+          >
+            <div className="px-5 py-4 border-b flex items-center justify-between gap-2 flex-wrap" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
+              <div>
+                <h3 className="font-semibold text-sm" style={{ color: "#E2EBF8" }}>Última Distribuição Feita</h3>
+                <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
+                  Registre o valor total distribuído — o sistema divide entre os sócios e abate do caixa
+                </p>
+              </div>
+              <Button size="sm" style={{ background: "var(--primary)" }} onClick={openRegistrarDistribuicao} disabled={companyPartners.length === 0}>
+                <Plus size={14} className="mr-1.5" />Registrar Distribuição
+              </Button>
+            </div>
+            {!ultimaDistribuicao ? (
+              <div className="p-6 text-center text-sm" style={{ color: "#3D5A78" }}>
+                Nenhuma distribuição registrada ainda. Clique em <b>Registrar Distribuição</b> pra lançar.
+              </div>
+            ) : (
+              <div className="p-5 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <p className="text-xs" style={{ color: "#7BA3C6" }}>{ultimaDistribuicao.description}</p>
+                    <p className="text-lg font-bold" style={{ color: "#0B87C3" }}>
+                      {formatCurrency(ultimaDistribuicao.total)}
+                      <span className="text-xs font-normal ml-2" style={{ color: "#7BA3C6" }}>
+                        em {formatDate(ultimaDistribuicao.date)}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs" style={{ color: "#7BA3C6" }}>Caixa após esta distribuição</p>
+                    <p className="text-lg font-bold" style={{ color: caixaAposDistribuicoes >= 0 ? "#22c55e" : "#ef4444" }}>
+                      {formatCurrency(caixaAposDistribuicoes)}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {ultimaDistribuicao.items.map((it) => (
+                    <div key={it.id} className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.03)" }}>
+                      <p className="text-[10px]" style={{ color: "#7BA3C6" }}>{it.partnerName}</p>
+                      <p className="text-sm font-semibold" style={{ color: "#E2EBF8" }}>{formatCurrency(it.value)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Lucro por Projeto */}
@@ -2990,6 +3095,76 @@ export function FinanceiroTab() {
               style={{ background: "var(--primary)" }}
             >
               {editingPartner ? "Salvar Alterações" : "Adicionar Sócio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: Registrar Distribuição ─── */}
+      <Dialog open={distDialogOpen} onOpenChange={setDistDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar Distribuição</DialogTitle>
+            <DialogDescription>
+              Informe o valor total distribuído — o sistema divide entre os sócios e abate do caixa
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Valor total (R$) *</Label>
+                <Input value={distValue} onChange={(e) => setDistValue(e.target.value)} placeholder="0,00" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Data</Label>
+                <Input type="date" value={distDate} onChange={(e) => setDistDate(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descrição</Label>
+              <Input value={distDesc} onChange={(e) => setDistDesc(e.target.value)} placeholder="Distribuição de lucros" />
+            </div>
+
+            {distribuicaoPreview.length > 0 && (
+              <div className="rounded-lg border border-border p-3 space-y-2">
+                <p className="text-xs font-medium text-text-primary">Como vai ser dividido</p>
+                {distribuicaoPreview.map((r) => (
+                  <div key={r.partner.id} className="flex items-center justify-between text-xs">
+                    <span className="text-text-muted">
+                      {r.partner.name}
+                      <span className="ml-1.5 text-[10px]">
+                        {r.partner.distribution_type === "fixed_value"
+                          ? "(fixo)"
+                          : `(${Number(r.partner.percentage ?? 0).toFixed(1)}%)`}
+                      </span>
+                      {r.partner.is_company && (
+                        <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)", color: "#8B5CF6" }}>
+                          Empresa
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-semibold text-text-primary">{formatCurrency(r.value)}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
+                  <span className="font-semibold text-text-primary">Total</span>
+                  <span className="font-bold" style={{ color: "#0B87C3" }}>
+                    {formatCurrency(distribuicaoPreview.reduce((s, r) => s + r.value, 0))}
+                  </span>
+                </div>
+                <p className="text-[11px] text-text-muted">
+                  Caixa depois desta distribuição:{" "}
+                  <b style={{ color: "#E2EBF8" }}>
+                    {formatCurrency(caixaAposDistribuicoes - distribuicaoPreview.reduce((s, r) => s + r.value, 0))}
+                  </b>
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDistDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleRegistrarDistribuicao} disabled={createAdvance.isPending} style={{ background: "var(--primary)" }}>
+              Registrar
             </Button>
           </DialogFooter>
         </DialogContent>
