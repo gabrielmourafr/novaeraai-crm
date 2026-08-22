@@ -7,6 +7,7 @@ import type { Database } from "@/types/database";
 
 export type PartnerAdvance = Database["public"]["Tables"]["partner_advances"]["Row"];
 type PartnerAdvanceInsert = Database["public"]["Tables"]["partner_advances"]["Insert"];
+type PartnerAdvanceUpdate = Database["public"]["Tables"]["partner_advances"]["Update"];
 
 export const usePartnerAdvances = () => {
   const supabase = createClient();
@@ -38,6 +39,22 @@ export const useCreatePartnerAdvance = () => {
       toast.success("Adiantamento registrado!");
     },
     onError: () => toast.error("Erro ao registrar adiantamento"),
+  });
+};
+
+export const useUpdatePartnerAdvance = () => {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: PartnerAdvanceUpdate & { id: string }) => {
+      const { error } = await supabase.from("partner_advances").update(data).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["partner-advances"] });
+      toast.success("Adiantamento atualizado!");
+    },
+    onError: () => toast.error("Erro ao atualizar adiantamento"),
   });
 };
 

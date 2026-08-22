@@ -42,7 +42,7 @@ import {
   type CompanyPartner,
 } from "@/lib/hooks/use-company-partners";
 import {
-  usePartnerAdvances, useCreatePartnerAdvance, useDeletePartnerAdvance, type PartnerAdvance,
+  usePartnerAdvances, useCreatePartnerAdvance, useUpdatePartnerAdvance, useDeletePartnerAdvance, type PartnerAdvance,
 } from "@/lib/hooks/use-partner-advances";
 import { useProjectProfitSummary } from "@/lib/hooks/use-project-profit";
 import { useCashFlowForecast } from "@/lib/hooks/use-cash-flow-forecast";
@@ -188,8 +188,10 @@ export function FinanceiroTab() {
   // Adiantamentos por sócio
   const { data: partnerAdvances = [] } = usePartnerAdvances();
   const createAdvance = useCreatePartnerAdvance();
+  const updateAdvance = useUpdatePartnerAdvance();
   const deleteAdvance = useDeletePartnerAdvance();
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
+  const [editingAdvance, setEditingAdvance] = useState<PartnerAdvance | undefined>();
   const [deletingAdvance, setDeletingAdvance] = useState<PartnerAdvance | undefined>();
   const [advancePartnerId, setAdvancePartnerId] = useState("__none__");
   const [advanceProjectId, setAdvanceProjectId] = useState("__none__");
@@ -288,6 +290,7 @@ export function FinanceiroTab() {
   };
 
   const openCreateAdvance = (projectId?: string) => {
+    setEditingAdvance(undefined);
     setAdvancePartnerId("__none__");
     setAdvanceProjectId(projectId ?? "__none__");
     setAdvanceValue("");
@@ -295,20 +298,40 @@ export function FinanceiroTab() {
     setAdvanceDesc("");
     setAdvanceDialogOpen(true);
   };
+  const openEditAdvance = (a: PartnerAdvance) => {
+    setEditingAdvance(a);
+    setAdvancePartnerId(a.partner_id);
+    setAdvanceProjectId(a.project_id ?? "__none__");
+    setAdvanceValue(String(a.value));
+    setAdvanceDate(a.date);
+    setAdvanceDesc(a.description ?? "");
+    setAdvanceDialogOpen(true);
+  };
   const handleSaveAdvance = async () => {
     if (!user) return;
     if (advancePartnerId === "__none__" || !advanceValue) { toast.error("Selecione o sócio e o valor."); return; }
     const parsedValue = parseCurrencyInput(advanceValue);
     if (isNaN(parsedValue) || parsedValue <= 0) { toast.error("Valor inválido."); return; }
-    await createAdvance.mutateAsync({
-      org_id: user.org_id,
-      partner_id: advancePartnerId,
-      project_id: advanceProjectId !== "__none__" ? advanceProjectId : null,
-      description: advanceDesc.trim() || null,
-      value: parsedValue,
-      date: advanceDate || new Date().toISOString().slice(0, 10),
-      notes: null,
-    });
+    if (editingAdvance) {
+      await updateAdvance.mutateAsync({
+        id: editingAdvance.id,
+        partner_id: advancePartnerId,
+        project_id: advanceProjectId !== "__none__" ? advanceProjectId : null,
+        description: advanceDesc.trim() || null,
+        value: parsedValue,
+        date: advanceDate || new Date().toISOString().slice(0, 10),
+      });
+    } else {
+      await createAdvance.mutateAsync({
+        org_id: user.org_id,
+        partner_id: advancePartnerId,
+        project_id: advanceProjectId !== "__none__" ? advanceProjectId : null,
+        description: advanceDesc.trim() || null,
+        value: parsedValue,
+        date: advanceDate || new Date().toISOString().slice(0, 10),
+        notes: null,
+      });
+    }
     setAdvanceDialogOpen(false);
   };
   const { data: mensalidadeSummary = [] } = useClientMensalidadeSummary();
@@ -2309,7 +2332,7 @@ export function FinanceiroTab() {
                     <TableHead style={{ color: "#7BA3C6" }}>Projeto</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }}>Data</TableHead>
                     <TableHead style={{ color: "#7BA3C6" }} className="text-right">Valor</TableHead>
-                    <TableHead className="w-[60px]" />
+                    <TableHead className="w-[90px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -2325,9 +2348,14 @@ export function FinanceiroTab() {
                       <TableCell className="text-sm" style={{ color: "#7BA3C6" }}>{formatDate(a.date)}</TableCell>
                       <TableCell className="text-right text-sm font-semibold" style={{ color: "#F59E0B" }}>{formatCurrency(Number(a.value))}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => setDeletingAdvance(a)}>
-                          <Trash2 size={13} />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditAdvance(a)}>
+                            <Pencil size={13} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300" onClick={() => setDeletingAdvance(a)}>
+                            <Trash2 size={13} />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -2951,12 +2979,14 @@ export function FinanceiroTab() {
         </DialogContent>
       </Dialog>
 
-      {/* ─── DIALOG: Novo Adiantamento ─── */}
-      <Dialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
+      {/* ─── DIALOG: Novo/Editar Adiantamento ─── */}
+      <Dialog open={advanceDialogOpen} onOpenChange={(v) => { setAdvanceDialogOpen(v); if (!v) setEditingAdvance(undefined); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Novo Adiantamento</DialogTitle>
-            <DialogDescription>Registre um valor já retirado por um sócio</DialogDescription>
+            <DialogTitle>{editingAdvance ? "Editar Adiantamento" : "Novo Adiantamento"}</DialogTitle>
+            <DialogDescription>
+              {editingAdvance ? "Atualize os dados desse adiantamento" : "Registre um valor já retirado por um sócio"}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
@@ -3002,9 +3032,9 @@ export function FinanceiroTab() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAdvanceDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveAdvance} disabled={createAdvance.isPending} style={{ background: "var(--primary)" }}>
-              Salvar
+            <Button variant="outline" onClick={() => { setAdvanceDialogOpen(false); setEditingAdvance(undefined); }}>Cancelar</Button>
+            <Button onClick={handleSaveAdvance} disabled={createAdvance.isPending || updateAdvance.isPending} style={{ background: "var(--primary)" }}>
+              {editingAdvance ? "Salvar Alterações" : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>
