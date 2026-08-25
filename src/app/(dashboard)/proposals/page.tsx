@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Search, FileText, Building2, Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, FileText, Building2, Eye, Pencil, Trash2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { useProposals, useDeleteProposal, useAutoExpireProposals, type ProposalWithRelations } from "@/lib/hooks/use-proposals";
+import { useLeads } from "@/lib/hooks/use-leads";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   rascunho: { label: "Rascunho", className: "bg-white/5 text-gray-400" },
@@ -59,8 +60,23 @@ export default function ProposalsPage() {
   const [deletingProposal, setDeletingProposal] = useState<ProposalWithRelations | undefined>();
 
   const { data: proposals = [], isLoading } = useProposals();
+  const { data: leads = [] } = useLeads();
   const deleteProposal = useDeleteProposal();
   const autoExpire = useAutoExpireProposals();
+
+  // Leads que já estão no estágio "Proposta Enviada" do kanban mas não têm
+  // nenhuma proposta cadastrada aqui — mover o card no kanban não cria o
+  // documento, então sem isso eles ficavam invisíveis nesta tela.
+  const leadsSemProposta = useMemo(() => {
+    const comProposta = new Set(proposals.map((p) => p.lead_id).filter(Boolean));
+    return leads.filter(
+      (l) =>
+        !l.archived &&
+        l.closed_at === null &&
+        (l.stage?.name ?? "").toLowerCase().includes("proposta") &&
+        !comProposta.has(l.id)
+    );
+  }, [leads, proposals]);
 
   // Auto-expire proposals whose validity has passed (best-effort, runs once on mount)
   useEffect(() => {
@@ -152,6 +168,40 @@ export default function ProposalsPage() {
           </Button>
         }
       />
+
+      {/* Leads já em "Proposta Enviada" no kanban, mas sem proposta criada aqui */}
+      {leadsSemProposta.length > 0 && (
+        <div
+          className="rounded-xl p-4"
+          style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)" }}
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-text-primary">
+                {leadsSemProposta.length} {leadsSemProposta.length === 1 ? "lead está" : "leads estão"} em &quot;Proposta Enviada&quot; no kanban, mas sem proposta cadastrada
+              </p>
+              <p className="text-xs text-text-muted mt-0.5">
+                Mover o card no kanban não cria o documento da proposta — por isso eles não aparecem nos números acima.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {leadsSemProposta.map((l) => (
+                  <Button
+                    key={l.id}
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() => router.push(`/proposals/new?leadId=${l.id}`)}
+                  >
+                    <Plus size={12} className="mr-1" />
+                    {l.title}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Trash2, ArrowLeft, Save, Send, Paperclip, X, FileText } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -56,6 +56,8 @@ interface Props {
 
 export function ProposalEditor({ proposal }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefillLeadId = searchParams.get("leadId");
   const { user } = useUser();
   const createProposal = useCreateProposal();
   const updateProposal = useUpdateProposal();
@@ -128,8 +130,11 @@ export function ProposalEditor({ proposal }: Props) {
       const d = new Date();
       d.setDate(d.getDate() + 30);
       setValue("valid_until", d.toISOString().split("T")[0]);
+      // Veio de "criar proposta pra esse lead" (atalho na tela de Propostas
+      // pros leads já em "Proposta Enviada" no kanban) — já deixa selecionado
+      if (prefillLeadId) setValue("lead_id", prefillLeadId);
     }
-  }, [proposal, reset, setValue]);
+  }, [proposal, reset, setValue, prefillLeadId]);
 
   // When lead is selected, auto-fill (skip auto-fill on initial edit load to preserve proposal data)
   useEffect(() => {
