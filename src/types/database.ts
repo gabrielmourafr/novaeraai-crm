@@ -37,9 +37,11 @@ export interface Database {
           email: string;
           avatar_url: string | null;
           role: "admin" | "member" | "developer";
+          // Email corporativo pra notificações; nulo = usa o email de login.
+          notification_email: string | null;
           created_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["users"]["Row"], "created_at">;
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["users"]["Row"], "created_at">>;
         Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
         Relationships: [
           { foreignKeyName: "users_org_id_fkey"; columns: ["org_id"]; referencedRelation: "organizations"; referencedColumns: ["id"] }

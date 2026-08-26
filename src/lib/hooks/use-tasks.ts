@@ -121,7 +121,7 @@ export const useCreateTask = () => {
         console.error("[useCreateTask] insert error:", error);
         throw error;
       }
-      return data;
+      return data as unknown as Task;
     },
     onSuccess: async (data) => {
       console.log("[useCreateTask] criada:", data);
@@ -134,6 +134,23 @@ export const useCreateTask = () => {
         qc.refetchQueries({ queryKey: ["activities"], type: "all" }),
       ]);
       toast.success("Tarefa criada!");
+
+      // Avisa o responsável por email. Fire-and-forget de propósito: se o
+      // envio falhar, a tarefa já está criada e o CRM não pode travar por
+      // causa disso — o erro fica no log do servidor.
+      if (data?.assignee_id) {
+        fetch("/api/tasks/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId: data.id }),
+        })
+          .then((r) => r.json())
+          .then((r) => {
+            if (r?.ok) toast.success(`Email enviado para ${r.to}`);
+            else console.warn("[useCreateTask] email não enviado:", r);
+          })
+          .catch((e) => console.warn("[useCreateTask] falha ao notificar:", e));
+      }
     },
     onError: (err: Error & { message?: string; code?: string }) => {
       console.error("[useCreateTask] error:", err);
