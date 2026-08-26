@@ -147,7 +147,7 @@ export function FinanceiroTab() {
   const [expValue, setExpValue] = useState("");
   const [expDueDate, setExpDueDate] = useState("");
   const [expStatus, setExpStatus] = useState<"pendente" | "pago" | "atrasado">("pendente");
-  const [expRecurrence, setExpRecurrence] = useState<"pontual" | "mensal" | "trimestral" | "anual">("pontual");
+  const [expRecurrence, setExpRecurrence] = useState<"pontual" | "semanal" | "quinzenal" | "mensal" | "trimestral" | "anual">("pontual");
   const [expType, setExpType] = useState<"" | "fixo" | "variavel">("");
   const [editingExpense, setEditingExpense] = useState<ExpenseWithCompany | undefined>();
   const [expenseTypeFilter, setExpenseTypeFilter] = useState<"all" | "fixo" | "variavel">("all");
@@ -733,6 +733,13 @@ export function FinanceiroTab() {
     setCreateExpenseOpen(true);
   };
 
+  // Frequências que um modelo recorrente sabe gerar sozinho (pontual,
+  // trimestral e anual não geram lançamento automático).
+  const isTemplateFrequency = (r: string) => r === "mensal" || r === "semanal" || r === "quinzenal";
+  // Semanal/quinzenal caem várias vezes no mês, então não têm "dia de
+  // cobrança" fixo — quem manda é o início do contrato.
+  const expIsSubMonthly = expRecurrence === "semanal" || expRecurrence === "quinzenal";
+
   const openEditExpense = (exp: ExpenseWithCompany) => {
     setExpDesc(exp.description);
     setExpCategory(exp.category);
@@ -760,15 +767,21 @@ export function FinanceiroTab() {
       toast.error("Selecione o cliente pra uma despesa recorrente vinculada a cliente.");
       return;
     }
+    // Semanal/quinzenal contam as ocorrências a partir do início do contrato —
+    // sem essa data o sistema não sabe em que dia cai cada lançamento.
+    if (expIsRecurringTemplate && expIsSubMonthly && !expContractStart) {
+      toast.error("Informe o início do contrato — é ele que define o dia das ocorrências semanais/quinzenais.");
+      return;
+    }
     const sharedFields = {
       description: expDesc,
       category: expCategory,
       value: parsedValue,
       status: expStatus,
-      recurrence: expIsRecurringTemplate ? "mensal" as const : expRecurrence,
+      recurrence: expIsRecurringTemplate && !isTemplateFrequency(expRecurrence) ? ("mensal" as const) : expRecurrence,
       expense_type: expType || null,
       company_id: expCompanyId !== "__none__" ? expCompanyId : null,
-      billing_day: expIsRecurringTemplate && expBillingDay ? parseInt(expBillingDay) : null,
+      billing_day: expIsRecurringTemplate && !expIsSubMonthly && expBillingDay ? parseInt(expBillingDay) : null,
       contract_start: expIsRecurringTemplate ? (expContractStart || null) : null,
       contract_end: expIsRecurringTemplate ? (expContractEnd || null) : null,
       is_recurring_template: expIsRecurringTemplate,
@@ -2655,7 +2668,7 @@ export function FinanceiroTab() {
               <span>
                 <span className="block text-sm font-medium text-text-primary">Despesa recorrente vinculada a cliente</span>
                 <span className="block text-xs text-text-muted mt-0.5">
-                  Ex: VPS de um cliente, cobrada todo mês num dia fixo, com prazo de contrato — o sistema gera o lançamento do mês sozinho.
+                  Ex: VPS de um cliente ou diarista — o sistema gera os lançamentos do mês sozinho, na frequência escolhida (mensal, semanal ou quinzenal).
                 </span>
               </span>
             </label>
@@ -2674,15 +2687,38 @@ export function FinanceiroTab() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label>Valor (R$) *</Label>
                     <Input value={expValue} onChange={(e) => setExpValue(e.target.value)} placeholder="0,00" required />
                   </div>
                   <div className="space-y-1.5">
+                    <Label>Frequência</Label>
+                    <Select
+                      value={isTemplateFrequency(expRecurrence) ? expRecurrence : "mensal"}
+                      onValueChange={(v) => setExpRecurrence(v as typeof expRecurrence)}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mensal">Mensal</SelectItem>
+                        <SelectItem value="semanal">Semanal</SelectItem>
+                        <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {expIsSubMonthly ? (
+                    <div className="space-y-1.5">
+                      <Label>Ocorrências</Label>
+                      <div className="h-9 flex items-center text-xs text-text-muted">
+                        {expRecurrence === "semanal" ? "A cada 7 dias" : "A cada 14 dias"}
+                      </div>
+                    </div>
+                  ) : (
+                  <div className="space-y-1.5">
                     <Label>Dia de cobrança</Label>
                     <Input type="number" min={1} max={31} value={expBillingDay} onChange={(e) => setExpBillingDay(e.target.value)} placeholder="10" />
                   </div>
+                  )}
                   <div className="space-y-1.5">
                     <Label>Categoria</Label>
                     <Select value={expCategory} onValueChange={(v) => setExpCategory(v as typeof expCategory)}>
@@ -2700,8 +2736,13 @@ export function FinanceiroTab() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label>Início do contrato</Label>
+                    <Label>Início do contrato{expIsSubMonthly ? " *" : ""}</Label>
                     <Input type="date" value={expContractStart} onChange={(e) => setExpContractStart(e.target.value)} />
+                    {expIsSubMonthly && (
+                      <p className="text-xs text-text-muted">
+                        É a partir dessa data que as ocorrências são contadas.
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Fim do contrato (opcional)</Label>
@@ -2766,6 +2807,8 @@ export function FinanceiroTab() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pontual">Pontual</SelectItem>
+                        <SelectItem value="semanal">Semanal</SelectItem>
+                        <SelectItem value="quinzenal">Quinzenal</SelectItem>
                         <SelectItem value="mensal">Mensal</SelectItem>
                         <SelectItem value="trimestral">Trimestral</SelectItem>
                         <SelectItem value="anual">Anual</SelectItem>

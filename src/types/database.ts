@@ -535,7 +535,7 @@ export interface Database {
           due_date: string | null;
           paid_at: string | null;
           status: "pendente" | "pago" | "atrasado";
-          recurrence: "pontual" | "mensal" | "trimestral" | "anual";
+          recurrence: "pontual" | "semanal" | "quinzenal" | "mensal" | "trimestral" | "anual";
           expense_type: "fixo" | "variavel" | null;
           company_id: string | null;
           billing_day: number | null;
