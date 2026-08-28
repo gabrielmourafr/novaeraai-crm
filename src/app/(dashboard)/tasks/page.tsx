@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { TaskForm, type TaskInitialData } from "@/components/forms/task-form";
 import { TasksKanbanBoard } from "@/components/tasks/tasks-kanban-board";
+import { TaskDetailDialog } from "@/components/tasks/task-detail-dialog";
 import { useAllTasks, useToggleTask, useUpdateTask, useDeleteTask, type TaskWithRelations } from "@/lib/hooks/use-tasks";
 import { useOrgUsers, useUser } from "@/lib/hooks/use-user";
 import { formatDate, formatInitials, formatDurationBetween, formatHoursDecimal, isPastDate } from "@/lib/utils/format";
@@ -36,12 +37,13 @@ const STATUS_TABS = [
 ];
 
 function TaskRow({
-  task, onEdit, onDelete, onToggle,
+  task, onEdit, onDelete, onToggle, onOpen,
 }: {
   task: TaskWithRelations;
   onEdit: (t: TaskWithRelations) => void;
   onDelete: (t: TaskWithRelations) => void;
   onToggle: (id: string, status: string) => void;
+  onOpen: (t: TaskWithRelations) => void;
 }) {
   const prio = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.media;
   const isOverdue = task.due_date && isPastDate(task.due_date) && task.status !== "concluida" && task.status !== "cancelada";
@@ -69,9 +71,13 @@ function TaskRow({
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${isDone ? "line-through" : ""}`} style={{ color: isDone ? "#3D5A78" : "#E2EBF8" }}>
+        <button
+          onClick={() => onOpen(task)}
+          className={`text-sm font-medium truncate text-left hover:underline ${isDone ? "line-through" : ""}`}
+          style={{ color: isDone ? "#3D5A78" : "#E2EBF8" }}
+        >
           {task.title}
-        </p>
+        </button>
         <div className="flex items-center gap-3 mt-0.5">
           <span className="text-[11px]" style={{ color: "#3D5A78" }}>
             {TYPE_LABELS[task.type] ?? task.type}
@@ -179,6 +185,7 @@ function TasksPageContent() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskInitialData | undefined>();
   const [deletingTask, setDeletingTask] = useState<TaskWithRelations | undefined>();
+  const [viewingTask, setViewingTask] = useState<TaskWithRelations | undefined>();
   const router = useRouter();
   const searchParams = useSearchParams();
   const focusTaskId = searchParams.get("task");
@@ -254,6 +261,15 @@ function TasksPageContent() {
     setEditingTask(undefined);
   };
 
+  // Depois de concluir/iniciar pelo painel, a lista refaz o fetch e o
+  // objeto antigo fica defasado — repõe pela versão nova.
+  useEffect(() => {
+    if (!viewingTask) return;
+    const fresh = allTasks.find((t) => t.id === viewingTask.id);
+    if (fresh && fresh !== viewingTask) setViewingTask(fresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allTasks]);
+
   // Link do email ("Abrir no CRM") chega como /tasks?task=<id>: abre o
   // painel daquela tarefa e limpa o parâmetro, pra fechar o painel não
   // reabrir sozinho no próximo render.
@@ -263,7 +279,7 @@ function TasksPageContent() {
     const target = allTasks.find((t) => t.id === focusTaskId);
     if (!target) return;
     openedFromUrl.current = true;
-    handleEdit(target);
+    setViewingTask(target);
     router.replace("/tasks", { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTaskId, allTasks]);
@@ -462,6 +478,7 @@ function TasksPageContent() {
                       task={task}
                       onEdit={handleEdit}
                       onDelete={setDeletingTask}
+                      onOpen={setViewingTask}
                       onToggle={(id, status) => toggleTask.mutate({ id, currentStatus: status as "pendente" | "concluida" | "em_andamento" | "cancelada" })}
                     />
                   ))}
@@ -472,6 +489,14 @@ function TasksPageContent() {
         ))}
       </Tabs>
       )}
+
+      {/* Visualização da tarefa (link do email e clique no título) */}
+      <TaskDetailDialog
+        task={viewingTask}
+        open={!!viewingTask}
+        onClose={() => setViewingTask(undefined)}
+        onEdit={(t) => { setViewingTask(undefined); handleEdit(t); }}
+      />
 
       {/* Task Form */}
       <TaskForm
