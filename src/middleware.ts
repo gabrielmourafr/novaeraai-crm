@@ -3,8 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_ROUTES = ["/login"];
 
-// Papel "developer": acesso restrito só à área de Entrega (Projetos e Documentos)
-const DEVELOPER_ALLOWED_PREFIXES = ["/projects", "/documents"];
+// Papel "developer": acesso restrito à área de Entrega (Projetos e Documentos)
+// + Tarefas, porque é pra lá que o email de "nova tarefa" aponta. Em /tasks
+// o developer só enxerga as tarefas atribuídas a ele (filtro na página).
+const DEVELOPER_ALLOWED_PREFIXES = ["/projects", "/documents", "/tasks"];
 const DEVELOPER_HOME = "/projects";
 
 function isPublicRoute(pathname: string) {

@@ -61,6 +61,18 @@ const NAV_GROUPS = [
   },
 ];
 
+// O que o papel "developer" vê: só a Entrega, mais Tarefas — é pra lá que
+// o email de nova tarefa leva, então precisa existir no menu também.
+const DEVELOPER_NAV_GROUPS = NAV_GROUPS
+  .filter((g) => g.label === "ENTREGA")
+  .map((g) => ({
+    ...g,
+    items: [
+      ...g.items,
+      ...NAV_GROUPS.flatMap((other) => other.items).filter((i) => i.href === "/tasks"),
+    ],
+  }));
+
 export const Sidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
@@ -108,7 +120,7 @@ export const Sidebar = () => {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 space-y-6">
-          {(user?.role === "developer" ? NAV_GROUPS.filter((g) => g.label === "ENTREGA") : NAV_GROUPS).map((group) => (
+          {(user?.role === "developer" ? DEVELOPER_NAV_GROUPS : NAV_GROUPS).map((group) => (
             <div key={group.label}>
               {!collapsed && (
                 <p className="px-4 mb-2 text-[11px] font-semibold tracking-[0.1em] text-sidebar-text/40 uppercase">

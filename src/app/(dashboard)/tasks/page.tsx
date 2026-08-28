@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckSquare, Plus, Search, Trash2, Edit2, AlertCircle, Clock, CheckCircle2, List, LayoutGrid,
 } from "lucide-react";
@@ -11,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { TaskForm, type TaskInitialData } from "@/components/forms/task-form";
 import { TasksKanbanBoard } from "@/components/tasks/tasks-kanban-board";
 import { useAllTasks, useToggleTask, useUpdateTask, useDeleteTask, type TaskWithRelations } from "@/lib/hooks/use-tasks";
-import { useOrgUsers } from "@/lib/hooks/use-user";
+import { useOrgUsers, useUser } from "@/lib/hooks/use-user";
 import { formatDate, formatInitials, formatDurationBetween, formatHoursDecimal, isPastDate } from "@/lib/utils/format";
 import { TASK_TYPES, TASK_COMPLEXITIES } from "@/lib/utils/constants";
 
@@ -170,7 +171,7 @@ function TaskRow({
   );
 }
 
-export default function TasksPage() {
+function TasksPageContent() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
@@ -178,9 +179,18 @@ export default function TasksPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskInitialData | undefined>();
   const [deletingTask, setDeletingTask] = useState<TaskWithRelations | undefined>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const focusTaskId = searchParams.get("task");
 
-  const { data: allTasks = [], isLoading } = useAllTasks({ search: search || undefined });
+  const { data: rawTasks = [], isLoading } = useAllTasks({ search: search || undefined });
   const { data: orgUsers = [] } = useOrgUsers();
+  const { user } = useUser();
+
+  // Developer só enxerga o que foi atribuído a ele — o acesso dele é a
+  // Entrega, e Tarefas entrou no menu só por causa do link do email.
+  const isDeveloper = user?.role === "developer";
+  const allTasks = isDeveloper ? rawTasks.filter((t) => t.assignee_id === user?.id) : rawTasks;
   const toggleTask = useToggleTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -243,6 +253,20 @@ export default function TasksPage() {
     setFormOpen(false);
     setEditingTask(undefined);
   };
+
+  // Link do email ("Abrir no CRM") chega como /tasks?task=<id>: abre o
+  // painel daquela tarefa e limpa o parâmetro, pra fechar o painel não
+  // reabrir sozinho no próximo render.
+  const openedFromUrl = useRef(false);
+  useEffect(() => {
+    if (openedFromUrl.current || !focusTaskId || allTasks.length === 0) return;
+    const target = allTasks.find((t) => t.id === focusTaskId);
+    if (!target) return;
+    openedFromUrl.current = true;
+    handleEdit(target);
+    router.replace("/tasks", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTaskId, allTasks]);
 
   return (
     <div className="space-y-6">
@@ -482,5 +506,15 @@ export default function TasksPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+// useSearchParams precisa de um boundary de Suspense pro Next conseguir
+// pré-renderizar a rota.
+export default function TasksPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-sm" style={{ color: "#3D5A78" }}>Carregando...</div>}>
+      <TasksPageContent />
+    </Suspense>
   );
 }

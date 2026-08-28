@@ -96,7 +96,8 @@ export async function POST(req: Request) {
     companyName: task.company?.name ?? null,
     projectName: task.project?.name ?? null,
     leadTitle: task.lead?.title ?? null,
-    taskUrl: `${appUrl}/tasks`,
+    // Link direto: /tasks?task=<id> abre a tarefa já com o painel dela aberto.
+    taskUrl: `${appUrl}/tasks?task=${task.id}`,
   };
 
   const { html, text } = buildTaskAssignedEmail(emailData);
