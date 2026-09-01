@@ -20,6 +20,10 @@ interface UseEventsFilters {
   year?: number;
   leadId?: string;
   projectId?: string;
+  // Janela livre (ISO), pra visões que não se encaixam num mês — o painel
+  // de disponibilidade, por exemplo, mostra semanas que cruzam meses.
+  from?: string;
+  to?: string;
 }
 
 export const useEvents = (filters?: UseEventsFilters) => {
@@ -37,7 +41,9 @@ export const useEvents = (filters?: UseEventsFilters) => {
         )
         .order("start_at", { ascending: true });
 
-      if (filters?.month !== undefined && filters?.year !== undefined) {
+      if (filters?.from && filters?.to) {
+        query = query.gte("start_at", filters.from).lte("start_at", filters.to);
+      } else if (filters?.month !== undefined && filters?.year !== undefined) {
         const start = new Date(filters.year, filters.month, 1);
         const end = new Date(filters.year, filters.month + 1, 0, 23, 59, 59);
         query = query

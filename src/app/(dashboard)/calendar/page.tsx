@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon,
   Clock, X, Tag, Briefcase, User, Trash2, Bell, CheckCircle2,
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AvailabilityBoard } from "@/components/calendar/availability-board";
 import { Badge } from "@/components/ui/badge";
 import {
   useEvents, useCreateEvent, useDeleteEvent, type EventWithRelations,
@@ -162,7 +163,26 @@ export default function CalendarPage() {
   const [newParticipants, setNewParticipants] = useState<string[]>([]);
   const [newProjectId, setNewProjectId] = useState("__none__");
 
+  const [comView, setComView] = useState<"calendario" | "pessoas">("calendario");
+
   const { data: events = [] } = useEvents({ month: comMonth, year: comYear });
+
+  // Janela ampla (mês passado até dois meses à frente) pro painel de
+  // disponibilidade, que navega por semana e cruza a virada de mês.
+  const availabilityWindow = useMemo(() => {
+    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 3, 0, 23, 59, 59);
+    return { from: from.toISOString(), to: to.toISOString() };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const { data: availabilityEvents = [] } = useEvents(availabilityWindow);
+
+  // Quem entra no painel de disponibilidade: quem faz agenda comercial.
+  // Developer não atende cliente, fica de fora.
+  const schedulableUsers = useMemo(
+    () => orgUsers.filter((u) => u.role !== "developer"),
+    [orgUsers]
+  );
   const createEvent = useCreateEvent();
   const deleteEvent = useDeleteEvent();
 
@@ -352,9 +372,28 @@ export default function CalendarPage() {
         {/* ─── ABA: AGENDA COMERCIAL ─── */}
         <TabsContent value="comercial">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm" style={{ color: "#7BA3C6" }}>
-              {events.length} evento{events.length !== 1 ? "s" : ""} em {MONTHS[comMonth]}
-            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid rgba(11,135,195,0.2)" }}>
+                {([["calendario", "Calendário"], ["pessoas", "Por pessoa"]] as const).map(([v, label]) => (
+                  <button
+                    key={v}
+                    onClick={() => setComView(v)}
+                    className="px-3 py-1.5 text-xs font-medium transition-colors"
+                    style={{
+                      background: comView === v ? "rgba(11,135,195,0.18)" : "transparent",
+                      color: comView === v ? "#0B87C3" : "#7BA3C6",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-sm" style={{ color: "#7BA3C6" }}>
+                {comView === "calendario"
+                  ? `${events.length} evento${events.length !== 1 ? "s" : ""} em ${MONTHS[comMonth]}`
+                  : "Horários livres por pessoa — clique num horário pra agendar"}
+              </p>
+            </div>
             <Button
               onClick={() => { setComFormOpen(true); setNewDate(toDateStr(comYear, comMonth, now.getDate())); }}
               className="flex items-center gap-2 text-sm font-semibold"
@@ -364,6 +403,20 @@ export default function CalendarPage() {
             </Button>
           </div>
 
+          {comView === "pessoas" && (
+            <AvailabilityBoard
+              users={schedulableUsers}
+              events={availabilityEvents}
+              onPickSlot={(userId, date, time) => {
+                setNewParticipants([userId]);
+                setNewDate(date);
+                setNewTime(time);
+                setComFormOpen(true);
+              }}
+            />
+          )}
+
+          {comView === "calendario" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Calendar */}
             <div className="lg:col-span-2 rounded-xl overflow-hidden" style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}>
@@ -459,6 +512,7 @@ export default function CalendarPage() {
               </div>
             </div>
           </div>
+          )}
         </TabsContent>
 
         {/* ─── ABA: FOLLOW-UP ─── */}

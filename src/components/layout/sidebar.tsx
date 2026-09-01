@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Target, Building2, FileText, Package,
   Rocket, FolderOpen, CheckSquare, Calendar, Settings,
-  ChevronLeft, ChevronRight, LogOut, TrendingUp, ShieldCheck, HeartHandshake,
+  ChevronLeft, ChevronRight, LogOut, ShieldCheck, HeartHandshake,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useSidebarStore } from "@/store/sidebar-store";
@@ -28,7 +28,6 @@ const NAV_GROUPS = [
       { icon: Target, label: "Leads & Contatos", href: "/leads" },
       { icon: Building2, label: "Empresas", href: "/companies" },
       { icon: FileText, label: "Propostas", href: "/proposals" },
-      { icon: TrendingUp, label: "Upsell", href: "/upsells" },
       { icon: Package, label: "Catálogo", href: "/catalog" },
     ],
   },
@@ -73,6 +72,22 @@ const DEVELOPER_NAV_GROUPS = NAV_GROUPS
     ],
   }));
 
+// O papel "comercial" vê o bloco Comercial inteiro, a Gestão e o Customer
+// Success (esse limitado à carteira dele, filtrado na própria página).
+const COMERCIAL_NAV_GROUPS = NAV_GROUPS.filter((g) =>
+  ["COMERCIAL", "GESTÃO", "SUCESSO DO CLIENTE"].includes(g.label)
+);
+
+const NAV_GROUPS_BY_ROLE: Record<string, typeof NAV_GROUPS> = {
+  developer: DEVELOPER_NAV_GROUPS,
+  comercial: COMERCIAL_NAV_GROUPS,
+};
+
+const HOME_BY_ROLE: Record<string, string> = {
+  developer: "/projects",
+  comercial: "/leads",
+};
+
 export const Sidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
@@ -105,7 +120,7 @@ export const Sidebar = () => {
           "flex items-center h-16 border-b border-sidebar-hover px-4 flex-shrink-0",
           collapsed ? "justify-center" : "justify-between"
         )}>
-          <Link href={user?.role === "developer" ? "/projects" : "/dashboard"} className="flex items-center">
+          <Link href={HOME_BY_ROLE[user?.role ?? ""] ?? "/dashboard"} className="flex items-center">
             <NovaeraLogo collapsed={collapsed} />
           </Link>
           {!collapsed && (
@@ -120,7 +135,7 @@ export const Sidebar = () => {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 space-y-6">
-          {(user?.role === "developer" ? DEVELOPER_NAV_GROUPS : NAV_GROUPS).map((group) => (
+          {(NAV_GROUPS_BY_ROLE[user?.role ?? ""] ?? NAV_GROUPS).map((group) => (
             <div key={group.label}>
               {!collapsed && (
                 <p className="px-4 mb-2 text-[11px] font-semibold tracking-[0.1em] text-sidebar-text/40 uppercase">

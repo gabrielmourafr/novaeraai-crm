@@ -24,17 +24,21 @@ const currentMonthKey = () => {
 // Carteira de clientes ativos (mensalidade), com o dado de Customer Success
 // já registrado em cada projeto (NPS, churn risk, CRs, upsell) e se o
 // check-in mensal desse mês já foi feito.
-export const useCsClients = () => {
+// ownerId restringe à carteira de um vendedor: os projetos em que ele
+// consta como "Fechado por". Usado pelo papel "comercial".
+export const useCsClients = (ownerId?: string) => {
   const supabase = createClient();
   return useQuery({
-    queryKey: ["customer-success", "clients"],
+    queryKey: ["customer-success", "clients", ownerId ?? "all"],
     queryFn: async () => {
-      const { data: projects, error: projectsError } = await supabase
+      let query = supabase
         .from("projects")
         .select(
           "id, name, company_id, company:companies(id, name), latest_nps_score, latest_meeting_date, crs_opened_count, crs_resolved_count, upsell_opportunity_note, churn_risk"
         )
         .eq("billing_status", "ativo");
+      if (ownerId) query = query.eq("closed_by_user_id", ownerId);
+      const { data: projects, error: projectsError } = await query;
       if (projectsError) throw projectsError;
 
       const rows = (projects ?? []) as unknown as {

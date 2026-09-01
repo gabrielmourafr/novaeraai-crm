@@ -3,11 +3,26 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_ROUTES = ["/login"];
 
-// Papel "developer": acesso restrito à área de Entrega (Projetos e Documentos)
-// + Tarefas, porque é pra lá que o email de "nova tarefa" aponta. Em /tasks
-// o developer só enxerga as tarefas atribuídas a ele (filtro na página).
-const DEVELOPER_ALLOWED_PREFIXES = ["/projects", "/documents", "/tasks"];
-const DEVELOPER_HOME = "/projects";
+// Papéis com acesso restrito a um recorte do sistema. Admin e member
+// continuam vendo tudo (não aparecem aqui).
+//
+// developer: área de Entrega (Projetos e Documentos) + Tarefas, porque é
+//   pra lá que o email de "nova tarefa" aponta. Em /tasks ele só enxerga
+//   as tarefas atribuídas a ele (filtro na página).
+// comercial: bloco Comercial inteiro + Gestão (Tarefas e Agenda) +
+//   Customer Success, esse último limitado à carteira dele.
+const ROLE_ALLOWED_PREFIXES: Record<string, string[]> = {
+  developer: ["/projects", "/documents", "/tasks"],
+  comercial: [
+    "/leads", "/contacts", "/companies", "/proposals", "/catalog",
+    "/tasks", "/calendar", "/customer-success",
+  ],
+};
+
+const ROLE_HOME: Record<string, string> = {
+  developer: "/projects",
+  comercial: "/leads",
+};
 
 function isPublicRoute(pathname: string) {
   if (PUBLIC_ROUTES.includes(pathname)) return true;
@@ -16,8 +31,10 @@ function isPublicRoute(pathname: string) {
   return false;
 }
 
-function isAllowedForDeveloper(pathname: string) {
-  return DEVELOPER_ALLOWED_PREFIXES.some(
+function isAllowedForRole(role: string, pathname: string) {
+  const prefixes = ROLE_ALLOWED_PREFIXES[role];
+  if (!prefixes) return true; // papel sem restrição (admin, member)
+  return prefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 }
@@ -60,17 +77,18 @@ export async function middleware(request: NextRequest) {
 
   if (user) {
     const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single();
-    const isDeveloper = profile?.role === "developer";
+    const role = profile?.role ?? "member";
+    const home = ROLE_HOME[role] ?? "/dashboard";
 
     if (PUBLIC_ROUTES.includes(pathname)) {
       const url = request.nextUrl.clone();
-      url.pathname = isDeveloper ? DEVELOPER_HOME : "/dashboard";
+      url.pathname = home;
       return NextResponse.redirect(url);
     }
 
-    if (isDeveloper && !isAllowedForDeveloper(pathname)) {
+    if (!isAllowedForRole(role, pathname)) {
       const url = request.nextUrl.clone();
-      url.pathname = DEVELOPER_HOME;
+      url.pathname = home;
       return NextResponse.redirect(url);
     }
   }

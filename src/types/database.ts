@@ -36,7 +36,7 @@ export interface Database {
           full_name: string;
           email: string;
           avatar_url: string | null;
-          role: "admin" | "member" | "developer";
+          role: "admin" | "member" | "developer" | "comercial";
           // Email corporativo pra notificações; nulo = usa o email de login.
           notification_email: string | null;
           created_at: string;

@@ -13,6 +13,7 @@ import { StatCard } from "@/components/shared/stat-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCsClients, useNpsTrend } from "@/lib/hooks/use-customer-success";
+import { useUser } from "@/lib/hooks/use-user";
 import { CHURN_RISK_OPTIONS } from "@/lib/utils/constants";
 import { formatDate } from "@/lib/utils/format";
 
@@ -29,7 +30,10 @@ const tooltipStyle = {
 const churnMeta = (risk: string | null) => CHURN_RISK_OPTIONS.find((o) => o.value === risk);
 
 export default function CustomerSuccessPage() {
-  const { data: clients = [], isLoading } = useCsClients();
+  const { user } = useUser();
+  // Vendedor vê só a carteira dele (projetos em que consta como "Fechado por").
+  const isComercial = user?.role === "comercial";
+  const { data: clients = [], isLoading } = useCsClients(isComercial ? user?.id : undefined);
   const { data: npsTrend = [] } = useNpsTrend();
 
   const stats = useMemo(() => {
