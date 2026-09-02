@@ -86,16 +86,31 @@ function googleEventToCrmFields(gEvent: GoogleEvent, orgId: string, userId: stri
 export async function pushCrmEventsToGoogle(admin: AdminClient, connection: Connection) {
   const accessToken = await getValidAccessToken(admin, connection);
 
-  const { data: pending, error } = await admin
+  // ATENÇÃO: não dá pra comparar duas COLUNAS num filtro do PostgREST — o
+  // lado direito é sempre tratado como literal. O filtro que existia aqui,
+  // `updated_at.gt.google_synced_at`, devolvia HTTP 400 ("invalid input
+  // syntax for type timestamp with time zone") em toda chamada, então esta
+  // função lançava sempre e nenhum evento jamais foi enviado ao Google.
+  // A comparação é feita em JS — o volume é de dezenas de linhas.
+  const { data: candidates, error } = await admin
     .from("events")
     .select("*")
     .eq("created_by", connection.user_id)
-    .eq("sync_source", "crm")
-    .or(`google_synced_at.is.null,updated_at.gt.google_synced_at`);
+    .eq("sync_source", "crm");
   if (error) throw error;
 
+  // Tolerância de 5s: gravar o carimbo dispara o trigger de updated_at, que
+  // ficaria alguns milissegundos à frente e reenviaria o mesmo evento em toda
+  // sincronização, pra sempre.
+  const RESYNC_TOLERANCE_MS = 5000;
+  const pending = ((candidates ?? []) as unknown as CrmEvent[]).filter(
+    (e) =>
+      !e.google_synced_at ||
+      new Date(e.updated_at).getTime() > new Date(e.google_synced_at).getTime() + RESYNC_TOLERANCE_MS
+  );
+
   let pushed = 0;
-  for (const event of (pending ?? []) as unknown as CrmEvent[]) {
+  for (const event of pending) {
     const body = crmEventToGoogleBody(event);
     let googleEvent: GoogleEvent;
     if (event.google_event_id) {

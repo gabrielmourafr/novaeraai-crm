@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -20,9 +20,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectSeparator,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { TASK_PRIORITIES, TASK_TYPES, TASK_TYPES_CURRENT, TASK_COMPLEXITIES, MAINTENANCE_TASK_TYPES, isLegacyTaskType } from "@/lib/utils/constants";
+import { TASK_PRIORITIES, TASK_TYPES_CURRENT, TASK_TYPES_LEGACY, TASK_COMPLEXITIES, MAINTENANCE_TASK_TYPES } from "@/lib/utils/constants";
 import { toast } from "sonner";
 import { useCreateTask, useUpdateTask } from "@/lib/hooks/use-tasks";
 import { useUser, useOrgUsers } from "@/lib/hooks/use-user";
@@ -43,12 +44,6 @@ const toLocalDate = (iso: string) => {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
-// Formato do <input type="datetime-local">: YYYY-MM-DDTHH:mm no fuso local.
-const toLocalDateTime = (iso: string) => {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
 const toLocalTime = (iso: string) => {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -66,9 +61,8 @@ const taskSchema = z.object({
   title: z.string().min(1, "Título é obrigatório"),
   type: z.string().min(1, "Tipo é obrigatório"),
   due_date: z.string().optional(),
-  due_time: z.string().optional(),
-  scheduled_start: z.string().optional(),
-  scheduled_end: z.string().optional(),
+  scheduled_start_time: z.string().optional(),
+  scheduled_end_time: z.string().optional(),
   priority: z.string().min(1, "Prioridade é obrigatória"),
   status: z.string().optional(),
   notes: z.string().optional(),
@@ -156,22 +150,15 @@ export const TaskForm = ({
   const companyIdValue = watch("company_id");
   const taskProjectIdValue = watch("task_project_id");
   const dueDateValue = watch("due_date");
-  const dueTimeValue = watch("due_time");
-  const scheduledStartValue = watch("scheduled_start");
-  const scheduledEndValue = watch("scheduled_end");
+  const startTimeValue = watch("scheduled_start_time");
+  const endTimeValue = watch("scheduled_end_time");
   const isMaintenanceType = MAINTENANCE_TASK_TYPES.has(typeValue ?? "");
 
-  // Na criação só os tipos atuais. Na edição, some o legado — menos o tipo
-  // que a própria tarefa já tem, senão o select abriria vazio.
-  const typeOptions = useMemo(() => {
-    if (!isEditing) return TASK_TYPES_CURRENT.slice();
-    const current: { value: string; label: string }[] = TASK_TYPES_CURRENT.slice();
-    if (typeValue && isLegacyTaskType(typeValue)) {
-      const legacy = TASK_TYPES.find((t) => t.value === typeValue);
-      if (legacy) current.push({ value: legacy.value, label: `${legacy.label} (legado)` });
-    }
-    return current;
-  }, [isEditing, typeValue]);
+  // Todos os tipos cadastrados ficam disponíveis — o que resolvia o problema
+  // do "todo mundo salva como follow-up sem querer" era tirar a pré-seleção,
+  // não esconder opção. Os antigos aparecem num grupo separado no fim.
+  const typeOptions = TASK_TYPES_CURRENT;
+  const legacyTypeOptions = TASK_TYPES_LEGACY;
 
   const { data: companyProjects = [] } = useProjects(
     companyIdValue && companyIdValue !== "__none__" ? { companyId: companyIdValue } : undefined
@@ -183,10 +170,13 @@ export const TaskForm = ({
         reset({
           title: initialData.title,
           type: initialData.type,
-          due_date: initialData.due_date ? toLocalDate(initialData.due_date) : "",
-          due_time: initialData.has_time && initialData.due_date ? toLocalTime(initialData.due_date) : "",
-          scheduled_start: initialData.scheduled_start ? toLocalDateTime(initialData.scheduled_start) : "",
-          scheduled_end: initialData.scheduled_end ? toLocalDateTime(initialData.scheduled_end) : "",
+          due_date: initialData.due_date
+            ? toLocalDate(initialData.due_date)
+            : initialData.scheduled_start
+            ? toLocalDate(initialData.scheduled_start)
+            : "",
+          scheduled_start_time: initialData.scheduled_start ? toLocalTime(initialData.scheduled_start) : "",
+          scheduled_end_time: initialData.scheduled_end ? toLocalTime(initialData.scheduled_end) : "",
           priority: initialData.priority,
           status: initialData.status,
           notes: initialData.notes ?? "",
@@ -201,9 +191,8 @@ export const TaskForm = ({
           title: "",
           type: "",
           due_date: "",
-          due_time: "",
-          scheduled_start: "",
-          scheduled_end: "",
+          scheduled_start_time: "",
+          scheduled_end_time: "",
           priority: "media",
           status: "pendente",
           notes: "",
@@ -217,26 +206,31 @@ export const TaskForm = ({
     }
   }, [open, initialData, reset, user]);
 
-  // due_date guarda data + hora (a coluna é TIMESTAMPTZ). Sem hora escolhida,
-  // grava só a data e has_time fica false — aí a tarefa não vira compromisso.
-  const buildDueDate = (date?: string, time?: string) => {
-    if (!date) return null;
-    if (!time) return date;
-    return new Date(`${date}T${time}`).toISOString();
-  };
-
   const onSubmit = async (values: TaskFormValues) => {
-    if (values.scheduled_end && !values.scheduled_start) {
-      toast.error("Defina o início antes do fim.");
+    if (values.scheduled_start_time && !values.due_date) {
+      toast.error("Escolha a data limite antes de agendar o horário.");
+      return;
+    }
+    if (values.scheduled_end_time && !values.scheduled_start_time) {
+      toast.error("Defina o horário de início antes do fim.");
       return;
     }
     if (
-      values.scheduled_start && values.scheduled_end &&
-      new Date(values.scheduled_end) <= new Date(values.scheduled_start)
+      values.scheduled_start_time && values.scheduled_end_time &&
+      values.scheduled_end_time <= values.scheduled_start_time
     ) {
       toast.error("O fim precisa ser depois do início.");
       return;
     }
+
+    // A janela agendada usa a mesma data do prazo — foi isso que o time pediu:
+    // escolher a data uma vez só e preencher apenas as horas.
+    const scheduledStart = values.due_date && values.scheduled_start_time
+      ? new Date(`${values.due_date}T${values.scheduled_start_time}`).toISOString()
+      : null;
+    const scheduledEnd = values.due_date && values.scheduled_end_time
+      ? new Date(`${values.due_date}T${values.scheduled_end_time}`).toISOString()
+      : null;
     const complexity = values.complexity && values.complexity !== "__none__" ? (values.complexity as TaskComplexity) : null;
     const estimatedHours = values.estimated_hours ? parseFloat(values.estimated_hours.replace(",", ".")) : null;
     const companyId = values.company_id && values.company_id !== "__none__" ? values.company_id : null;
@@ -247,10 +241,10 @@ export const TaskForm = ({
         id: initialData.id,
         title: values.title,
         type: values.type as TaskType,
-        due_date: buildDueDate(values.due_date, values.due_time),
-        has_time: Boolean(values.due_date && values.due_time),
-        scheduled_start: values.scheduled_start ? new Date(values.scheduled_start).toISOString() : null,
-        scheduled_end: values.scheduled_end ? new Date(values.scheduled_end).toISOString() : null,
+        due_date: values.due_date || null,
+        has_time: Boolean(scheduledStart),
+        scheduled_start: scheduledStart,
+        scheduled_end: scheduledEnd,
         priority: values.priority as TaskPriority,
         status: values.status as TaskStatus,
         notes: values.notes || null,
@@ -269,10 +263,10 @@ export const TaskForm = ({
       await createTask.mutateAsync({
         title: values.title,
         type: values.type as TaskType,
-        due_date: buildDueDate(values.due_date, values.due_time),
-        has_time: Boolean(values.due_date && values.due_time),
-        scheduled_start: values.scheduled_start ? new Date(values.scheduled_start).toISOString() : null,
-        scheduled_end: values.scheduled_end ? new Date(values.scheduled_end).toISOString() : null,
+        due_date: values.due_date || null,
+        has_time: Boolean(scheduledStart),
+        scheduled_start: scheduledStart,
+        scheduled_end: scheduledEnd,
         priority: values.priority as TaskPriority,
         status: "pendente",
         notes: values.notes || null,
@@ -317,6 +311,12 @@ export const TaskForm = ({
               </SelectTrigger>
               <SelectContent>
                 {typeOptions.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+                <SelectSeparator />
+                {legacyTypeOptions.map((t) => (
                   <SelectItem key={t.value} value={t.value}>
                     {t.label}
                   </SelectItem>
@@ -366,15 +366,10 @@ export const TaskForm = ({
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="task-due-date">Data Limite</Label>
               <Input id="task-due-date" type="date" {...register("due_date")} />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="task-due-time">Horário</Label>
-              <Input id="task-due-time" type="time" disabled={!dueDateValue} {...register("due_time")} />
             </div>
 
             <div className="space-y-1.5">
@@ -405,35 +400,35 @@ export const TaskForm = ({
             <div>
               <p className="text-sm font-medium" style={{ color: "#E2EBF8" }}>Agendar na agenda</p>
               <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
-                Com início preenchido, a tarefa vira compromisso na agenda do responsável —
-                e no Google Calendar dele, se estiver conectado. Diferente do prazo acima:
-                dá pra executar quarta 14h e ter prazo sexta.
+                Usa a data limite acima — preencha só os horários. Com início definido, a
+                tarefa vira compromisso na agenda do responsável, e no Google Calendar dele
+                se estiver conectado.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="task-sched-start">Início</Label>
-                <Input id="task-sched-start" type="datetime-local" {...register("scheduled_start")} />
+                <Input id="task-sched-start" type="time" disabled={!dueDateValue} {...register("scheduled_start_time")} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="task-sched-end">Fim</Label>
                 <Input
                   id="task-sched-end"
-                  type="datetime-local"
-                  min={scheduledStartValue || undefined}
-                  disabled={!scheduledStartValue}
-                  {...register("scheduled_end")}
+                  type="time"
+                  min={startTimeValue || undefined}
+                  disabled={!startTimeValue}
+                  {...register("scheduled_end_time")}
                 />
               </div>
             </div>
-            {scheduledStartValue && !scheduledEndValue && (
+            {!dueDateValue && (
               <p className="text-xs" style={{ color: "#7BA3C6" }}>
-                Sem fim definido, usa as horas estimadas — ou 1 hora.
+                Escolha a data limite acima pra liberar os horários.
               </p>
             )}
-            {dueDateValue && dueTimeValue && !scheduledStartValue && (
+            {startTimeValue && !endTimeValue && (
               <p className="text-xs" style={{ color: "#7BA3C6" }}>
-                Sem início, o horário do prazo acima é usado como começo do compromisso.
+                Sem fim definido, usa as horas estimadas — ou 1 hora.
               </p>
             )}
           </div>
