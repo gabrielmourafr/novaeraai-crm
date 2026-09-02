@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Clock, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, CalendarDays, Users } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatInitials } from "@/lib/utils/format";
 import type { EventWithRelations } from "@/lib/hooks/use-events";
@@ -31,6 +31,7 @@ interface Busy {
   start: number; // ms
   end: number;   // ms
   title: string;
+  isTask: boolean; // espelho de tarefa com horário, não reunião
 }
 
 function startOfWeek(base: Date) {
@@ -82,7 +83,7 @@ export function AvailabilityBoard({
 }: {
   users: AvailabilityUser[];
   events: EventWithRelations[];
-  onPickSlot: (userId: string, date: string, time: string) => void;
+  onPickSlot: (userIds: string[], date: string, time: string) => void;
 }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [duration, setDuration] = useState("60");
@@ -117,9 +118,10 @@ export function AvailabilityBoard({
         ...(ev.participant_ids ?? []),
         ...(ev.created_by ? [ev.created_by] : []),
       ]));
+      const isTask = Boolean(ev.task_id);
       for (const pid of people) {
         const list = map.get(pid);
-        if (list) list.push({ start, end, title: ev.title });
+        if (list) list.push({ start, end, title: ev.title, isTask });
       }
     }
     return map;
@@ -193,6 +195,60 @@ export function AvailabilityBoard({
         })}
       </div>
 
+      {/* Horários em que TODAS as pessoas visíveis estão livres — o caso
+          real de closer + vendedor entrando na mesma call. */}
+      {visibleUsers.length > 1 && (
+        <div
+          className="grid border-b"
+          style={{ gridTemplateColumns: "160px repeat(5, 1fr)", borderColor: "rgba(11,135,195,0.15)", background: "rgba(34,197,94,0.04)" }}
+        >
+          <div className="px-4 py-3 flex items-center gap-2">
+            <Users size={14} style={{ color: "#4ade80" }} />
+            <span className="text-xs font-semibold" style={{ color: "#4ade80" }}>Todos livres</span>
+          </div>
+          {weekDays.map((day, i) => {
+            const perUser = visibleUsers.map((u) => {
+              const dayBusy = (busyByUser.get(u.id) ?? []).filter(
+                (b) => isoLocal(new Date(b.start)) === isoLocal(day)
+              );
+              return new Set(freeSlots(day, dayBusy, durationMin).map((d) => d.getTime()));
+            });
+            const common = perUser.length
+              ? Array.from(perUser[0]).filter((t) => perUser.every((set) => set.has(t))).sort((a, b) => a - b)
+              : [];
+
+            return (
+              <div key={i} className="px-1.5 py-2 border-l" style={{ borderColor: "rgba(11,135,195,0.06)" }}>
+                {common.length === 0 ? (
+                  <p className="text-[10px] text-center py-1" style={{ color: "#3D5A78" }}>—</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1">
+                    {common.slice(0, 6).map((t, si) => (
+                      <button
+                        key={si}
+                        onClick={() => {
+                          const d = new Date(t);
+                          onPickSlot(visibleUsers.map((u) => u.id), isoLocal(d), hhmm(d));
+                        }}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors hover:brightness-125"
+                        style={{ background: "rgba(34,197,94,0.22)", color: "#4ade80" }}
+                      >
+                        {hhmm(new Date(t))}
+                      </button>
+                    ))}
+                    {common.length > 6 && (
+                      <span className="text-[10px] px-1 py-0.5" style={{ color: "#3D5A78" }}>
+                        +{common.length - 6}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Uma linha por pessoa */}
       {visibleUsers.length === 0 ? (
         <div className="p-10 text-center text-sm" style={{ color: "#3D5A78" }}>
@@ -230,8 +286,12 @@ export function AvailabilityBoard({
                       <div
                         key={bi}
                         className="px-1.5 py-1 rounded text-[10px] truncate"
-                        style={{ background: "rgba(239,68,68,0.12)", color: "#fca5a5" }}
-                        title={`${hhmm(new Date(b.start))} — ${b.title}`}
+                        style={
+                          b.isTask
+                            ? { background: "rgba(245,158,11,0.12)", color: "#fcd34d" }
+                            : { background: "rgba(239,68,68,0.12)", color: "#fca5a5" }
+                        }
+                        title={`${hhmm(new Date(b.start))} — ${b.title}${b.isTask ? " (tarefa)" : ""}`}
                       >
                         {hhmm(new Date(b.start))} {b.title}
                       </div>
@@ -247,7 +307,7 @@ export function AvailabilityBoard({
                         {slots.slice(0, 6).map((s, si) => (
                           <button
                             key={si}
-                            onClick={() => onPickSlot(u.id, isoLocal(s), hhmm(s))}
+                            onClick={() => onPickSlot([u.id], isoLocal(s), hhmm(s))}
                             className="px-1.5 py-0.5 rounded text-[10px] transition-colors hover:brightness-125"
                             style={{ background: "rgba(34,197,94,0.12)", color: "#4ade80" }}
                           >
@@ -275,7 +335,10 @@ export function AvailabilityBoard({
           <span className="w-2.5 h-2.5 rounded" style={{ background: "rgba(34,197,94,0.4)" }} /> Livre — clique pra agendar
         </span>
         <span className="flex items-center gap-1.5 text-[11px]" style={{ color: "#7BA3C6" }}>
-          <span className="w-2.5 h-2.5 rounded" style={{ background: "rgba(239,68,68,0.4)" }} /> Ocupado
+          <span className="w-2.5 h-2.5 rounded" style={{ background: "rgba(239,68,68,0.4)" }} /> Reunião
+        </span>
+        <span className="flex items-center gap-1.5 text-[11px]" style={{ color: "#7BA3C6" }}>
+          <span className="w-2.5 h-2.5 rounded" style={{ background: "rgba(245,158,11,0.4)" }} /> Tarefa com horário
         </span>
         <span className="flex items-center gap-1.5 text-[11px] ml-auto" style={{ color: "#3D5A78" }}>
           <Clock size={11} /> Expediente {WORK_START_HOUR}h–{WORK_END_HOUR}h, almoço {LUNCH_START_HOUR}h–{LUNCH_END_HOUR}h

@@ -575,13 +575,16 @@ export interface Database {
           notes: string | null;
           complexity: "baixa" | "media" | "alta" | null;
           estimated_hours: number | null;
+          // true quando o usuário escolheu horário (não só data) — a tarefa
+          // vira compromisso na agenda e no Google Calendar do responsável.
+          has_time: boolean;
           started_at: string | null;
           completed_at: string | null;
           created_at: string;
           updated_at: string;
           created_by: string | null;
         };
-        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["tasks"]["Row"], "id" | "created_at" | "updated_at" | "started_at" | "completed_at">>;
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["tasks"]["Row"], "id" | "created_at" | "updated_at" | "started_at" | "completed_at" | "has_time">> & { has_time?: boolean };
         Update: Partial<Database["public"]["Tables"]["tasks"]["Insert"]>;
         Relationships: [];
       };
@@ -603,6 +606,8 @@ export interface Database {
           google_event_id: string | null;
           google_synced_at: string | null;
           sync_source: "crm" | "google";
+          // Preenchido quando o evento é o espelho de uma tarefa com horário.
+          task_id: string | null;
           created_at: string;
           updated_at: string;
           created_by: string | null;

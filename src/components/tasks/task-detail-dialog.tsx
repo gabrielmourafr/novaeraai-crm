@@ -4,7 +4,7 @@ import { Calendar, Clock, User, Building2, Rocket, Target, AlertCircle, CheckCir
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToggleTask, useUpdateTask, type TaskWithRelations } from "@/lib/hooks/use-tasks";
-import { formatDateTime, formatHoursDecimal, isPastDate } from "@/lib/utils/format";
+import { formatDate, formatDateTime, formatHoursDecimal, isPastDate } from "@/lib/utils/format";
 import { TASK_TYPES, TASK_COMPLEXITIES } from "@/lib/utils/constants";
 
 // Visualização da tarefa — é o que abre pelo link do email ("Abrir no CRM")
@@ -109,7 +109,13 @@ export function TaskDetailDialog({
             <Field
               icon={Calendar}
               label="Prazo"
-              value={task.due_date ? formatDateTime(task.due_date) : "Sem prazo"}
+              value={
+                task.due_date
+                  ? task.has_time
+                    ? `${formatDateTime(task.due_date)} · na agenda`
+                    : formatDate(task.due_date)
+                  : "Sem prazo"
+              }
               valueColor={isOverdue ? "#ef4444" : undefined}
             />
             <Field icon={Target} label="Tipo" value={TYPE_LABELS[task.type] ?? task.type} />

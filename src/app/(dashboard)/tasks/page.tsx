@@ -127,7 +127,11 @@ function TaskRow({
       {/* Due date */}
       <div className="hidden sm:flex items-center gap-1 text-xs flex-shrink-0" style={{ color: isOverdue ? "#ef4444" : "#7BA3C6" }}>
         {isOverdue ? <AlertCircle size={11} /> : <Clock size={11} />}
-        {task.due_date ? formatDate(task.due_date) : "—"}
+        {task.due_date
+          ? task.has_time
+            ? `${formatDate(task.due_date)} ${new Date(task.due_date).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+            : formatDate(task.due_date)
+          : "—"}
       </div>
 
       {/* Complexity badge */}
@@ -311,6 +315,7 @@ function TasksPageContent() {
       title: task.title,
       type: task.type,
       due_date: task.due_date,
+      has_time: task.has_time,
       priority: task.priority,
       status: task.status,
       notes: task.notes,

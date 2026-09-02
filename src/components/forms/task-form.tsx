@@ -36,6 +36,19 @@ type TaskStatus = Database["public"]["Tables"]["tasks"]["Row"]["status"];
 type TaskType = Database["public"]["Tables"]["tasks"]["Row"]["type"];
 type TaskComplexity = Database["public"]["Tables"]["tasks"]["Row"]["complexity"];
 
+// due_date é TIMESTAMPTZ: separa em data e hora no fuso local, senão o
+// input mostraria o horário em UTC.
+const toLocalDate = (iso: string) => {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+const toLocalTime = (iso: string) => {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
   { value: "pendente", label: "Pendente" },
   { value: "em_andamento", label: "Em Andamento" },
@@ -47,6 +60,7 @@ const taskSchema = z.object({
   title: z.string().min(1, "Título é obrigatório"),
   type: z.string().min(1, "Tipo é obrigatório"),
   due_date: z.string().optional(),
+  due_time: z.string().optional(),
   priority: z.string().min(1, "Prioridade é obrigatória"),
   status: z.string().optional(),
   notes: z.string().optional(),
@@ -64,6 +78,7 @@ export interface TaskInitialData {
   title: string;
   type: string;
   due_date: string | null;
+  has_time?: boolean;
   priority: string;
   status: string;
   notes: string | null;
@@ -130,6 +145,8 @@ export const TaskForm = ({
   const complexityValue = watch("complexity");
   const companyIdValue = watch("company_id");
   const taskProjectIdValue = watch("task_project_id");
+  const dueDateValue = watch("due_date");
+  const dueTimeValue = watch("due_time");
   const isMaintenanceType = MAINTENANCE_TASK_TYPES.has(typeValue ?? "");
 
   // Na criação só os tipos atuais. Na edição, some o legado — menos o tipo
@@ -154,9 +171,8 @@ export const TaskForm = ({
         reset({
           title: initialData.title,
           type: initialData.type,
-          due_date: initialData.due_date
-            ? initialData.due_date.split("T")[0]
-            : "",
+          due_date: initialData.due_date ? toLocalDate(initialData.due_date) : "",
+          due_time: initialData.has_time && initialData.due_date ? toLocalTime(initialData.due_date) : "",
           priority: initialData.priority,
           status: initialData.status,
           notes: initialData.notes ?? "",
@@ -171,6 +187,7 @@ export const TaskForm = ({
           title: "",
           type: "",
           due_date: "",
+          due_time: "",
           priority: "media",
           status: "pendente",
           notes: "",
@@ -184,6 +201,14 @@ export const TaskForm = ({
     }
   }, [open, initialData, reset, user]);
 
+  // due_date guarda data + hora (a coluna é TIMESTAMPTZ). Sem hora escolhida,
+  // grava só a data e has_time fica false — aí a tarefa não vira compromisso.
+  const buildDueDate = (date?: string, time?: string) => {
+    if (!date) return null;
+    if (!time) return date;
+    return new Date(`${date}T${time}`).toISOString();
+  };
+
   const onSubmit = async (values: TaskFormValues) => {
     const complexity = values.complexity && values.complexity !== "__none__" ? (values.complexity as TaskComplexity) : null;
     const estimatedHours = values.estimated_hours ? parseFloat(values.estimated_hours.replace(",", ".")) : null;
@@ -195,7 +220,8 @@ export const TaskForm = ({
         id: initialData.id,
         title: values.title,
         type: values.type as TaskType,
-        due_date: values.due_date || null,
+        due_date: buildDueDate(values.due_date, values.due_time),
+        has_time: Boolean(values.due_date && values.due_time),
         priority: values.priority as TaskPriority,
         status: values.status as TaskStatus,
         notes: values.notes || null,
@@ -214,7 +240,8 @@ export const TaskForm = ({
       await createTask.mutateAsync({
         title: values.title,
         type: values.type as TaskType,
-        due_date: values.due_date || null,
+        due_date: buildDueDate(values.due_date, values.due_time),
+        has_time: Boolean(values.due_date && values.due_time),
         priority: values.priority as TaskPriority,
         status: "pendente",
         notes: values.notes || null,
@@ -308,10 +335,15 @@ export const TaskForm = ({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="task-due-date">Data Limite</Label>
               <Input id="task-due-date" type="date" {...register("due_date")} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="task-due-time">Horário</Label>
+              <Input id="task-due-time" type="time" disabled={!dueDateValue} {...register("due_time")} />
             </div>
 
             <div className="space-y-1.5">
@@ -337,6 +369,13 @@ export const TaskForm = ({
               {errors.priority && <p className="text-xs text-danger">{errors.priority.message}</p>}
             </div>
           </div>
+
+          {dueDateValue && dueTimeValue && (
+            <p className="text-xs -mt-1" style={{ color: "#7BA3C6" }}>
+              Com horário definido, essa tarefa vira um compromisso na agenda do
+              responsável — e no Google Calendar dele, se estiver conectado.
+            </p>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">

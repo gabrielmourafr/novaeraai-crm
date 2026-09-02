@@ -407,8 +407,8 @@ export default function CalendarPage() {
             <AvailabilityBoard
               users={schedulableUsers}
               events={availabilityEvents}
-              onPickSlot={(userId, date, time) => {
-                setNewParticipants([userId]);
+              onPickSlot={(userIds, date, time) => {
+                setNewParticipants(userIds);
                 setNewDate(date);
                 setNewTime(time);
                 setComFormOpen(true);
