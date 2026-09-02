@@ -17,7 +17,7 @@ import { useProposals } from "@/lib/hooks/use-proposals";
 import { useAllTasks } from "@/lib/hooks/use-tasks";
 import { useRevenues, useExpenses } from "@/lib/hooks/use-finance";
 import { useGoal, useUpsertGoal } from "@/lib/hooks/use-goals";
-import { useBillingAlerts } from "@/lib/hooks/use-billing-alerts";
+import { useBillingAlerts, DUE_SOON_DAYS } from "@/lib/hooks/use-billing-alerts";
 import { TeamGoalsCard } from "@/components/dashboard/team-goals-card";
 import { useUser } from "@/lib/hooks/use-user";
 import { formatCurrency, formatDate, isPastDate, parseCurrencyInput } from "@/lib/utils/format";
@@ -171,7 +171,7 @@ export function OverviewTab() {
             {dueSoonAlerts.length > 0 && (
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#EF4444" }}>
-                  Vencendo nos próximos 7 dias — emitir boleto
+                  Vencendo nos próximos {DUE_SOON_DAYS} dias — emitir boleto
                 </p>
                 <div className="space-y-1.5">
                   {dueSoonAlerts.map((a) => (
@@ -186,6 +186,14 @@ export function OverviewTab() {
                         <p className="text-[10px] mt-0.5 truncate" style={{ color: "#7BA3C6" }}>
                           {a.description} · {a.daysUntil === 0 ? "Vence hoje" : `Vence em ${a.daysUntil}d`} · {formatCurrency(a.amount)}
                         </p>
+                        {a.forecast && (
+                          <span
+                            className="inline-block mt-1 text-[9px] px-1.5 py-0.5 rounded"
+                            style={{ background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}
+                          >
+                            Previsto — ainda não lançado
+                          </span>
+                        )}
                       </div>
                       <ReceiptText size={12} className="text-red-400 flex-shrink-0" />
                     </Link>

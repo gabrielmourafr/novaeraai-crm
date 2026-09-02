@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Clock, CalendarDays, Users } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatInitials } from "@/lib/utils/format";
 import type { EventWithRelations } from "@/lib/hooks/use-events";
 
@@ -86,6 +87,12 @@ export function AvailabilityBoard({
   onPickSlot: (userIds: string[], date: string, time: string) => void;
 }) {
   const [weekOffset, setWeekOffset] = useState(0);
+  const [detail, setDetail] = useState<{
+    user: AvailabilityUser;
+    day: Date;
+    slots: Date[];
+    busy: Busy[];
+  } | null>(null);
   const [duration, setDuration] = useState("60");
   const [personFilter, setPersonFilter] = useState("all");
 
@@ -279,49 +286,36 @@ export function AvailabilityBoard({
                   .sort((a, b) => a.start - b.start);
                 const slots = freeSlots(day, dayBusy, durationMin);
 
+                // A grade agora é só o resumo — a lista completa de horários
+                // fica no detalhe, senão a semana inteira vira um paredão de
+                // chips ilegível.
                 return (
-                  <div key={i} className="px-1.5 py-2 space-y-1 border-l" style={{ borderColor: "rgba(11,135,195,0.06)" }}>
-                    {/* Compromissos já marcados */}
-                    {dayBusy.map((b, bi) => (
-                      <div
-                        key={bi}
-                        className="px-1.5 py-1 rounded text-[10px] truncate"
-                        style={
-                          b.isTask
-                            ? { background: "rgba(245,158,11,0.12)", color: "#fcd34d" }
-                            : { background: "rgba(239,68,68,0.12)", color: "#fca5a5" }
-                        }
-                        title={`${hhmm(new Date(b.start))} — ${b.title}${b.isTask ? " (tarefa)" : ""}`}
-                      >
-                        {hhmm(new Date(b.start))} {b.title}
-                      </div>
-                    ))}
-
-                    {/* Horários livres, clicáveis */}
+                  <button
+                    key={i}
+                    onClick={() => setDetail({ user: u, day, slots, busy: dayBusy })}
+                    className="px-2 py-2.5 border-l text-left transition-colors hover:bg-white/[0.03]"
+                    style={{ borderColor: "rgba(11,135,195,0.06)" }}
+                  >
                     {slots.length === 0 ? (
-                      <p className="text-[10px] text-center py-1" style={{ color: "#3D5A78" }}>
-                        {dayBusy.length > 0 ? "sem espaço" : "—"}
+                      <p className="text-[11px]" style={{ color: "#3D5A78" }}>
+                        {dayBusy.length > 0 ? "Sem espaço" : "—"}
                       </p>
                     ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {slots.slice(0, 6).map((s, si) => (
-                          <button
-                            key={si}
-                            onClick={() => onPickSlot([u.id], isoLocal(s), hhmm(s))}
-                            className="px-1.5 py-0.5 rounded text-[10px] transition-colors hover:brightness-125"
-                            style={{ background: "rgba(34,197,94,0.12)", color: "#4ade80" }}
-                          >
-                            {hhmm(s)}
-                          </button>
-                        ))}
-                        {slots.length > 6 && (
-                          <span className="text-[10px] px-1 py-0.5" style={{ color: "#3D5A78" }}>
-                            +{slots.length - 6}
-                          </span>
-                        )}
-                      </div>
+                      <p className="text-[11px] font-medium" style={{ color: "#4ade80" }}>
+                        {slots.length} {slots.length === 1 ? "horário" : "horários"}
+                      </p>
                     )}
-                  </div>
+                    {dayBusy.length > 0 && (
+                      <p className="text-[10px] mt-0.5" style={{ color: "#fca5a5" }}>
+                        {dayBusy.length} ocupado{dayBusy.length > 1 ? "s" : ""}
+                      </p>
+                    )}
+                    {slots.length > 0 && (
+                      <p className="text-[10px] mt-0.5" style={{ color: "#3D5A78" }}>
+                        a partir de {hhmm(slots[0])}
+                      </p>
+                    )}
+                  </button>
                 );
               })}
             </div>
@@ -329,10 +323,87 @@ export function AvailabilityBoard({
         })
       )}
 
+      {/* Detalhe do dia de uma pessoa: a lista completa de horários vive aqui */}
+      <Dialog open={!!detail} onOpenChange={(v) => !v && setDetail(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{detail?.user.full_name}</DialogTitle>
+            <DialogDescription>
+              {detail &&
+                detail.day.toLocaleDateString("pt-BR", {
+                  weekday: "long", day: "2-digit", month: "long",
+                })}
+              {" · blocos de "}
+              {durationMin >= 60 ? `${durationMin / 60}h` : `${durationMin}min`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {detail && (
+            <div className="space-y-4 mt-1">
+              {detail.busy.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#3D5A78" }}>
+                    Ocupado
+                  </p>
+                  <div className="space-y-1">
+                    {detail.busy.map((b, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded text-xs"
+                        style={
+                          b.isTask
+                            ? { background: "rgba(245,158,11,0.1)", color: "#fcd34d" }
+                            : { background: "rgba(239,68,68,0.1)", color: "#fca5a5" }
+                        }
+                      >
+                        <span className="font-medium tabular-nums">
+                          {hhmm(new Date(b.start))}–{hhmm(new Date(b.end))}
+                        </span>
+                        <span className="truncate" style={{ color: "#C3D4E8" }}>{b.title}</span>
+                        {b.isTask && (
+                          <span className="ml-auto text-[10px] flex-shrink-0" style={{ color: "#3D5A78" }}>tarefa</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#3D5A78" }}>
+                  Livre — clique pra agendar
+                </p>
+                {detail.slots.length === 0 ? (
+                  <p className="text-xs py-2" style={{ color: "#3D5A78" }}>
+                    Nenhum horário livre com essa duração nesse dia.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {detail.slots.map((sl, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          onPickSlot([detail.user.id], isoLocal(sl), hhmm(sl));
+                          setDetail(null);
+                        }}
+                        className="px-2 py-1.5 rounded text-xs font-medium tabular-nums transition-colors hover:brightness-125"
+                        style={{ background: "rgba(34,197,94,0.14)", color: "#4ade80" }}
+                      >
+                        {hhmm(sl)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Legenda */}
       <div className="flex flex-wrap items-center gap-4 px-5 py-3 border-t" style={{ borderColor: "rgba(11,135,195,0.1)" }}>
         <span className="flex items-center gap-1.5 text-[11px]" style={{ color: "#7BA3C6" }}>
-          <span className="w-2.5 h-2.5 rounded" style={{ background: "rgba(34,197,94,0.4)" }} /> Livre — clique pra agendar
+          <span className="w-2.5 h-2.5 rounded" style={{ background: "rgba(34,197,94,0.4)" }} /> Clique num dia pra ver os horários
         </span>
         <span className="flex items-center gap-1.5 text-[11px]" style={{ color: "#7BA3C6" }}>
           <span className="w-2.5 h-2.5 rounded" style={{ background: "rgba(239,68,68,0.4)" }} /> Reunião
