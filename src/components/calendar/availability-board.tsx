@@ -15,13 +15,27 @@ import type { BusyBlock, CalendarCoverage } from "@/lib/hooks/use-busy-blocks";
 // Clicar num horário livre abre o formulário de evento já preenchido com
 // aquela pessoa, data e hora.
 
-const WORK_START_HOUR = 9;   // 09:00
-const WORK_END_HOUR = 18;    // 18:00
-const LUNCH_START_HOUR = 12; // bloqueia 12:00–13:00
-const LUNCH_END_HOUR = 13;
-const SLOT_STEP_MIN = 30;    // grade de 30 em 30
+// Expediente por dia da semana (0 = domingo). Fora disso, sem atendimento.
+interface WorkWindow {
+  startHour: number;
+  endHour: number;
+  lunchStartHour?: number;
+  lunchEndHour?: number;
+}
 
-const WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex"];
+const WEEK_SCHEDULE: Record<number, WorkWindow | undefined> = {
+  1: { startHour: 8, endHour: 20, lunchStartHour: 12, lunchEndHour: 13 },
+  2: { startHour: 8, endHour: 20, lunchStartHour: 12, lunchEndHour: 13 },
+  3: { startHour: 8, endHour: 20, lunchStartHour: 12, lunchEndHour: 13 },
+  4: { startHour: 8, endHour: 20, lunchStartHour: 12, lunchEndHour: 13 },
+  5: { startHour: 8, endHour: 20, lunchStartHour: 12, lunchEndHour: 13 },
+  6: { startHour: 9, endHour: 12 }, // sábado, sem almoço na janela
+};
+
+const SLOT_STEP_MIN = 30; // grade de 30 em 30
+
+const WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const WEEK_DAY_COUNT = WEEKDAY_LABELS.length;
 
 const BUSY_STYLE: Record<BusyKind, { background: string; color: string }> = {
   reuniao: { background: "rgba(239,68,68,0.1)", color: "#fca5a5" },
@@ -68,14 +82,17 @@ function freeSlots(day: Date, busy: Busy[], durationMin: number) {
   const slots: Date[] = [];
   const now = Date.now();
 
+  const window = WEEK_SCHEDULE[day.getDay()];
+  if (!window) return slots;
+
   // Evento de dia inteiro zera o dia: o Google manda só a data, sem hora, e
   // qualquer conversão de fuso aqui erraria a janela por algumas horas.
   if (busy.some((b) => b.allDay)) return slots;
 
   const cursor = new Date(day);
-  cursor.setHours(WORK_START_HOUR, 0, 0, 0);
+  cursor.setHours(window.startHour, 0, 0, 0);
   const dayEnd = new Date(day);
-  dayEnd.setHours(WORK_END_HOUR, 0, 0, 0);
+  dayEnd.setHours(window.endHour, 0, 0, 0);
 
   while (cursor.getTime() + durationMin * 60000 <= dayEnd.getTime()) {
     const slotStart = cursor.getTime();
@@ -83,7 +100,9 @@ function freeSlots(day: Date, busy: Busy[], durationMin: number) {
 
     const startHour = cursor.getHours() + cursor.getMinutes() / 60;
     const endHour = startHour + durationMin / 60;
-    const hitsLunch = startHour < LUNCH_END_HOUR && endHour > LUNCH_START_HOUR;
+    const hitsLunch =
+      window.lunchStartHour !== undefined && window.lunchEndHour !== undefined &&
+      startHour < window.lunchEndHour && endHour > window.lunchStartHour;
     const isPast = slotEnd <= now;
     const overlaps = busy.some((b) => slotStart < b.end && slotEnd > b.start);
 
@@ -123,7 +142,7 @@ export function AvailabilityBoard({
   }, [weekOffset]);
 
   const weekDays = useMemo(
-    () => Array.from({ length: 5 }, (_, i) => {
+    () => Array.from({ length: WEEK_DAY_COUNT }, (_, i) => {
       const d = new Date(weekStart);
       d.setDate(d.getDate() + i);
       return d;
@@ -192,7 +211,8 @@ export function AvailabilityBoard({
   }, [users, coverage]);
 
   const unreliable = visibleUsers.filter((u) => !coverageByUser.get(u.id)?.reliable);
-  const weekLabel = `${weekStart.getDate()}/${weekStart.getMonth() + 1} – ${weekDays[4].getDate()}/${weekDays[4].getMonth() + 1}`;
+  const lastDay = weekDays[WEEK_DAY_COUNT - 1];
+  const weekLabel = `${weekStart.getDate()}/${weekStart.getMonth() + 1} – ${lastDay.getDate()}/${lastDay.getMonth() + 1}`;
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}>
@@ -258,7 +278,7 @@ export function AvailabilityBoard({
       )}
 
       {/* Cabeçalho dos dias */}
-      <div className="grid border-b" style={{ gridTemplateColumns: "160px repeat(5, 1fr)", borderColor: "rgba(11,135,195,0.08)" }}>
+      <div className="grid border-b" style={{ gridTemplateColumns: `160px repeat(${WEEK_DAY_COUNT}, 1fr)`, borderColor: "rgba(11,135,195,0.08)" }}>
         <div className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#3D5A78" }}>
           Pessoa
         </div>
@@ -279,7 +299,7 @@ export function AvailabilityBoard({
       {visibleUsers.length > 1 && (
         <div
           className="grid border-b"
-          style={{ gridTemplateColumns: "160px repeat(5, 1fr)", borderColor: "rgba(11,135,195,0.15)", background: "rgba(34,197,94,0.04)" }}
+          style={{ gridTemplateColumns: `160px repeat(${WEEK_DAY_COUNT}, 1fr)`, borderColor: "rgba(11,135,195,0.15)", background: "rgba(34,197,94,0.04)" }}
         >
           <div className="px-4 py-3 flex items-center gap-2">
             <Users size={14} style={{ color: "#4ade80" }} />
@@ -340,7 +360,7 @@ export function AvailabilityBoard({
             <div
               key={u.id}
               className="grid border-b last:border-0"
-              style={{ gridTemplateColumns: "160px repeat(5, 1fr)", borderColor: "rgba(11,135,195,0.08)" }}
+              style={{ gridTemplateColumns: `160px repeat(${WEEK_DAY_COUNT}, 1fr)`, borderColor: "rgba(11,135,195,0.08)" }}
             >
               <div className="px-4 py-3 flex items-center gap-2.5">
                 <div
@@ -503,10 +523,10 @@ export function AvailabilityBoard({
           <span className="w-2.5 h-2.5 rounded" style={{ background: "rgba(148,163,184,0.4)" }} /> Pessoal (Google)
         </span>
         <span className="flex items-center gap-1.5 text-[11px] ml-auto" style={{ color: "#3D5A78" }}>
-          <Clock size={11} /> Expediente {WORK_START_HOUR}h–{WORK_END_HOUR}h, almoço {LUNCH_START_HOUR}h–{LUNCH_END_HOUR}h
+          <Clock size={11} /> Seg a sex 8h–20h (almoço 12h–13h)
         </span>
         <span className="flex items-center gap-1.5 text-[11px]" style={{ color: "#3D5A78" }}>
-          <CalendarDays size={11} /> Seg a sex
+          <CalendarDays size={11} /> Sáb 9h–12h
         </span>
       </div>
     </div>

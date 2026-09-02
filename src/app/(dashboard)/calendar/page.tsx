@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon,
-  Clock, X, Tag, Briefcase, User, Trash2, Bell, CheckCircle2,
+  Clock, X, Tag, Briefcase, User, Trash2, Bell, CheckCircle2, Pencil,
   Phone, Mail, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { AvailabilityBoard } from "@/components/calendar/availability-board";
 import { useBusyBlocks, useCalendarCoverage, useSyncAllCalendars } from "@/lib/hooks/use-busy-blocks";
 import { Badge } from "@/components/ui/badge";
 import {
-  useEvents, useCreateEvent, useDeleteEvent, type EventWithRelations,
+  useEvents, useCreateEvent, useUpdateEvent, useDeleteEvent, type EventWithRelations,
 } from "@/lib/hooks/use-events";
 import {
   useAllTasks, useCreateTask, useUpdateTask, type TaskWithRelations,
@@ -159,6 +159,7 @@ export default function CalendarPage() {
   const [comMonth, setComMonth] = useState(now.getMonth());
   const [comSelectedDay, setComSelectedDay] = useState<number | null>(null);
   const [comFormOpen, setComFormOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EventWithRelations | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<EventWithRelations | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState("demo");
@@ -194,6 +195,7 @@ export default function CalendarPage() {
     [orgUsers]
   );
   const createEvent = useCreateEvent();
+  const updateEvent = useUpdateEvent();
   const deleteEvent = useDeleteEvent();
 
   // ── AGENDA PROJETOS state ──
@@ -324,6 +326,29 @@ export default function CalendarPage() {
     setFuDetailTask(null);
   };
 
+  const resetComForm = () => {
+    setNewTitle(""); setNewType("demo"); setNewTime(""); setNewDuration("60");
+    setNewNotes(""); setNewParticipants([]); setNewProjectId("__none__");
+  };
+
+  // Abre o formulário já preenchido com o evento — data e hora convertidas
+  // pro fuso local, senão o campo mostraria o horário em UTC.
+  const openEditEvent = (ev: EventWithRelations) => {
+    const d = new Date(ev.start_at);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setNewTitle(ev.title);
+    setNewType(ev.type);
+    setNewDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+    setNewTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    setNewDuration(String(ev.duration_min ?? 60));
+    setNewNotes(ev.agenda ?? "");
+    setNewParticipants(ev.participant_ids ?? []);
+    setNewProjectId(ev.project_id ?? "__none__");
+    setEditingEvent(ev);
+    setSelectedEvent(null);
+    setComFormOpen(true);
+  };
+
   // Agenda comercial submit
   const handleComSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -331,6 +356,24 @@ export default function CalendarPage() {
     // Sem offset, o Postgres lê a string como UTC e o evento nasce 3h antes
     // do que foi digitado (9h vira 6h). Converte usando o fuso do navegador.
     const startAt = new Date(`${newDate}T${newTime || "09:00"}:00`).toISOString();
+
+    if (editingEvent) {
+      await updateEvent.mutateAsync({
+        id: editingEvent.id,
+        title: newTitle,
+        type: newType as "demo" | "reuniao_exploratoria" | "followup" | "kickoff" | "review" | "interno" | "outro",
+        start_at: startAt,
+        duration_min: parseInt(newDuration) || 60,
+        agenda: newNotes || null,
+        project_id: newProjectId !== "__none__" ? newProjectId : null,
+        participant_ids: newParticipants,
+      });
+      setComFormOpen(false);
+      setEditingEvent(null);
+      resetComForm();
+      return;
+    }
+
     await createEvent.mutateAsync({
       title: newTitle,
       type: newType as "demo" | "reuniao_exploratoria" | "followup" | "kickoff" | "review" | "interno" | "outro",
@@ -346,8 +389,7 @@ export default function CalendarPage() {
       meeting_url: null, result: null,
     });
     setComFormOpen(false);
-    setNewTitle(""); setNewType("demo"); setNewTime(""); setNewDuration("60");
-    setNewNotes(""); setNewParticipants([]); setNewProjectId("__none__");
+    resetComForm();
   };
 
   // O evento espelho de uma tarefa com horário não entra aqui: a tarefa já é
@@ -809,11 +851,13 @@ export default function CalendarPage() {
       </Tabs>
 
       {/* ─── DIALOG: Novo Evento Comercial ─── */}
-      <Dialog open={comFormOpen} onOpenChange={(v) => !v && setComFormOpen(false)}>
+      <Dialog open={comFormOpen} onOpenChange={(v) => { if (!v) { setComFormOpen(false); setEditingEvent(null); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Novo Evento</DialogTitle>
-            <DialogDescription>Adicione um evento à agenda comercial</DialogDescription>
+            <DialogTitle>{editingEvent ? "Editar Evento" : "Novo Evento"}</DialogTitle>
+            <DialogDescription>
+              {editingEvent ? "Atualize os dados desse compromisso" : "Adicione um evento à agenda comercial"}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleComSubmit} className="space-y-4 mt-2">
             <div className="space-y-1.5">
@@ -877,8 +921,10 @@ export default function CalendarPage() {
               <Textarea value={newNotes} onChange={(e) => setNewNotes(e.target.value)} placeholder="Observações..." rows={2} />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setComFormOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createEvent.isPending} style={{ background: "linear-gradient(135deg, #0B87C3, #0CA8F5)", color: "#fff" }}>Criar Evento</Button>
+              <Button type="button" variant="outline" onClick={() => { setComFormOpen(false); setEditingEvent(null); }}>Cancelar</Button>
+              <Button type="submit" disabled={createEvent.isPending || updateEvent.isPending} style={{ background: "linear-gradient(135deg, #0B87C3, #0CA8F5)", color: "#fff" }}>
+                {editingEvent ? "Salvar" : "Criar Evento"}
+              </Button>
             </div>
           </form>
         </DialogContent>
@@ -1137,7 +1183,7 @@ export default function CalendarPage() {
               </div>
               <div className="flex items-center gap-2 text-sm" style={{ color: "#7BA3C6" }}>
                 <Clock size={14} />
-                <span>{formatDate(selectedEvent.start_at)} — {selectedEvent.start_at.slice(11, 16)}{selectedEvent.duration_min ? ` · ${selectedEvent.duration_min}min` : ""}</span>
+                <span>{formatDate(selectedEvent.start_at)} — {localTime(selectedEvent.start_at)}{selectedEvent.duration_min ? ` · ${selectedEvent.duration_min}min` : ""}</span>
               </div>
               {selectedEvent.lead && (
                 <div className="flex items-center gap-2 text-sm" style={{ color: "#7BA3C6" }}>
@@ -1160,7 +1206,10 @@ export default function CalendarPage() {
                   {selectedEvent.agenda}
                 </p>
               )}
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-between items-center pt-2">
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => openEditEvent(selectedEvent)}>
+                  <Pencil size={13} className="mr-1.5" /> Editar
+                </Button>
                 <Button variant="ghost" className="text-red-400 hover:text-red-300 text-xs" onClick={() => { deleteEvent.mutate(selectedEvent.id); setSelectedEvent(null); }}>
                   <Trash2 size={13} className="mr-1" /> Remover evento
                 </Button>
