@@ -55,34 +55,6 @@ function crmEventToGoogleBody(event: CrmEvent) {
   };
 }
 
-function googleEventToCrmFields(gEvent: GoogleEvent, orgId: string, userId: string) {
-  const startIso = gEvent.start?.dateTime ?? (gEvent.start?.date ? `${gEvent.start.date}T00:00:00` : null);
-  const endIso = gEvent.end?.dateTime ?? (gEvent.end?.date ? `${gEvent.end.date}T00:00:00` : null);
-  const durationMin =
-    startIso && endIso ? Math.max(15, Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000)) : 60;
-
-  return {
-    org_id: orgId,
-    title: gEvent.summary || "(Sem título)",
-    type: "outro" as const,
-    start_at: startIso ?? new Date().toISOString(),
-    duration_min: durationMin,
-    agenda: gEvent.description ?? null,
-    meeting_url: gEvent.hangoutLink ?? gEvent.location ?? null,
-    created_by: userId,
-    google_event_id: gEvent.id,
-    google_synced_at: new Date().toISOString(),
-    sync_source: "google" as const,
-    participant_ids: [],
-    lead_id: null,
-    project_id: null,
-    contact_id: null,
-    result: null,
-  };
-}
-
-// Envia pro Google os eventos criados no CRM que ainda não foram sincronizados
-// ou que mudaram desde a última sincronização.
 export async function pushCrmEventsToGoogle(admin: AdminClient, connection: Connection) {
   const accessToken = await getValidAccessToken(admin, connection);
 
@@ -143,59 +115,103 @@ export async function deleteCrmEventFromGoogle(admin: AdminClient, userId: strin
 }
 
 // Traz do Google os eventos novos/alterados e cria/atualiza no CRM
-export async function pullGoogleEventsToCrm(admin: AdminClient, connection: Connection) {
+// Janela de ocupação que interessa pra agenda: de agora até 120 dias.
+// Sem limite, recorrências do Google chegavam expandidas até 2056.
+const BUSY_WINDOW_DAYS = 120;
+
+// Traz a agenda do Google como BLOCOS DE OCUPAÇÃO, numa tabela própria.
+//
+// Nunca grava em `events`: agenda pessoal não é evento do CRM. Antes tudo
+// caía em events, o que (a) enchia a agenda comercial de compromisso
+// pessoal, com título visível pra organização inteira, e (b) sobrescrevia
+// o evento do CRM que tinha acabado de ser enviado, apagando tipo,
+// participantes e vínculos.
+export async function pullGoogleBusyBlocks(admin: AdminClient, connection: Connection) {
   const accessToken = await getValidAccessToken(admin, connection);
 
-  let result;
-  try {
-    result = await listGoogleEvents(accessToken, connection.calendar_id, {
-      syncToken: connection.sync_token ?? undefined,
-      timeMin: connection.sync_token ? undefined : new Date().toISOString(),
-    });
-  } catch (err) {
-    if (err instanceof Error && err.name === "SyncTokenInvalidError") {
-      // Token de sincronização expirou — refaz do zero a partir de agora
-      result = await listGoogleEvents(accessToken, connection.calendar_id, { timeMin: new Date().toISOString() });
-    } else {
-      throw err;
-    }
-  }
+  const timeMin = new Date();
+  const timeMax = new Date(Date.now() + BUSY_WINDOW_DAYS * 86400000);
 
-  let pulled = 0;
+  const result = await listGoogleEvents(accessToken, connection.calendar_id, {
+    timeMin: timeMin.toISOString(),
+    timeMax: timeMax.toISOString(),
+  });
+
+  // Eventos que nós mesmos enviamos já estão em `events` e seriam contados
+  // duas vezes na disponibilidade.
+  const { data: ourEvents } = await admin
+    .from("events")
+    .select("google_event_id")
+    .eq("created_by", connection.user_id)
+    .not("google_event_id", "is", null);
+  const ours = new Set((ourEvents ?? []).map((e) => e.google_event_id as string));
+
+  const rows: {
+    org_id: string; user_id: string; google_event_id: string; title: string | null;
+    start_at: string; end_at: string; is_all_day: boolean; synced_at: string;
+  }[] = [];
+  const cancelled: string[] = [];
+
   for (const gEvent of result.events) {
     if (gEvent.status === "cancelled") {
-      await admin.from("events").delete().eq("google_event_id", gEvent.id).eq("created_by", connection.user_id);
+      cancelled.push(gEvent.id);
       continue;
     }
+    if (ours.has(gEvent.id)) continue;
+    // Recusado por quem sincronizou não ocupa a agenda dele.
+    const me = gEvent.attendees?.find((a) => a.self);
+    if (me?.responseStatus === "declined") continue;
+    // "Livre" no Google (transparent) também não ocupa.
+    if (gEvent.transparency === "transparent") continue;
 
-    const { data: existing } = await admin
-      .from("events")
-      .select("id")
-      .eq("google_event_id", gEvent.id)
-      .eq("created_by", connection.user_id)
-      .maybeSingle();
+    const isAllDay = !gEvent.start?.dateTime && Boolean(gEvent.start?.date);
+    const startIso = gEvent.start?.dateTime ?? (gEvent.start?.date ? `${gEvent.start.date}T00:00:00` : null);
+    const endIso = gEvent.end?.dateTime ?? (gEvent.end?.date ? `${gEvent.end.date}T00:00:00` : null);
+    if (!startIso) continue;
 
-    const fields = googleEventToCrmFields(gEvent, connection.org_id, connection.user_id);
+    rows.push({
+      org_id: connection.org_id,
+      user_id: connection.user_id,
+      google_event_id: gEvent.id,
+      title: gEvent.summary ?? null,
+      start_at: new Date(startIso).toISOString(),
+      end_at: new Date(endIso ?? new Date(new Date(startIso).getTime() + 3600000)).toISOString(),
+      is_all_day: isAllDay,
+      synced_at: new Date().toISOString(),
+    });
+  }
 
-    if (existing) {
-      await admin.from("events").update(fields).eq("id", existing.id);
-    } else {
-      await admin.from("events").insert(fields);
-    }
-    pulled++;
+  // Substitui a janela inteira: o que sumiu do Google some daqui também,
+  // sem depender de receber o "cancelled" de cada um.
+  await admin
+    .from("external_busy_blocks")
+    .delete()
+    .eq("user_id", connection.user_id)
+    .gte("start_at", timeMin.toISOString())
+    .lte("start_at", timeMax.toISOString());
+
+  if (rows.length > 0) {
+    await admin.from("external_busy_blocks").upsert(rows, { onConflict: "user_id,google_event_id" });
+  }
+  if (cancelled.length > 0) {
+    await admin
+      .from("external_busy_blocks")
+      .delete()
+      .eq("user_id", connection.user_id)
+      .in("google_event_id", cancelled);
   }
 
   await admin
     .from("google_calendar_connections")
-    .update({ sync_token: result.nextSyncToken ?? connection.sync_token, last_synced_at: new Date().toISOString() })
+    .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  return pulled;
+  return rows.length;
 }
 
 export async function syncConnection(admin: AdminClient, connection: Connection) {
   const pushed = await pushCrmEventsToGoogle(admin, connection);
-  const pulled = await pullGoogleEventsToCrm(admin, connection);
+  const pulled = await pullGoogleBusyBlocks(admin, connection);
   // Deu certo: limpa o erro anterior e carimba a hora.
   await admin
     .from("google_calendar_connections")

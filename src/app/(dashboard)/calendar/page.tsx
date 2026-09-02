@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AvailabilityBoard } from "@/components/calendar/availability-board";
+import { useBusyBlocks } from "@/lib/hooks/use-busy-blocks";
 import { Badge } from "@/components/ui/badge";
 import {
   useEvents, useCreateEvent, useDeleteEvent, type EventWithRelations,
@@ -181,6 +182,7 @@ export default function CalendarPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const { data: availabilityEvents = [] } = useEvents(availabilityWindow);
+  const { data: busyBlocks = [] } = useBusyBlocks(availabilityWindow.from, availabilityWindow.to);
 
   // Quem entra no painel de disponibilidade: quem faz agenda comercial.
   // Developer não atende cliente, fica de fora.
@@ -228,7 +230,7 @@ export default function CalendarPage() {
   // Agenda comercial dots
   const comEventDots = (day: number) => {
     const dateStr = toDateStr(comYear, comMonth, day);
-    const evs = events.filter((e) => !e.task_id && e.start_at.startsWith(dateStr));
+    const evs = events.filter((e) => !e.task_id && e.sync_source === "crm" && e.start_at.startsWith(dateStr));
     const tsks = allTasks.filter((t) => t.due_date?.startsWith(dateStr));
     return [
       ...evs.map((e) => ({ color: TYPE_COLOR[e.type] ?? "#3D5A78", label: e.title })),
@@ -344,7 +346,9 @@ export default function CalendarPage() {
   // desenhada na agenda por conta própria, e mostrar os dois duplicaria o
   // mesmo compromisso. O espelho existe pra ocupar horário no painel de
   // disponibilidade e pra ir ao Google Calendar.
-  const comEvents = events.filter((e) => !e.task_id);
+  // Só o que foi registrado no CRM. Compromisso pessoal vindo do Google vive
+  // em external_busy_blocks e entra apenas na disponibilidade, nunca aqui.
+  const comEvents = events.filter((e) => !e.task_id && e.sync_source === "crm");
   const comDayEvents = comSelectedDay ? comEvents.filter((e) => e.start_at.startsWith(toDateStr(comYear, comMonth, comSelectedDay))) : [];
   const comDayTasks = comSelectedDay ? allTasks.filter((t) => t.due_date?.startsWith(toDateStr(comYear, comMonth, comSelectedDay))) : [];
   const projDayEvents = projSelectedDay ? projEvents.filter((e) => e.start_at.startsWith(toDateStr(projYear, projMonth, projSelectedDay))) : [];
@@ -420,6 +424,8 @@ export default function CalendarPage() {
             <AvailabilityBoard
               users={schedulableUsers}
               events={availabilityEvents}
+              busyBlocks={busyBlocks}
+              currentUserId={user?.id}
               onPickSlot={(userIds, date, time) => {
                 setNewParticipants(userIds);
                 setNewDate(date);

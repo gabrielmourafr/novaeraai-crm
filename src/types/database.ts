@@ -648,6 +648,22 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["proposal_views"]["Insert"]>;
         Relationships: [];
       };
+      external_busy_blocks: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string;
+          google_event_id: string;
+          title: string | null;
+          start_at: string;
+          end_at: string;
+          is_all_day: boolean;
+          synced_at: string;
+        };
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["external_busy_blocks"]["Row"], "id" | "synced_at">> & { synced_at?: string };
+        Update: Partial<Database["public"]["Tables"]["external_busy_blocks"]["Insert"]>;
+        Relationships: [];
+      };
       google_calendar_connections: {
         Row: {
           id: string;

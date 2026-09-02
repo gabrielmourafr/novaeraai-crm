@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatInitials } from "@/lib/utils/format";
 import type { EventWithRelations } from "@/lib/hooks/use-events";
+import type { BusyBlock } from "@/lib/hooks/use-busy-blocks";
 
 // Painel de disponibilidade da agenda comercial: uma linha por pessoa,
 // cinco colunas (seg–sex), mostrando o que já está marcado e — o que o
@@ -22,17 +23,25 @@ const SLOT_STEP_MIN = 30;    // grade de 30 em 30
 
 const WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex"];
 
+const BUSY_STYLE: Record<BusyKind, { background: string; color: string }> = {
+  reuniao: { background: "rgba(239,68,68,0.1)", color: "#fca5a5" },
+  tarefa:  { background: "rgba(245,158,11,0.1)", color: "#fcd34d" },
+  pessoal: { background: "rgba(148,163,184,0.12)", color: "#cbd5e1" },
+};
+
 export interface AvailabilityUser {
   id: string;
   full_name: string;
   role?: string;
 }
 
+type BusyKind = "reuniao" | "tarefa" | "pessoal";
+
 interface Busy {
   start: number; // ms
   end: number;   // ms
   title: string;
-  isTask: boolean; // espelho de tarefa com horário, não reunião
+  kind: BusyKind;
 }
 
 function startOfWeek(base: Date) {
@@ -80,10 +89,14 @@ function freeSlots(day: Date, busy: Busy[], durationMin: number) {
 }
 
 export function AvailabilityBoard({
-  users, events, onPickSlot,
+  users, events, busyBlocks, currentUserId, onPickSlot,
 }: {
   users: AvailabilityUser[];
   events: EventWithRelations[];
+  /** Ocupação vinda do Google de cada pessoa (agenda pessoal incluída). */
+  busyBlocks: BusyBlock[];
+  /** Só o dono vê o título do próprio compromisso pessoal. */
+  currentUserId?: string;
   onPickSlot: (userIds: string[], date: string, time: string) => void;
 }) {
   const [weekOffset, setWeekOffset] = useState(0);
@@ -125,14 +138,27 @@ export function AvailabilityBoard({
         ...(ev.participant_ids ?? []),
         ...(ev.created_by ? [ev.created_by] : []),
       ]));
-      const isTask = Boolean(ev.task_id);
+      const kind: BusyKind = ev.task_id ? "tarefa" : "reuniao";
       for (const pid of people) {
         const list = map.get(pid);
-        if (list) list.push({ start, end, title: ev.title, isTask });
+        if (list) list.push({ start, end, title: ev.title, kind });
       }
     }
+
+    // Compromissos do Google que não vieram do CRM: ocupam a agenda, mas o
+    // título só aparece pra própria pessoa — o resto do time vê "Pessoal".
+    for (const b of busyBlocks) {
+      const list = map.get(b.user_id);
+      if (!list) continue;
+      list.push({
+        start: new Date(b.start_at).getTime(),
+        end: new Date(b.end_at).getTime(),
+        title: b.user_id === currentUserId ? (b.title ?? "Compromisso pessoal") : "Compromisso pessoal",
+        kind: "pessoal",
+      });
+    }
     return map;
-  }, [users, events]);
+  }, [users, events, busyBlocks, currentUserId]);
 
   const durationMin = Number(duration);
   const weekLabel = `${weekStart.getDate()}/${weekStart.getMonth() + 1} – ${weekDays[4].getDate()}/${weekDays[4].getMonth() + 1}`;
@@ -350,18 +376,16 @@ export function AvailabilityBoard({
                       <div
                         key={i}
                         className="flex items-center gap-2 px-2.5 py-1.5 rounded text-xs"
-                        style={
-                          b.isTask
-                            ? { background: "rgba(245,158,11,0.1)", color: "#fcd34d" }
-                            : { background: "rgba(239,68,68,0.1)", color: "#fca5a5" }
-                        }
+                        style={BUSY_STYLE[b.kind]}
                       >
                         <span className="font-medium tabular-nums">
                           {hhmm(new Date(b.start))}–{hhmm(new Date(b.end))}
                         </span>
                         <span className="truncate" style={{ color: "#C3D4E8" }}>{b.title}</span>
-                        {b.isTask && (
-                          <span className="ml-auto text-[10px] flex-shrink-0" style={{ color: "#3D5A78" }}>tarefa</span>
+                        {b.kind !== "reuniao" && (
+                          <span className="ml-auto text-[10px] flex-shrink-0" style={{ color: "#3D5A78" }}>
+                            {b.kind === "tarefa" ? "tarefa" : "pessoal"}
+                          </span>
                         )}
                       </div>
                     ))}
@@ -410,6 +434,9 @@ export function AvailabilityBoard({
         </span>
         <span className="flex items-center gap-1.5 text-[11px]" style={{ color: "#7BA3C6" }}>
           <span className="w-2.5 h-2.5 rounded" style={{ background: "rgba(245,158,11,0.4)" }} /> Tarefa com horário
+        </span>
+        <span className="flex items-center gap-1.5 text-[11px]" style={{ color: "#7BA3C6" }}>
+          <span className="w-2.5 h-2.5 rounded" style={{ background: "rgba(148,163,184,0.4)" }} /> Pessoal (Google)
         </span>
         <span className="flex items-center gap-1.5 text-[11px] ml-auto" style={{ color: "#3D5A78" }}>
           <Clock size={11} /> Expediente {WORK_START_HOUR}h–{WORK_END_HOUR}h, almoço {LUNCH_START_HOUR}h–{LUNCH_END_HOUR}h

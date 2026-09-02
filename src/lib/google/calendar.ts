@@ -91,12 +91,15 @@ export interface GoogleEvent {
   location?: string;
   status?: string; // "confirmed" | "cancelled" | "tentative"
   updated?: string;
+  // "transparent" = marcado como Livre no Google, não ocupa a agenda
+  transparency?: string;
+  attendees?: { self?: boolean; responseStatus?: string; email?: string }[];
 }
 
 export async function listGoogleEvents(
   accessToken: string,
   calendarId: string,
-  opts: { syncToken?: string; timeMin?: string } = {}
+  opts: { syncToken?: string; timeMin?: string; timeMax?: string } = {}
 ): Promise<{ events: GoogleEvent[]; nextSyncToken?: string }> {
   const events: GoogleEvent[] = [];
   let pageToken: string | undefined;
@@ -106,8 +109,9 @@ export async function listGoogleEvents(
     const params = new URLSearchParams({ maxResults: "250", singleEvents: "true" });
     if (opts.syncToken) {
       params.set("syncToken", opts.syncToken);
-    } else if (opts.timeMin) {
-      params.set("timeMin", opts.timeMin);
+    } else {
+      if (opts.timeMin) params.set("timeMin", opts.timeMin);
+      if (opts.timeMax) params.set("timeMax", opts.timeMax);
     }
     if (pageToken) params.set("pageToken", pageToken);
 
