@@ -32,9 +32,10 @@ const COMPLEXITY_CONFIG: Record<string, { label: string; color: string }> = Obje
 // O recorte principal virou "quando", não "status": é assim que a pessoa
 // abre a tela de manhã. Status continua disponível, como filtro.
 const HORIZON_TABS = [
-  { value: "hoje",     label: "Hoje" },
-  { value: "proximos", label: "Próximos 3 dias" },
-  { value: "geral",    label: "Geral" },
+  { value: "hoje",       label: "Hoje" },
+  { value: "proximos",   label: "Próximos 3 dias" },
+  { value: "geral",      label: "Geral" },
+  { value: "concluidas", label: "Concluídas" },
 ] as const;
 
 const STATUS_OPTIONS = [
@@ -193,7 +194,9 @@ function TasksPageContent() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
-  const [horizon, setHorizon] = useState<"hoje" | "proximos" | "geral">("hoje");
+  // hoje/proximos: em aberto dentro da janela. geral: em aberto SEM prazo —
+  // é a lista do que não tem data e some das outras abas. concluidas: histórico.
+  const [horizon, setHorizon] = useState<"hoje" | "proximos" | "geral" | "concluidas">("hoje");
   const [onlyMine, setOnlyMine] = useState(true);
   const [typeFilter, setTypeFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -221,7 +224,7 @@ function TasksPageContent() {
   // Janela de datas do horizonte selecionado. "Hoje" inclui o que venceu e
   // ainda está aberto — atrasada é problema de hoje, não do dia que passou.
   const horizonEnd = useMemo(() => {
-    if (horizon === "geral") return null;
+    if (horizon === "geral" || horizon === "concluidas") return null;
     const d = new Date();
     d.setDate(d.getDate() + (horizon === "hoje" ? 0 : 3));
     d.setHours(23, 59, 59, 999);
@@ -247,8 +250,11 @@ function TasksPageContent() {
   // "Suas tarefas": Hoje e Próximos 3 dias abrem no que é seu; Geral mostra
   // tudo. Developer já vem restrito a si mesmo lá em cima.
   const scopedTasks = useMemo(() => {
-    if (horizon === "geral") return assigneeFilteredTasks;
-    // Hoje / Próximos 3 dias são listas de trabalho: só o que está em aberto,
+    if (horizon === "concluidas") {
+      return assigneeFilteredTasks.filter((t) => t.status === "concluida");
+    }
+
+    // As três primeiras abas são listas de trabalho: só o que está em aberto,
     // e por padrão só o que é seu.
     const base = assigneeFilteredTasks.filter(
       (t) => t.status !== "concluida" && t.status !== "cancelada"
@@ -257,6 +263,11 @@ function TasksPageContent() {
       onlyMine && user?.id && assigneeFilter === "all"
         ? base.filter((t) => t.assignee_id === user.id)
         : base;
+
+    // Geral é o balde do que não tem data limite — some das outras abas,
+    // então precisa de um lugar próprio pra não sumir do radar.
+    if (horizon === "geral") return byScope.filter((t) => !t.due_date);
+
     return byScope.filter(inHorizon);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assigneeFilteredTasks, onlyMine, horizon, user?.id, assigneeFilter, horizonEnd]);
@@ -280,7 +291,12 @@ function TasksPageContent() {
     };
     const upTo = (limit: number) =>
       mine.filter((t) => t.due_date && new Date(t.due_date).getTime() <= endOf(limit)).length;
-    return { hoje: upTo(0), proximos: upTo(3), geral: assigneeFilteredTasks.length };
+    return {
+      hoje: upTo(0),
+      proximos: upTo(3),
+      geral: mine.filter((t) => !t.due_date).length,
+      concluidas: assigneeFilteredTasks.filter((t) => t.status === "concluida").length,
+    };
   }, [assigneeFilteredTasks, onlyMine, user?.id, assigneeFilter]);
 
   const pendingCount = assigneeFilteredTasks.filter((t) => t.status === "pendente").length;
@@ -548,13 +564,20 @@ function TasksPageContent() {
             ))}
           </TabsList>
 
-          {horizon !== "geral" && assigneeFilter === "all" && (
+          {horizon === "geral" && (
+            <span className="text-[11px]" style={{ color: "#3D5A78" }}>
+              Tarefas sem data limite definida
+            </span>
+          )}
+
+          {horizon !== "concluidas" && assigneeFilter === "all" && (
             <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: "#7BA3C6" }}>
               <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
               Só as minhas
             </label>
           )}
 
+          {horizon !== "concluidas" && (
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="h-9 w-40 text-xs ml-auto">
               <SelectValue placeholder="Status" />
@@ -566,6 +589,7 @@ function TasksPageContent() {
               ))}
             </SelectContent>
           </Select>
+          )}
         </div>
 
         {HORIZON_TABS.map((t) => (
@@ -584,7 +608,9 @@ function TasksPageContent() {
                       ? "Nada pra hoje — dia limpo"
                       : horizon === "proximos"
                       ? "Nada nos próximos 3 dias"
-                      : "Nenhuma tarefa encontrada"}
+                      : horizon === "geral"
+                      ? "Nenhuma tarefa sem data limite"
+                      : "Nenhuma tarefa concluída ainda"}
                   </p>
                 </div>
               ) : (
