@@ -61,20 +61,15 @@ export interface CalendarCoverage {
 // precisa avisar quando a ocupação de alguém não é confiável, em vez de
 // deixar a pessoa achar que o dia está vago.
 export const useCalendarCoverage = () => {
-  const supabase = createClient();
   return useQuery({
     queryKey: ["google-calendar", "coverage"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("google_calendar_connections")
-        .select("user_id, last_synced_at, sync_error, sync_enabled");
-      if (error) throw error;
-      return (data ?? []).map((c): CalendarCoverage => ({
-        userId: c.user_id as string,
-        connected: Boolean(c.sync_enabled),
-        lastSyncedAt: (c.last_synced_at as string | null) ?? null,
-        syncError: (c.sync_error as string | null) ?? null,
-      }));
+      // Via rota: a RLS da tabela é por usuário e esconderia a conexão dos
+      // colegas, fazendo quem está conectado aparecer como desconectado.
+      const res = await fetch("/api/calendar/coverage");
+      if (!res.ok) return [] as CalendarCoverage[];
+      const json = (await res.json()) as { coverage: CalendarCoverage[] };
+      return json.coverage ?? [];
     },
   });
 };

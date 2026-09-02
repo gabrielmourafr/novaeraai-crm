@@ -293,13 +293,16 @@ export default function CalendarPage() {
       : [toDateStr(fuYear, fuMonth, now.getDate())];
 
     for (const date of datesOrFallback) {
-      const dueDate = fuTime ? `${date}T${fuTime}:00` : date;
+      // Mesmo cuidado do evento: string sem offset é lida como UTC.
+      const dueDate = fuTime ? new Date(`${date}T${fuTime}:00`).toISOString() : date;
       await createTask.mutateAsync({
         org_id: user?.org_id ?? "",
         title: fuTitle,
         type: fuType,
         priority: fuPriority,
         status: "pendente",
+        // Follow-up com hora marcada também ocupa a agenda.
+        has_time: Boolean(fuTime),
         due_date: dueDate,
         lead_id: fuLeadId !== "__none__" ? fuLeadId : null,
         contact_id: fuContactId !== "__none__" ? fuContactId : null,
@@ -325,7 +328,9 @@ export default function CalendarPage() {
   const handleComSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newDate) return;
-    const startAt = newTime ? `${newDate}T${newTime}:00` : `${newDate}T09:00:00`;
+    // Sem offset, o Postgres lê a string como UTC e o evento nasce 3h antes
+    // do que foi digitado (9h vira 6h). Converte usando o fuso do navegador.
+    const startAt = new Date(`${newDate}T${newTime || "09:00"}:00`).toISOString();
     await createEvent.mutateAsync({
       title: newTitle,
       type: newType as "demo" | "reuniao_exploratoria" | "followup" | "kickoff" | "review" | "interno" | "outro",
