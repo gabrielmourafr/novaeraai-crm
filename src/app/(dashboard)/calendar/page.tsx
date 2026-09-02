@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AvailabilityBoard } from "@/components/calendar/availability-board";
-import { useBusyBlocks } from "@/lib/hooks/use-busy-blocks";
+import { useBusyBlocks, useCalendarCoverage, useSyncAllCalendars } from "@/lib/hooks/use-busy-blocks";
 import { Badge } from "@/components/ui/badge";
 import {
   useEvents, useCreateEvent, useDeleteEvent, type EventWithRelations,
@@ -183,6 +183,9 @@ export default function CalendarPage() {
   }, []);
   const { data: availabilityEvents = [] } = useEvents(availabilityWindow);
   const { data: busyBlocks = [] } = useBusyBlocks(availabilityWindow.from, availabilityWindow.to);
+  const { data: calendarCoverage = [] } = useCalendarCoverage();
+  // Puxa a agenda de todo mundo antes de mostrar disponibilidade.
+  useSyncAllCalendars();
 
   // Quem entra no painel de disponibilidade: quem faz agenda comercial.
   // Developer não atende cliente, fica de fora.
@@ -425,6 +428,7 @@ export default function CalendarPage() {
               users={schedulableUsers}
               events={availabilityEvents}
               busyBlocks={busyBlocks}
+              coverage={calendarCoverage}
               currentUserId={user?.id}
               onPickSlot={(userIds, date, time) => {
                 setNewParticipants(userIds);

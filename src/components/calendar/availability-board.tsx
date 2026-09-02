@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Clock, CalendarDays, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, CalendarDays, Users, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatInitials } from "@/lib/utils/format";
 import type { EventWithRelations } from "@/lib/hooks/use-events";
-import type { BusyBlock } from "@/lib/hooks/use-busy-blocks";
+import type { BusyBlock, CalendarCoverage } from "@/lib/hooks/use-busy-blocks";
 
 // Painel de disponibilidade da agenda comercial: uma linha por pessoa,
 // cinco colunas (seg–sex), mostrando o que já está marcado e — o que o
@@ -42,6 +42,7 @@ interface Busy {
   end: number;   // ms
   title: string;
   kind: BusyKind;
+  allDay?: boolean;
 }
 
 function startOfWeek(base: Date) {
@@ -67,6 +68,10 @@ function freeSlots(day: Date, busy: Busy[], durationMin: number) {
   const slots: Date[] = [];
   const now = Date.now();
 
+  // Evento de dia inteiro zera o dia: o Google manda só a data, sem hora, e
+  // qualquer conversão de fuso aqui erraria a janela por algumas horas.
+  if (busy.some((b) => b.allDay)) return slots;
+
   const cursor = new Date(day);
   cursor.setHours(WORK_START_HOUR, 0, 0, 0);
   const dayEnd = new Date(day);
@@ -89,12 +94,14 @@ function freeSlots(day: Date, busy: Busy[], durationMin: number) {
 }
 
 export function AvailabilityBoard({
-  users, events, busyBlocks, currentUserId, onPickSlot,
+  users, events, busyBlocks, coverage, currentUserId, onPickSlot,
 }: {
   users: AvailabilityUser[];
   events: EventWithRelations[];
   /** Ocupação vinda do Google de cada pessoa (agenda pessoal incluída). */
   busyBlocks: BusyBlock[];
+  /** Quem tem agenda conectada e sincronizando — define em quem confiar. */
+  coverage: CalendarCoverage[];
   /** Só o dono vê o título do próprio compromisso pessoal. */
   currentUserId?: string;
   onPickSlot: (userIds: string[], date: string, time: string) => void;
@@ -155,12 +162,36 @@ export function AvailabilityBoard({
         end: new Date(b.end_at).getTime(),
         title: b.user_id === currentUserId ? (b.title ?? "Compromisso pessoal") : "Compromisso pessoal",
         kind: "pessoal",
+        allDay: b.is_all_day,
       });
     }
     return map;
   }, [users, events, busyBlocks, currentUserId]);
 
   const durationMin = Number(duration);
+
+  // Em quem dá pra confiar: sem agenda conectada (ou com sincronização
+  // falhando), o CRM só enxerga os compromissos criados aqui dentro — a
+  // pessoa pode estar ocupada no Google e aparecer livre. A tela precisa
+  // dizer isso, e não deixar alguém marcar em cima.
+  const coverageByUser = useMemo(() => {
+    const map = new Map<string, { reliable: boolean; reason: string }>();
+    for (const u of users) {
+      const c = coverage.find((x) => x.userId === u.id);
+      if (!c || !c.connected) {
+        map.set(u.id, { reliable: false, reason: "Google Calendar não conectado" });
+      } else if (c.syncError) {
+        map.set(u.id, { reliable: false, reason: "Sincronização com erro — reconectar" });
+      } else if (!c.lastSyncedAt) {
+        map.set(u.id, { reliable: false, reason: "Agenda ainda não sincronizada" });
+      } else {
+        map.set(u.id, { reliable: true, reason: "" });
+      }
+    }
+    return map;
+  }, [users, coverage]);
+
+  const unreliable = visibleUsers.filter((u) => !coverageByUser.get(u.id)?.reliable);
   const weekLabel = `${weekStart.getDate()}/${weekStart.getMonth() + 1} – ${weekDays[4].getDate()}/${weekDays[4].getMonth() + 1}`;
 
   return (
@@ -210,6 +241,21 @@ export function AvailabilityBoard({
           </Select>
         </div>
       </div>
+
+      {unreliable.length > 0 && (
+        <div
+          className="flex items-start gap-2 px-5 py-2.5 border-b"
+          style={{ background: "rgba(245,158,11,0.06)", borderColor: "rgba(245,158,11,0.2)" }}
+        >
+          <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" style={{ color: "#f59e0b" }} />
+          <p className="text-[11px]" style={{ color: "#fcd34d" }}>
+            Disponibilidade incompleta de{" "}
+            <b>{unreliable.map((u) => u.full_name).join(", ")}</b> — só os compromissos do
+            CRM estão sendo considerados. Peça pra conectar o Google Calendar em
+            Configurações → Integrações antes de marcar em cima.
+          </p>
+        </div>
+      )}
 
       {/* Cabeçalho dos dias */}
       <div className="grid border-b" style={{ gridTemplateColumns: "160px repeat(5, 1fr)", borderColor: "rgba(11,135,195,0.08)" }}>
@@ -304,6 +350,11 @@ export function AvailabilityBoard({
                   {formatInitials(u.full_name)}
                 </div>
                 <span className="text-sm truncate" style={{ color: "#E2EBF8" }}>{u.full_name}</span>
+                {!coverageByUser.get(u.id)?.reliable && (
+                  <span title={coverageByUser.get(u.id)?.reason}>
+                    <AlertTriangle size={12} className="flex-shrink-0" style={{ color: "#f59e0b" }} />
+                  </span>
+                )}
               </div>
 
               {weekDays.map((day, i) => {
@@ -366,7 +417,20 @@ export function AvailabilityBoard({
 
           {detail && (
             <div className="space-y-4 mt-1">
-              {detail.busy.length > 0 && (
+              {!coverageByUser.get(detail.user.id)?.reliable && (
+              <div
+                className="flex items-start gap-2 rounded-lg p-2.5"
+                style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}
+              >
+                <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" style={{ color: "#f59e0b" }} />
+                <p className="text-[11px]" style={{ color: "#fcd34d" }}>
+                  {coverageByUser.get(detail.user.id)?.reason}. Estes horários consideram só
+                  o que está no CRM — confirme com a pessoa antes de marcar.
+                </p>
+              </div>
+            )}
+
+            {detail.busy.length > 0 && (
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#3D5A78" }}>
                     Ocupado
