@@ -27,6 +27,11 @@ import { useContacts } from "@/lib/hooks/use-contacts";
 import { useProjects } from "@/lib/hooks/use-projects";
 import { formatDate, isPastDate } from "@/lib/utils/format";
 
+// A hora vinha de um slice da string ISO, ou seja, em UTC — 14h aparecia
+// como 17h. Converte pro fuso do navegador.
+const localTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
 const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const DAYS = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
@@ -223,11 +228,14 @@ export default function CalendarPage() {
   // Agenda comercial dots
   const comEventDots = (day: number) => {
     const dateStr = toDateStr(comYear, comMonth, day);
-    const evs = events.filter((e) => e.start_at.startsWith(dateStr));
+    const evs = events.filter((e) => !e.task_id && e.start_at.startsWith(dateStr));
     const tsks = allTasks.filter((t) => t.due_date?.startsWith(dateStr));
     return [
       ...evs.map((e) => ({ color: TYPE_COLOR[e.type] ?? "#3D5A78", label: e.title })),
-      ...tsks.map((t) => ({ color: "#f59e0b", label: `✓ ${t.title}` })),
+      ...tsks.map((t) => ({
+        color: "#f59e0b",
+        label: t.has_time ? `✓ ${localTime(t.due_date!)} ${t.title}` : `✓ ${t.title}`,
+      })),
     ];
   };
 
@@ -332,7 +340,12 @@ export default function CalendarPage() {
     setNewNotes(""); setNewParticipants([]); setNewProjectId("__none__");
   };
 
-  const comDayEvents = comSelectedDay ? events.filter((e) => e.start_at.startsWith(toDateStr(comYear, comMonth, comSelectedDay))) : [];
+  // O evento espelho de uma tarefa com horário não entra aqui: a tarefa já é
+  // desenhada na agenda por conta própria, e mostrar os dois duplicaria o
+  // mesmo compromisso. O espelho existe pra ocupar horário no painel de
+  // disponibilidade e pra ir ao Google Calendar.
+  const comEvents = events.filter((e) => !e.task_id);
+  const comDayEvents = comSelectedDay ? comEvents.filter((e) => e.start_at.startsWith(toDateStr(comYear, comMonth, comSelectedDay))) : [];
   const comDayTasks = comSelectedDay ? allTasks.filter((t) => t.due_date?.startsWith(toDateStr(comYear, comMonth, comSelectedDay))) : [];
   const projDayEvents = projSelectedDay ? projEvents.filter((e) => e.start_at.startsWith(toDateStr(projYear, projMonth, projSelectedDay))) : [];
   const projDayTasks = projSelectedDay ? projTasksAll.filter((t) => t.due_date?.startsWith(toDateStr(projYear, projMonth, projSelectedDay))) : [];
@@ -474,7 +487,7 @@ export default function CalendarPage() {
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <Clock size={10} style={{ color: "#7BA3C6" }} />
-                          <span className="text-[10px]" style={{ color: "#7BA3C6" }}>{ev.start_at.slice(11, 16)}{ev.duration_min ? ` · ${ev.duration_min}min` : ""}</span>
+                          <span className="text-[10px]" style={{ color: "#7BA3C6" }}>{localTime(ev.start_at)}{ev.duration_min ? ` · ${ev.duration_min}min` : ""}</span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full capitalize" style={{ background: `${TYPE_COLOR[ev.type] ?? "#3D5A78"}20`, color: TYPE_COLOR[ev.type] ?? "#3D5A78" }}>
                             {EVENT_TYPES.find((t) => t.value === ev.type)?.label ?? ev.type}
                           </span>
@@ -484,7 +497,9 @@ export default function CalendarPage() {
                     {comDayTasks.map((t) => (
                       <div key={t.id} className="p-3 rounded-lg" style={{ background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.15)" }}>
                         <p className="text-xs font-semibold" style={{ color: "#E2EBF8" }}>{t.title}</p>
-                        <p className="text-[10px] mt-1" style={{ color: "#f59e0b" }}>Tarefa — {t.priority}</p>
+                        <p className="text-[10px] mt-1" style={{ color: "#f59e0b" }}>
+                          {t.has_time && t.due_date ? `${localTime(t.due_date)} · ` : ""}Tarefa — {t.priority}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -494,11 +509,11 @@ export default function CalendarPage() {
               {/* Próximos eventos */}
               <div className="rounded-xl p-5" style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}>
                 <h3 className="font-semibold text-sm mb-3" style={{ color: "#E2EBF8" }}>Próximos Eventos</h3>
-                {events.filter((e) => new Date(e.start_at) >= now).slice(0, 5).length === 0 ? (
+                {comEvents.filter((e) => new Date(e.start_at) >= now).slice(0, 5).length === 0 ? (
                   <p className="text-xs text-center py-4" style={{ color: "#3D5A78" }}>Nenhum evento futuro</p>
                 ) : (
                   <div className="space-y-2">
-                    {events.filter((e) => new Date(e.start_at) >= now).slice(0, 5).map((ev) => (
+                    {comEvents.filter((e) => new Date(e.start_at) >= now).slice(0, 5).map((ev) => (
                       <div key={ev.id} className="flex items-center gap-2.5">
                         <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: TYPE_COLOR[ev.type] ?? "#3D5A78" }} />
                         <div className="flex-1 min-w-0">
@@ -728,7 +743,7 @@ export default function CalendarPage() {
                         </div>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <Clock size={10} style={{ color: "#7BA3C6" }} />
-                          <span className="text-[10px]" style={{ color: "#7BA3C6" }}>{ev.start_at.slice(11, 16)}{ev.duration_min ? ` · ${ev.duration_min}min` : ""}</span>
+                          <span className="text-[10px]" style={{ color: "#7BA3C6" }}>{localTime(ev.start_at)}{ev.duration_min ? ` · ${ev.duration_min}min` : ""}</span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full capitalize" style={{ background: `${TYPE_COLOR[ev.type] ?? "#3D5A78"}20`, color: TYPE_COLOR[ev.type] ?? "#3D5A78" }}>
                             {EVENT_TYPES.find((t) => t.value === ev.type)?.label ?? ev.type}
                           </span>

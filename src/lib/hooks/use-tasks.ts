@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/types/database";
+import { triggerGoogleSync } from "@/lib/hooks/use-events";
 
 export type Task = Database["public"]["Tables"]["tasks"]["Row"];
 type TaskInsert = Database["public"]["Tables"]["tasks"]["Insert"];
@@ -132,7 +133,11 @@ export const useCreateTask = () => {
         qc.refetchQueries({ queryKey: ["tasks"], type: "all" }),
         qc.refetchQueries({ queryKey: ["leads-contact-summary"], type: "all" }),
         qc.refetchQueries({ queryKey: ["activities"], type: "all" }),
+        // Tarefa com horário vira evento por trigger no banco — a agenda
+        // precisa refazer a query, e o Google precisa do push.
+        qc.refetchQueries({ queryKey: ["events"], type: "all" }),
       ]);
+      triggerGoogleSync();
       toast.success("Tarefa criada!");
 
       // Avisa o responsável por email. Fire-and-forget de propósito: se o
@@ -173,7 +178,11 @@ export const useUpdateTask = () => {
         qc.refetchQueries({ queryKey: ["tasks"], type: "all" }),
         qc.refetchQueries({ queryKey: ["leads-contact-summary"], type: "all" }),
         qc.refetchQueries({ queryKey: ["activities"], type: "all" }),
+        // Tarefa com horário vira evento por trigger no banco — a agenda
+        // precisa refazer a query, e o Google precisa do push.
+        qc.refetchQueries({ queryKey: ["events"], type: "all" }),
       ]);
+      triggerGoogleSync();
       toast.success("Tarefa atualizada!");
     },
     onError: () => toast.error("Erro ao atualizar tarefa"),
@@ -198,6 +207,9 @@ export const useToggleTask = () => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["leads-contact-summary"] });
       qc.invalidateQueries({ queryKey: ["activities"] });
+      // Concluir/reabrir cria ou remove o evento espelho.
+      qc.invalidateQueries({ queryKey: ["events"] });
+      triggerGoogleSync();
     },
     onError: () => toast.error("Erro ao atualizar tarefa"),
   });
@@ -214,6 +226,8 @@ export const useDeleteTask = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["leads-contact-summary"] });
+      // O evento espelho cai por cascade — a agenda precisa saber.
+      qc.invalidateQueries({ queryKey: ["events"] });
       toast.success("Tarefa removida!");
     },
     onError: () => toast.error("Erro ao remover tarefa"),

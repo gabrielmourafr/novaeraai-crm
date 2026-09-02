@@ -1,9 +1,11 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/topbar";
+import { GoogleAutoSync } from "@/components/layout/google-autosync";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--background)" }}>
+      <GoogleAutoSync />
       <div className="hidden lg:flex">
         <Sidebar />
       </div>

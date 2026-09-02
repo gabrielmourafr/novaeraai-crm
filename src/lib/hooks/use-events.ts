@@ -85,7 +85,7 @@ export const useEvent = (id: string) => {
 
 // Dispara a sincronização com o Google Calendar em segundo plano, sem travar
 // a UI — se o usuário não tiver conectado, a rota só retorna 404 e ignoramos.
-const triggerGoogleSync = () => {
+export const triggerGoogleSync = () => {
   fetch("/api/calendar/sync", { method: "POST" }).catch(() => {});
 };
 
