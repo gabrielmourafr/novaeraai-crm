@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { TASK_PRIORITIES, TASK_TYPES, TASK_COMPLEXITIES, MAINTENANCE_TASK_TYPES } from "@/lib/utils/constants";
+import { TASK_PRIORITIES, TASK_TYPES, TASK_TYPES_CURRENT, TASK_COMPLEXITIES, MAINTENANCE_TASK_TYPES, isLegacyTaskType } from "@/lib/utils/constants";
 import { toast } from "sonner";
 import { useCreateTask, useUpdateTask } from "@/lib/hooks/use-tasks";
 import { useUser, useOrgUsers } from "@/lib/hooks/use-user";
@@ -115,7 +115,10 @@ export const TaskForm = ({
     resolver: zodResolver(taskSchema),
     defaultValues: {
       priority: "media",
-      type: "followup",
+      // Sem tipo pré-selecionado de propósito: antes vinha "followup" (que
+      // nem é mais um tipo válido pra tarefa nova) e todo mundo salvava
+      // sem perceber, arruinando a análise de tempo por tipo.
+      type: "",
       status: "pendente",
     },
   });
@@ -128,6 +131,18 @@ export const TaskForm = ({
   const companyIdValue = watch("company_id");
   const taskProjectIdValue = watch("task_project_id");
   const isMaintenanceType = MAINTENANCE_TASK_TYPES.has(typeValue ?? "");
+
+  // Na criação só os tipos atuais. Na edição, some o legado — menos o tipo
+  // que a própria tarefa já tem, senão o select abriria vazio.
+  const typeOptions = useMemo(() => {
+    if (!isEditing) return TASK_TYPES_CURRENT.slice();
+    const current: { value: string; label: string }[] = TASK_TYPES_CURRENT.slice();
+    if (typeValue && isLegacyTaskType(typeValue)) {
+      const legacy = TASK_TYPES.find((t) => t.value === typeValue);
+      if (legacy) current.push({ value: legacy.value, label: `${legacy.label} (legado)` });
+    }
+    return current;
+  }, [isEditing, typeValue]);
 
   const { data: companyProjects = [] } = useProjects(
     companyIdValue && companyIdValue !== "__none__" ? { companyId: companyIdValue } : undefined
@@ -154,7 +169,7 @@ export const TaskForm = ({
       } else {
         reset({
           title: "",
-          type: "followup",
+          type: "",
           due_date: "",
           priority: "media",
           status: "pendente",
@@ -238,12 +253,12 @@ export const TaskForm = ({
 
           <div className="space-y-1.5">
             <Label>Tipo *</Label>
-            <Select value={typeValue} onValueChange={(v) => setValue("type", v)}>
+            <Select value={typeValue || undefined} onValueChange={(v) => setValue("type", v, { shouldValidate: true })}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecionar tipo" />
+                <SelectValue placeholder="Selecione o tipo da tarefa" />
               </SelectTrigger>
               <SelectContent>
-                {TASK_TYPES.map((t) => (
+                {typeOptions.map((t) => (
                   <SelectItem key={t.value} value={t.value}>
                     {t.label}
                   </SelectItem>

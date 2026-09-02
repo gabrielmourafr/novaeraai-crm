@@ -1,13 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckSquare, Plus, Search, Trash2, Edit2, AlertCircle, Clock, CheckCircle2, List, LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { TaskForm, type TaskInitialData } from "@/components/forms/task-form";
 import { TasksKanbanBoard } from "@/components/tasks/tasks-kanban-board";
@@ -15,7 +15,7 @@ import { TaskDetailDialog } from "@/components/tasks/task-detail-dialog";
 import { useAllTasks, useToggleTask, useUpdateTask, useDeleteTask, type TaskWithRelations } from "@/lib/hooks/use-tasks";
 import { useOrgUsers, useUser } from "@/lib/hooks/use-user";
 import { formatDate, formatInitials, formatDurationBetween, formatHoursDecimal, isPastDate } from "@/lib/utils/format";
-import { TASK_TYPES, TASK_COMPLEXITIES } from "@/lib/utils/constants";
+import { TASK_TYPES, TASK_TYPES_CURRENT, TASK_TYPES_LEGACY, TASK_COMPLEXITIES, TASK_PRIORITIES } from "@/lib/utils/constants";
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   urgente: { label: "Urgente", color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
@@ -29,11 +29,19 @@ const COMPLEXITY_CONFIG: Record<string, { label: string; color: string }> = Obje
   TASK_COMPLEXITIES.map((c) => [c.value, { label: c.label, color: c.color }])
 );
 
-const STATUS_TABS = [
-  { value: "all",         label: "Todas" },
-  { value: "pendente",    label: "Pendentes" },
-  { value: "em_andamento",label: "Em Andamento" },
-  { value: "concluida",   label: "Concluídas" },
+// O recorte principal virou "quando", não "status": é assim que a pessoa
+// abre a tela de manhã. Status continua disponível, como filtro.
+const HORIZON_TABS = [
+  { value: "hoje",     label: "Hoje" },
+  { value: "proximos", label: "Próximos 3 dias" },
+  { value: "geral",    label: "Geral" },
+] as const;
+
+const STATUS_OPTIONS = [
+  { value: "pendente",     label: "Pendente" },
+  { value: "em_andamento", label: "Em Andamento" },
+  { value: "concluida",    label: "Concluída" },
+  { value: "cancelada",    label: "Cancelada" },
 ];
 
 function TaskRow({
@@ -179,8 +187,12 @@ function TaskRow({
 
 function TasksPageContent() {
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [horizon, setHorizon] = useState<"hoje" | "proximos" | "geral">("hoje");
+  const [onlyMine, setOnlyMine] = useState(true);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
   const [view, setView] = useState<"list" | "kanban">("list");
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskInitialData | undefined>();
@@ -202,13 +214,70 @@ function TasksPageContent() {
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
+  // Janela de datas do horizonte selecionado. "Hoje" inclui o que venceu e
+  // ainda está aberto — atrasada é problema de hoje, não do dia que passou.
+  const horizonEnd = useMemo(() => {
+    if (horizon === "geral") return null;
+    const d = new Date();
+    d.setDate(d.getDate() + (horizon === "hoje" ? 0 : 3));
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, [horizon]);
+
+  const inHorizon = (t: TaskWithRelations) => {
+    if (!horizonEnd) return true;
+    if (!t.due_date) return false;
+    return new Date(t.due_date).getTime() <= horizonEnd.getTime();
+  };
+
+  // Base dos filtros (responsável + tipo + prioridade). É dela que saem os
+  // contadores, pra que os cards reflitam o recorte que está na tela.
   const assigneeFilteredTasks = allTasks.filter((t) => {
-    if (assigneeFilter === "unassigned") return !t.assignee_id;
-    if (assigneeFilter !== "all") return t.assignee_id === assigneeFilter;
+    if (assigneeFilter === "unassigned" && t.assignee_id) return false;
+    if (assigneeFilter !== "all" && assigneeFilter !== "unassigned" && t.assignee_id !== assigneeFilter) return false;
+    if (typeFilter !== "all" && t.type !== typeFilter) return false;
+    if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
     return true;
   });
 
-  const filteredTasks = assigneeFilteredTasks.filter((t) => tab === "all" || t.status === tab);
+  // "Suas tarefas": Hoje e Próximos 3 dias abrem no que é seu; Geral mostra
+  // tudo. Developer já vem restrito a si mesmo lá em cima.
+  const scopedTasks = useMemo(() => {
+    if (horizon === "geral") return assigneeFilteredTasks;
+    // Hoje / Próximos 3 dias são listas de trabalho: só o que está em aberto,
+    // e por padrão só o que é seu.
+    const base = assigneeFilteredTasks.filter(
+      (t) => t.status !== "concluida" && t.status !== "cancelada"
+    );
+    const byScope =
+      onlyMine && user?.id && assigneeFilter === "all"
+        ? base.filter((t) => t.assignee_id === user.id)
+        : base;
+    return byScope.filter(inHorizon);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assigneeFilteredTasks, onlyMine, horizon, user?.id, assigneeFilter, horizonEnd]);
+
+  const filteredTasks = scopedTasks.filter((t) => statusFilter === "all" || t.status === statusFilter);
+
+  // Contadores das abas: cada uma calculada com a sua própria janela, senão
+  // "Hoje (3)" mostraria o número da aba que está aberta.
+  const horizonCounts = useMemo(() => {
+    const open = assigneeFilteredTasks.filter(
+      (t) => t.status !== "concluida" && t.status !== "cancelada"
+    );
+    const mine = onlyMine && user?.id && assigneeFilter === "all"
+      ? open.filter((t) => t.assignee_id === user.id)
+      : open;
+    const endOf = (days: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      d.setHours(23, 59, 59, 999);
+      return d.getTime();
+    };
+    const upTo = (limit: number) =>
+      mine.filter((t) => t.due_date && new Date(t.due_date).getTime() <= endOf(limit)).length;
+    return { hoje: upTo(0), proximos: upTo(3), geral: assigneeFilteredTasks.length };
+  }, [assigneeFilteredTasks, onlyMine, user?.id, assigneeFilter]);
 
   const pendingCount = assigneeFilteredTasks.filter((t) => t.status === "pendente").length;
   const overdueCount = assigneeFilteredTasks.filter((t) =>
@@ -390,6 +459,44 @@ function TasksPageContent() {
           </SelectContent>
         </Select>
 
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            {TASK_TYPES_CURRENT.map((t) => (
+              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+            ))}
+            <SelectSeparator />
+            {TASK_TYPES_LEGACY.map((t) => (
+              <SelectItem key={t.value} value={t.value}>{t.label} (legado)</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Prioridade" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as prioridades</SelectItem>
+            {TASK_PRIORITIES.map((p) => (
+              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {(typeFilter !== "all" || priorityFilter !== "all" || assigneeFilter !== "all") && (
+          <button
+            onClick={() => { setTypeFilter("all"); setPriorityFilter("all"); setAssigneeFilter("all"); }}
+            className="text-xs px-2.5 py-2 rounded-lg whitespace-nowrap"
+            style={{ background: "rgba(11,135,195,0.1)", color: "#0B87C3" }}
+          >
+            Limpar filtros
+          </button>
+        )}
+
         <div className="flex gap-1 rounded-lg p-1" style={{ background: "rgba(11,135,195,0.05)", border: "1px solid rgba(11,135,195,0.15)" }}>
           <button
             onClick={() => setView("list")}
@@ -422,28 +529,41 @@ function TasksPageContent() {
 
       {/* Tasks list with tabs */}
       {view === "list" && (
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList
-          className="h-9"
-          style={{ background: "rgba(11,135,195,0.05)", border: "1px solid rgba(11,135,195,0.12)" }}
-        >
-          {STATUS_TABS.map((t) => (
-            <TabsTrigger
-              key={t.value}
-              value={t.value}
-              className="text-xs"
-            >
-              {t.label}
-              {t.value !== "all" && (
-                <span className="ml-1.5 text-[10px] opacity-60">
-                  ({assigneeFilteredTasks.filter((task) => t.value === "all" || task.status === t.value).length})
-                </span>
-              )}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <Tabs value={horizon} onValueChange={(v) => setHorizon(v as typeof horizon)}>
+        <div className="flex items-center gap-3 flex-wrap">
+          <TabsList
+            className="h-9"
+            style={{ background: "rgba(11,135,195,0.05)", border: "1px solid rgba(11,135,195,0.12)" }}
+          >
+            {HORIZON_TABS.map((t) => (
+              <TabsTrigger key={t.value} value={t.value} className="text-xs">
+                {t.label}
+                <span className="ml-1.5 text-[10px] opacity-60">({horizonCounts[t.value]})</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-        {STATUS_TABS.map((t) => (
+          {horizon !== "geral" && assigneeFilter === "all" && (
+            <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: "#7BA3C6" }}>
+              <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
+              Só as minhas
+            </label>
+          )}
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9 w-40 text-xs ml-auto">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os status</SelectItem>
+              {STATUS_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {HORIZON_TABS.map((t) => (
           <TabsContent key={t.value} value={t.value} className="mt-4">
             <div
               className="rounded-xl overflow-hidden"
@@ -454,7 +574,13 @@ function TasksPageContent() {
               ) : filteredTasks.length === 0 ? (
                 <div className="p-12 text-center">
                   <CheckSquare size={32} className="mx-auto mb-3 opacity-20" style={{ color: "#0B87C3" }} />
-                  <p className="text-sm" style={{ color: "#3D5A78" }}>Nenhuma tarefa encontrada</p>
+                  <p className="text-sm" style={{ color: "#3D5A78" }}>
+                    {horizon === "hoje"
+                      ? "Nada pra hoje — dia limpo"
+                      : horizon === "proximos"
+                      ? "Nada nos próximos 3 dias"
+                      : "Nenhuma tarefa encontrada"}
+                  </p>
                 </div>
               ) : (
                 <div>

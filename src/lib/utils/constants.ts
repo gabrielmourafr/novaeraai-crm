@@ -132,14 +132,19 @@ export const TASK_PRIORITIES = [
   { value: "urgente", label: "Urgente", color: "#EF4444" },
 ] as const;
 
-export const TASK_TYPES = [
+// Tipos oferecidos ao criar uma tarefa nova.
+export const TASK_TYPES_CURRENT = [
   { value: "financeiro", label: "Financeiro" },
   { value: "contrato", label: "Contrato" },
   { value: "arquitetura_solucao", label: "Arquitetura da Solução" },
   { value: "manutencao_adaptativa", label: "Manutenção Adaptativa" },
   { value: "manutencao_aditiva", label: "Manutenção Aditiva" },
   { value: "manutencao_corretiva", label: "Manutenção Corretiva" },
-  // legado — mantidos pra continuar exibindo o tipo certo de tarefas antigas
+] as const;
+
+// Legado: não aparece mais na criação, mas continua nos filtros e na edição
+// pra que tarefa antiga siga mostrando o tipo certo.
+export const TASK_TYPES_LEGACY = [
   { value: "followup", label: "Follow-up" },
   { value: "ligacao", label: "Ligação" },
   { value: "email", label: "Email" },
@@ -149,6 +154,11 @@ export const TASK_TYPES = [
   { value: "interno", label: "Interno" },
   { value: "outro", label: "Outro" },
 ] as const;
+
+export const TASK_TYPES = [...TASK_TYPES_CURRENT, ...TASK_TYPES_LEGACY];
+
+const LEGACY_VALUES = new Set<string>(TASK_TYPES_LEGACY.map((t) => t.value));
+export const isLegacyTaskType = (value: string) => LEGACY_VALUES.has(value);
 
 // Os 3 tipos de manutenção pedem cliente + projeto vinculados
 export const MAINTENANCE_TASK_TYPES = new Set([
