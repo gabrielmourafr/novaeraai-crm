@@ -18,7 +18,21 @@ export async function getValidAccessToken(admin: AdminClient, connection: Connec
   const expiresInMs = new Date(connection.token_expiry).getTime() - Date.now();
   if (expiresInMs > 60_000) return connection.access_token;
 
-  const refreshed = await refreshAccessToken(connection.refresh_token);
+  let refreshed;
+  try {
+    refreshed = await refreshAccessToken(connection.refresh_token);
+  } catch (err) {
+    // O refresh_token do Google morre em 7 dias enquanto o app OAuth está
+    // em "Testing", e a partir daí toda sincronização falha calada. Registra
+    // pra tela de Integrações poder pedir a reconexão.
+    const message = err instanceof Error ? err.message : String(err);
+    await admin
+      .from("google_calendar_connections")
+      .update({ sync_error: `Token expirado ou revogado: ${message}`, sync_error_at: new Date().toISOString() })
+      .eq("id", connection.id);
+    throw err;
+  }
+
   const newExpiry = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
 
   await admin
@@ -167,5 +181,10 @@ export async function pullGoogleEventsToCrm(admin: AdminClient, connection: Conn
 export async function syncConnection(admin: AdminClient, connection: Connection) {
   const pushed = await pushCrmEventsToGoogle(admin, connection);
   const pulled = await pullGoogleEventsToCrm(admin, connection);
+  // Deu certo: limpa o erro anterior e carimba a hora.
+  await admin
+    .from("google_calendar_connections")
+    .update({ sync_error: null, sync_error_at: null, last_synced_at: new Date().toISOString() })
+    .eq("id", connection.id);
   return { pushed, pulled };
 }

@@ -332,6 +332,8 @@ function TasksPageContent() {
       type: task.type,
       due_date: task.due_date,
       has_time: task.has_time,
+      scheduled_start: task.scheduled_start,
+      scheduled_end: task.scheduled_end,
       priority: task.priority,
       status: task.status,
       notes: task.notes,

@@ -80,6 +80,22 @@ export function IntegrationsTab() {
               )}
             </div>
 
+            {connection.sync_error && (
+              <div className="rounded-lg p-3" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
+                <p className="text-sm font-medium" style={{ color: "#fca5a5" }}>
+                  Sincronização falhando — reconecte sua conta
+                </p>
+                <p className="text-xs mt-1" style={{ color: "#7BA3C6" }}>
+                  {connection.sync_error}
+                </p>
+                <p className="text-xs mt-1.5" style={{ color: "#7BA3C6" }}>
+                  Clique em <b>Desconectar</b> e conecte de novo. Se voltar a acontecer em poucos dias,
+                  o app OAuth no Google Cloud provavelmente está em modo &quot;Testing&quot;, que invalida o
+                  acesso a cada 7 dias — publicar o app resolve de vez.
+                </p>
+              </div>
+            )}
+
             <div className="flex items-center justify-between rounded-lg border border-border p-3">
               <div>
                 <p className="text-sm text-text-primary">Sincronização automática</p>

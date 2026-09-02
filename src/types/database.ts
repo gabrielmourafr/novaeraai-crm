@@ -578,6 +578,10 @@ export interface Database {
           // true quando o usuário escolheu horário (não só data) — a tarefa
           // vira compromisso na agenda e no Google Calendar do responsável.
           has_time: boolean;
+          // Janela planejada — é ela que vira start/end do evento na agenda.
+          // Diferente de started_at/completed_at, que são a execução real.
+          scheduled_start: string | null;
+          scheduled_end: string | null;
           started_at: string | null;
           completed_at: string | null;
           created_at: string;
@@ -655,6 +659,8 @@ export interface Database {
           token_expiry: string;
           calendar_id: string;
           sync_enabled: boolean;
+          sync_error: string | null;
+          sync_error_at: string | null;
           last_synced_at: string | null;
           sync_token: string | null;
           created_at: string;

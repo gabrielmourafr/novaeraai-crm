@@ -132,6 +132,17 @@ export function TaskDetailDialog({
             )}
             {task.company && <Field icon={Building2} label="Cliente" value={task.company.name} />}
             {task.project && <Field icon={Rocket} label="Projeto" value={task.project.name} />}
+            {task.scheduled_start && (
+              <Field
+                icon={Calendar}
+                label="Agendada para"
+                value={
+                  task.scheduled_end
+                    ? `${formatDateTime(task.scheduled_start)} — ${new Date(task.scheduled_end).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                    : formatDateTime(task.scheduled_start)
+                }
+              />
+            )}
             {task.started_at && (
               <Field icon={Play} label="Iniciada em" value={formatDateTime(task.started_at)} />
             )}

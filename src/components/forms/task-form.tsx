@@ -43,6 +43,12 @@ const toLocalDate = (iso: string) => {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
+// Formato do <input type="datetime-local">: YYYY-MM-DDTHH:mm no fuso local.
+const toLocalDateTime = (iso: string) => {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 const toLocalTime = (iso: string) => {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -61,6 +67,8 @@ const taskSchema = z.object({
   type: z.string().min(1, "Tipo é obrigatório"),
   due_date: z.string().optional(),
   due_time: z.string().optional(),
+  scheduled_start: z.string().optional(),
+  scheduled_end: z.string().optional(),
   priority: z.string().min(1, "Prioridade é obrigatória"),
   status: z.string().optional(),
   notes: z.string().optional(),
@@ -79,6 +87,8 @@ export interface TaskInitialData {
   type: string;
   due_date: string | null;
   has_time?: boolean;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
   priority: string;
   status: string;
   notes: string | null;
@@ -147,6 +157,8 @@ export const TaskForm = ({
   const taskProjectIdValue = watch("task_project_id");
   const dueDateValue = watch("due_date");
   const dueTimeValue = watch("due_time");
+  const scheduledStartValue = watch("scheduled_start");
+  const scheduledEndValue = watch("scheduled_end");
   const isMaintenanceType = MAINTENANCE_TASK_TYPES.has(typeValue ?? "");
 
   // Na criação só os tipos atuais. Na edição, some o legado — menos o tipo
@@ -173,6 +185,8 @@ export const TaskForm = ({
           type: initialData.type,
           due_date: initialData.due_date ? toLocalDate(initialData.due_date) : "",
           due_time: initialData.has_time && initialData.due_date ? toLocalTime(initialData.due_date) : "",
+          scheduled_start: initialData.scheduled_start ? toLocalDateTime(initialData.scheduled_start) : "",
+          scheduled_end: initialData.scheduled_end ? toLocalDateTime(initialData.scheduled_end) : "",
           priority: initialData.priority,
           status: initialData.status,
           notes: initialData.notes ?? "",
@@ -188,6 +202,8 @@ export const TaskForm = ({
           type: "",
           due_date: "",
           due_time: "",
+          scheduled_start: "",
+          scheduled_end: "",
           priority: "media",
           status: "pendente",
           notes: "",
@@ -210,6 +226,17 @@ export const TaskForm = ({
   };
 
   const onSubmit = async (values: TaskFormValues) => {
+    if (values.scheduled_end && !values.scheduled_start) {
+      toast.error("Defina o início antes do fim.");
+      return;
+    }
+    if (
+      values.scheduled_start && values.scheduled_end &&
+      new Date(values.scheduled_end) <= new Date(values.scheduled_start)
+    ) {
+      toast.error("O fim precisa ser depois do início.");
+      return;
+    }
     const complexity = values.complexity && values.complexity !== "__none__" ? (values.complexity as TaskComplexity) : null;
     const estimatedHours = values.estimated_hours ? parseFloat(values.estimated_hours.replace(",", ".")) : null;
     const companyId = values.company_id && values.company_id !== "__none__" ? values.company_id : null;
@@ -222,6 +249,8 @@ export const TaskForm = ({
         type: values.type as TaskType,
         due_date: buildDueDate(values.due_date, values.due_time),
         has_time: Boolean(values.due_date && values.due_time),
+        scheduled_start: values.scheduled_start ? new Date(values.scheduled_start).toISOString() : null,
+        scheduled_end: values.scheduled_end ? new Date(values.scheduled_end).toISOString() : null,
         priority: values.priority as TaskPriority,
         status: values.status as TaskStatus,
         notes: values.notes || null,
@@ -242,6 +271,8 @@ export const TaskForm = ({
         type: values.type as TaskType,
         due_date: buildDueDate(values.due_date, values.due_time),
         has_time: Boolean(values.due_date && values.due_time),
+        scheduled_start: values.scheduled_start ? new Date(values.scheduled_start).toISOString() : null,
+        scheduled_end: values.scheduled_end ? new Date(values.scheduled_end).toISOString() : null,
         priority: values.priority as TaskPriority,
         status: "pendente",
         notes: values.notes || null,
@@ -370,12 +401,42 @@ export const TaskForm = ({
             </div>
           </div>
 
-          {dueDateValue && dueTimeValue && (
-            <p className="text-xs -mt-1" style={{ color: "#7BA3C6" }}>
-              Com horário definido, essa tarefa vira um compromisso na agenda do
-              responsável — e no Google Calendar dele, se estiver conectado.
-            </p>
-          )}
+          <div className="rounded-lg border border-border p-3 space-y-3">
+            <div>
+              <p className="text-sm font-medium" style={{ color: "#E2EBF8" }}>Agendar na agenda</p>
+              <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
+                Com início preenchido, a tarefa vira compromisso na agenda do responsável —
+                e no Google Calendar dele, se estiver conectado. Diferente do prazo acima:
+                dá pra executar quarta 14h e ter prazo sexta.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="task-sched-start">Início</Label>
+                <Input id="task-sched-start" type="datetime-local" {...register("scheduled_start")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="task-sched-end">Fim</Label>
+                <Input
+                  id="task-sched-end"
+                  type="datetime-local"
+                  min={scheduledStartValue || undefined}
+                  disabled={!scheduledStartValue}
+                  {...register("scheduled_end")}
+                />
+              </div>
+            </div>
+            {scheduledStartValue && !scheduledEndValue && (
+              <p className="text-xs" style={{ color: "#7BA3C6" }}>
+                Sem fim definido, usa as horas estimadas — ou 1 hora.
+              </p>
+            )}
+            {dueDateValue && dueTimeValue && !scheduledStartValue && (
+              <p className="text-xs" style={{ color: "#7BA3C6" }}>
+                Sem início, o horário do prazo acima é usado como começo do compromisso.
+              </p>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
