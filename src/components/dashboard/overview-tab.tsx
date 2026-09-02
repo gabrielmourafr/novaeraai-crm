@@ -18,6 +18,7 @@ import { useAllTasks } from "@/lib/hooks/use-tasks";
 import { useRevenues, useExpenses } from "@/lib/hooks/use-finance";
 import { useGoal, useUpsertGoal } from "@/lib/hooks/use-goals";
 import { useBillingAlerts } from "@/lib/hooks/use-billing-alerts";
+import { TeamGoalsCard } from "@/components/dashboard/team-goals-card";
 import { useUser } from "@/lib/hooks/use-user";
 import { formatCurrency, formatDate, isPastDate, parseCurrencyInput } from "@/lib/utils/format";
 
@@ -207,7 +208,7 @@ export function OverviewTab() {
               <Trophy size={14} />
               Metas de {monthNames[month - 1]}
             </h3>
-            <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>Faturamento recebido e novos contratos fechados</p>
+            <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>Faturamento recebido e VGV — valor gerado em vendas</p>
           </div>
           <Button size="sm" variant="outline" onClick={openGoalDialog}>
             <Pencil size={13} className="mr-1.5" />
@@ -238,7 +239,7 @@ export function OverviewTab() {
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs" style={{ color: "#7BA3C6" }}>Comercial (valor em novos contratos)</span>
+                <span className="text-xs" style={{ color: "#7BA3C6" }}>VGV (valor gerado em vendas)</span>
                 <span className="text-xs font-medium" style={{ color: "#E2EBF8" }}>
                   {formatCurrency(commercialClosedThisMonth)} / {formatCurrency(commercialTarget)}
                 </span>
@@ -254,6 +255,8 @@ export function OverviewTab() {
           </div>
         )}
       </div>
+
+      <TeamGoalsCard year={year} month={month} />
 
       {/* Próximas Tarefas */}
       <div
@@ -323,7 +326,7 @@ export function OverviewTab() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Meta comercial (R$ em novos contratos)</Label>
+              <Label>Meta de VGV — valor gerado em vendas (R$)</Label>
               <Input
                 value={commercialTargetInput}
                 onChange={(e) => setCommercialTargetInput(e.target.value)}

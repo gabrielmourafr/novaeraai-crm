@@ -681,6 +681,23 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["partner_payments"]["Insert"]>;
         Relationships: [];
       };
+      user_goals: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string;
+          reference_month: string;
+          meetings_target_month: number;
+          meetings_target_week: number;
+          vgv_target: number;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: NullableToOptional<Omit<Database["public"]["Tables"]["user_goals"]["Row"], "id" | "created_at" | "updated_at">>;
+        Update: Partial<Database["public"]["Tables"]["user_goals"]["Insert"]>;
+        Relationships: [];
+      };
       revenue_goals: {
         Row: {
           id: string;
