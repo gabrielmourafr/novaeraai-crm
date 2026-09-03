@@ -322,6 +322,25 @@ export const useRecurringExpenseTemplates = () => {
   });
 };
 
+// Despesa "agendada" (pagamento programado, tipo débito automático ou
+// boleto agendado) vira "pago" sozinha ao chegar a data de vencimento —
+// sem esperar alguém abrir o sistema e trocar manualmente. Mesmo padrão
+// sem cron das demais rotinas daqui: dispara por RPC ao abrir a tela.
+export const useMarkScheduledExpensesAsPaid = () => {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  useEffect(() => {
+    supabase.rpc("mark_scheduled_expenses_as_paid").then(({ error }) => {
+      if (error) {
+        console.error("Erro ao efetivar despesas agendadas:", error);
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+};
+
 // Garante que toda despesa fixa recorrente de cliente tenha o lançamento do
 // mês corrente gerado, sem depender de cron externo — roda ao abrir a página,
 // igual já acontece com a mensalidade dos projetos.

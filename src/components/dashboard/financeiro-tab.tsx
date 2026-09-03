@@ -21,7 +21,7 @@ import { formatCurrency, formatDate, parseCurrencyInput } from "@/lib/utils/form
 import { exportToCsv } from "@/lib/utils/csv";
 import {
   useRevenues, useExpenses, useRevenuesLastMonths, useRevenuesForwardMonths, useExpensesLastMonths, useUpcomingFixedExpenses,
-  useRecurringExpenseTemplates, useEnsureMonthlyFixedExpenses,
+  useRecurringExpenseTemplates, useEnsureMonthlyFixedExpenses, useMarkScheduledExpensesAsPaid,
   useDeleteRevenue, useDeleteExpense, useUpdateRevenue, useUpdateExpense, useCreateRevenue, useCreateExpense, useTotalRevenues,
   type Revenue, type Expense, type ExpenseWithCompany,
 } from "@/lib/hooks/use-finance";
@@ -66,6 +66,7 @@ const revenueStatusStyles: Record<string, string> = {
 };
 const expenseStatusStyles: Record<string, string> = {
   pendente: "bg-warning/10 text-warning",
+  agendado: "bg-sky-500/10 text-sky-500",
   pago: "bg-success/10 text-success",
   atrasado: "bg-danger/10 text-danger",
 };
@@ -146,7 +147,7 @@ export function FinanceiroTab() {
   const [expCategory, setExpCategory] = useState<"infraestrutura" | "saas" | "marketing" | "pessoal" | "imposto" | "outro">("outro");
   const [expValue, setExpValue] = useState("");
   const [expDueDate, setExpDueDate] = useState("");
-  const [expStatus, setExpStatus] = useState<"pendente" | "pago" | "atrasado">("pendente");
+  const [expStatus, setExpStatus] = useState<"pendente" | "agendado" | "pago" | "atrasado">("pendente");
   const [expRecurrence, setExpRecurrence] = useState<"pontual" | "semanal" | "quinzenal" | "mensal" | "trimestral" | "anual">("pontual");
   const [expType, setExpType] = useState<"" | "fixo" | "variavel">("");
   const [editingExpense, setEditingExpense] = useState<ExpenseWithCompany | undefined>();
@@ -160,6 +161,7 @@ export function FinanceiroTab() {
   const { user } = useUser();
   useEnsureMonthlyBilling();
   useEnsureMonthlyFixedExpenses();
+  useMarkScheduledExpensesAsPaid();
   const { data: totalRevenuesAllTime = 0 } = useTotalRevenues();
   const { data: activeSubscriptions = [], isLoading: subscriptionsLoading } = useActiveSubscriptions();
   const { data: mensalidadeHistory = [] } = useMensalidadeReceivedHistory();
@@ -2794,10 +2796,16 @@ export function FinanceiroTab() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="agendado">Agendado</SelectItem>
                         <SelectItem value="pago">Pago</SelectItem>
                         <SelectItem value="atrasado">Atrasado</SelectItem>
                       </SelectContent>
                     </Select>
+                    {expStatus === "agendado" && (
+                      <p className="text-[11px] mt-1" style={{ color: "#7BA3C6" }}>
+                        Vira &quot;Pago&quot; sozinha ao chegar a data de vencimento.
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -3806,8 +3814,16 @@ export function FinanceiroTab() {
                             <TableCell className="text-sm font-medium text-text-primary">{e.description}</TableCell>
                             <TableCell className="text-sm text-text-muted">{e.due_date ? formatDate(e.due_date) : "—"}</TableCell>
                             <TableCell className="text-sm">
-                              <span className={e.status === "atrasado" ? "text-red-500" : "text-amber-500"}>
-                                {e.status === "atrasado" ? "Atrasado" : "Pendente"}
+                              <span
+                                className={
+                                  e.status === "atrasado"
+                                    ? "text-red-500"
+                                    : e.status === "agendado"
+                                    ? "text-sky-500"
+                                    : "text-amber-500"
+                                }
+                              >
+                                {e.status === "atrasado" ? "Atrasado" : e.status === "agendado" ? "Agendado" : "Pendente"}
                               </span>
                             </TableCell>
                             <TableCell className="text-right text-sm font-semibold text-amber-500">{formatCurrency(e.value)}</TableCell>
