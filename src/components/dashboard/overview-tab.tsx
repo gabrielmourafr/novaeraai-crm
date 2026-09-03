@@ -216,7 +216,9 @@ export function OverviewTab() {
               <Trophy size={14} />
               Metas de {monthNames[month - 1]}
             </h3>
-            <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>Faturamento recebido e VGV — valor gerado em vendas</p>
+            <p className="text-xs mt-0.5" style={{ color: "#7BA3C6" }}>
+              Receita — dinheiro que já entrou — e VGV/Faturamento — valor vendido no mês, recebido ou não
+            </p>
           </div>
           <Button size="sm" variant="outline" onClick={openGoalDialog}>
             <Pencil size={13} className="mr-1.5" />
@@ -232,7 +234,7 @@ export function OverviewTab() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs" style={{ color: "#7BA3C6" }}>Faturamento</span>
+                <span className="text-xs" style={{ color: "#7BA3C6" }}>Receita (recebida)</span>
                 <span className="text-xs font-medium" style={{ color: "#E2EBF8" }}>
                   {formatCurrency(paidRevenues)} / {formatCurrency(revenueTarget)}
                 </span>
@@ -247,7 +249,7 @@ export function OverviewTab() {
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs" style={{ color: "#7BA3C6" }}>VGV (valor gerado em vendas)</span>
+                <span className="text-xs" style={{ color: "#7BA3C6" }}>VGV / Faturamento (valor vendido no mês)</span>
                 <span className="text-xs font-medium" style={{ color: "#E2EBF8" }}>
                   {formatCurrency(commercialClosedThisMonth)} / {formatCurrency(commercialTarget)}
                 </span>
@@ -322,11 +324,13 @@ export function OverviewTab() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Meta de {monthNames[month - 1]}</DialogTitle>
-            <DialogDescription>Defina os alvos de faturamento e comercial para o mês</DialogDescription>
+            <DialogDescription>
+              São duas metas diferentes: uma é dinheiro que entrou, a outra é o que foi vendido.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Meta de faturamento (R$)</Label>
+              <Label>Meta de Receita — dinheiro recebido no mês (R$)</Label>
               <Input
                 value={revenueTargetInput}
                 onChange={(e) => setRevenueTargetInput(e.target.value)}
@@ -334,7 +338,7 @@ export function OverviewTab() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Meta de VGV — valor gerado em vendas (R$)</Label>
+              <Label>Meta de VGV / Faturamento — valor vendido no mês, recebido ou não (R$)</Label>
               <Input
                 value={commercialTargetInput}
                 onChange={(e) => setCommercialTargetInput(e.target.value)}

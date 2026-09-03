@@ -1629,7 +1629,7 @@ export function FinanceiroTab() {
                   className="rounded-xl p-5"
                   style={{ background: "rgba(12,21,38,0.8)", border: "1px solid rgba(11,135,195,0.15)" }}
                 >
-                  <h3 className="font-semibold text-sm mb-1" style={{ color: "#E2EBF8" }}>Previsão vs Meta Comercial</h3>
+                  <h3 className="font-semibold text-sm mb-1" style={{ color: "#E2EBF8" }}>Previsão vs Meta de Receita</h3>
                   {!currentGoal ? (
                     <p className="text-xs mt-3" style={{ color: "#3D5A78" }}>
                       Nenhuma meta definida pra {months[month - 1]}. Defina em Dashboard → Visão Geral.
@@ -1637,7 +1637,7 @@ export function FinanceiroTab() {
                   ) : (
                     <>
                       <p className="text-xs mb-3" style={{ color: "#7BA3C6" }}>
-                        No ritmo atual de recebimento, a projeção pro fim do mês é:
+                        No ritmo atual de recebimento, a projeção de RECEITA (dinheiro que entra) pro fim do mês é:
                       </p>
                       <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#7BA3C6" }}>
                         <span>Projeção: <b style={{ color: projectedMonthEnd >= currentGoal.revenue_target ? "#22c55e" : "#F59E0B" }}>{formatCurrency(projectedMonthEnd)}</b></span>
