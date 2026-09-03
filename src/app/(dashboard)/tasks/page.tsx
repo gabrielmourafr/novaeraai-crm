@@ -264,9 +264,9 @@ function TasksPageContent() {
         ? base.filter((t) => t.assignee_id === user.id)
         : base;
 
-    // Geral é o balde do que não tem data limite — some das outras abas,
-    // então precisa de um lugar próprio pra não sumir do radar.
-    if (horizon === "geral") return byScope.filter((t) => !t.due_date);
+    // Geral é a lista completa do que está em aberto — inclui o que também
+    // aparece em Hoje e Próximos 3 dias, não é um recorte à parte.
+    if (horizon === "geral") return byScope;
 
     return byScope.filter(inHorizon);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -294,7 +294,7 @@ function TasksPageContent() {
     return {
       hoje: upTo(0),
       proximos: upTo(3),
-      geral: mine.filter((t) => !t.due_date).length,
+      geral: mine.length,
       concluidas: assigneeFilteredTasks.filter((t) => t.status === "concluida").length,
     };
   }, [assigneeFilteredTasks, onlyMine, user?.id, assigneeFilter]);
@@ -566,12 +566,6 @@ function TasksPageContent() {
             ))}
           </TabsList>
 
-          {horizon === "geral" && (
-            <span className="text-[11px]" style={{ color: "#3D5A78" }}>
-              Tarefas sem data limite definida
-            </span>
-          )}
-
           {horizon !== "concluidas" && assigneeFilter === "all" && (
             <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: "#7BA3C6" }}>
               <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
@@ -611,7 +605,7 @@ function TasksPageContent() {
                       : horizon === "proximos"
                       ? "Nada nos próximos 3 dias"
                       : horizon === "geral"
-                      ? "Nenhuma tarefa sem data limite"
+                      ? "Nenhuma tarefa em aberto"
                       : "Nenhuma tarefa concluída ainda"}
                   </p>
                 </div>
