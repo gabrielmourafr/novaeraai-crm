@@ -66,6 +66,12 @@ export const useUploadDocument = () => {
 
       const ext = file.name.split(".").pop() ?? "";
       const safeFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+
+      // .md e .markdown chegam sem Content-Type em vários SOs — o navegador
+      // não tem esse tipo registrado — e a allowlist do bucket exige um
+      // Content-Type reconhecido. Sem isso o upload falha silenciosamente.
+      const contentType =
+        file.type || (["md", "markdown"].includes(ext.toLowerCase()) ? "text/markdown" : undefined);
       let folder: string;
       if (projectId && companyId) {
         folder = `${orgId}/${companyId}/${projectId}`;
@@ -82,7 +88,7 @@ export const useUploadDocument = () => {
 
       const { error: uploadError } = await supabase.storage
         .from("documents")
-        .upload(storagePath, file, { upsert: false, contentType: file.type });
+        .upload(storagePath, file, { upsert: false, contentType });
 
       if (uploadError) throw uploadError;
 
@@ -97,7 +103,7 @@ export const useUploadDocument = () => {
         name,
         file_path: storagePath,
         file_size: file.size,
-        file_type: file.type || (ext ? `.${ext}` : null),
+        file_type: contentType || (ext ? `.${ext}` : null),
         type,
         version: 1,
         description: description || null,

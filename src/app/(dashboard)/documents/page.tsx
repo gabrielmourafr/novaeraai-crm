@@ -59,6 +59,7 @@ function getFileIcon(fileType: string | null) {
   if (t.includes("presentation") || t.includes("powerpoint") || t.endsWith("pptx") || t.endsWith("ppt")) return Presentation;
   if (t.includes("image") || t.includes("png") || t.includes("jpg") || t.includes("jpeg") || t.includes("gif") || t.includes("webp")) return Image;
   if (t.includes("word") || t.includes("document") || t.endsWith("docx") || t.endsWith("doc")) return FileText;
+  if (t.includes("markdown") || t === ".md" || t === ".markdown") return FileText;
   return File;
 }
 
@@ -70,6 +71,7 @@ function getFileIconColor(fileType: string | null): string {
   if (t.includes("presentation") || t.endsWith("pptx") || t.endsWith("ppt")) return "text-orange-500";
   if (t.includes("image")) return "text-purple-500";
   if (t.includes("word") || t.endsWith("docx") || t.endsWith("doc")) return "text-blue-500";
+  if (t.includes("markdown") || t === ".md" || t === ".markdown") return "text-indigo-400";
   return "text-gray-500";
 }
 
